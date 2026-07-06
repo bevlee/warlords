@@ -151,7 +151,7 @@
       onunitclick={handleUnitClick}
     />
 
-    <div class="mt-2 flex items-center gap-3">
+    <div class="relative z-10 mt-2 flex items-center gap-3">
       <button
         type="button"
         class="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-100
@@ -166,7 +166,7 @@
 
     {#if state.result !== 'ongoing'}
       <div
-        class="absolute inset-0 flex flex-col items-center justify-center gap-4 rounded-lg bg-black/70"
+        class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-lg bg-black/70"
       >
         <p class="text-4xl font-bold {state.result === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
           {state.result === 'player_wins' ? 'Victory!' : 'Defeat'}

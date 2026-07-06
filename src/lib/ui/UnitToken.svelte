@@ -22,20 +22,24 @@
 
   const glyph = $derived(GLYPHS[unit.definition.name] ?? '❓');
   const hpPct = $derived(Math.round((unit.hp / unit.definition.hp) * 100));
-  const sideClasses = $derived(
-    unit.side === 'player'
-      ? 'ring-sky-400 bg-sky-950/80'
-      : 'ring-red-400 bg-red-950/80'
+  const bgClass = $derived(unit.side === 'player' ? 'bg-sky-950/80' : 'bg-red-950/80');
+  // One ring style at a time: target > active > side colour.
+  const ringClass = $derived(
+    isTarget
+      ? 'ring-4 ring-red-500 animate-pulse'
+      : isActive
+        ? 'ring-4 ring-amber-300 shadow-lg shadow-amber-500/40'
+        : unit.side === 'player'
+          ? 'ring-2 ring-sky-400'
+          : 'ring-2 ring-red-400'
   );
 </script>
 
 <div
-  class="relative flex h-full w-full flex-col items-center justify-center rounded ring-2 {sideClasses}
-    {isActive ? 'ring-4 ring-amber-300 shadow-lg shadow-amber-500/40' : ''}
-    {isTarget ? 'ring-4 ring-red-500 animate-pulse' : ''}"
+  class="relative flex h-full w-full flex-col items-center justify-center rounded {bgClass} {ringClass}"
   title="{unit.definition.name} ×{unit.count}"
 >
-  <span class={small ? 'text-base leading-none' : 'text-xl leading-none sm:text-2xl'}>{glyph}</span>
+  <span class={small ? 'text-base leading-none' : 'text-2xl leading-none sm:text-3xl'}>{glyph}</span>
 
   <span
     class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 font-mono leading-tight text-slate-100
