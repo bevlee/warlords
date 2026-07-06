@@ -27,6 +27,10 @@ Useful hooks in the battle UI:
 - Attackable enemies: `div.grid button:has(div.ring-red-500)` (click to attack/shoot).
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
 - `Wait` and `New battle` are role=button by name.
+- Unit info panel: the sidebar `dl` — hover any unit's cell to populate it
+  (count, HP, attack, defense, damage, speed, range, shots).
+- Hover an attackable enemy to reveal `.action-icon` (⚔️ melee/move+attack,
+  🏹 shoot) on its cell.
 
 Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
 retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;

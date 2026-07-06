@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { UnitStack } from '$lib/engine/types';
+  import { glyphFor } from './glyphs';
 
   interface Props {
     unit: UnitStack;
@@ -10,17 +11,7 @@
 
   let { unit, isActive = false, isTarget = false, small = false }: Props = $props();
 
-  const GLYPHS: Record<string, string> = {
-    Goblin: '👺',
-    'Wolf Rider': '🐺',
-    Orc: '🪓',
-    Ogre: '👹',
-    Cyclops: '👁️',
-    Thunderbird: '🦅',
-    Behemoth: '🦍',
-  };
-
-  const glyph = $derived(GLYPHS[unit.definition.name] ?? '❓');
+  const glyph = $derived(glyphFor(unit.definition.name));
   const hpPct = $derived(Math.round((unit.hp / unit.definition.hp) * 100));
   const bgClass = $derived(unit.side === 'player' ? 'bg-sky-950/80' : 'bg-red-950/80');
   // One ring style at a time: target > active > side colour.

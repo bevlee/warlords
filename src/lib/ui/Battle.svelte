@@ -1,7 +1,12 @@
 <script lang="ts">
   import { initBattle, applyAction } from '$lib/engine/battle';
   import { aiTakeTurn } from '$lib/engine/ai';
-  import { getReachableCells, getMeleeTargets, canShoot } from '$lib/engine/selectors';
+  import {
+    getReachableCells,
+    getMeleeApproaches,
+    canShoot,
+    canShootTarget,
+  } from '$lib/engine/selectors';
   import type {
     ArmySlot,
     BattleEvent,
@@ -13,6 +18,7 @@
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
   import BattleLog from './BattleLog.svelte';
+  import UnitInfo from './UnitInfo.svelte';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -26,43 +32,51 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  let state: BattleState = $state(initBattle(playerArmy, enemyArmy, hero));
+  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero));
 
-  const activeUnit = $derived(state.units.find(u => u.id === state.currentUnitId) ?? null);
+  const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
   const isPlayerTurn = $derived(
-    state.result === 'ongoing' && activeUnit !== null && activeUnit.side === 'player'
+    battle.result === 'ongoing' && activeUnit !== null && activeUnit.side === 'player'
   );
 
   const reachableKeys = $derived(
     isPlayerTurn && activeUnit
-      ? new Set(getReachableCells(state.grid, activeUnit).map(p => `${p.col},${p.row}`))
+      ? new Set(getReachableCells(battle.grid, activeUnit).map(p => `${p.col},${p.row}`))
       : new Set<string>()
   );
 
-  const meleeTargetIds = $derived(
-    isPlayerTurn && activeUnit
-      ? new Set(getMeleeTargets(state, activeUnit).map(u => u.id))
-      : new Set<string>()
+  const meleeApproaches = $derived(
+    isPlayerTurn && activeUnit ? getMeleeApproaches(battle, activeUnit) : new Map<string, null>()
   );
 
-  const targetIds = $derived.by(() => {
-    if (!isPlayerTurn || !activeUnit) return new Set<string>();
-    const ids = new Set(meleeTargetIds);
-    if (canShoot(activeUnit)) {
-      for (const u of state.units) {
-        if (u.side === 'enemy' && u.count > 0) ids.add(u.id);
-      }
+  // What clicking each enemy does: adjacent melee > shoot in range > move+attack.
+  const actionIcons = $derived.by(() => {
+    const icons = new Map<string, 'melee' | 'shoot'>();
+    if (!isPlayerTurn || !activeUnit) return icons;
+    for (const u of battle.units) {
+      if (u.side !== 'enemy' || u.count === 0) continue;
+      if (meleeApproaches.get(u.id) === null) icons.set(u.id, 'melee');
+      else if (canShootTarget(activeUnit, u)) icons.set(u.id, 'shoot');
+      else if (meleeApproaches.has(u.id)) icons.set(u.id, 'melee');
     }
-    return ids;
+    return icons;
+  });
+
+  const targetIds = $derived(new Set(actionIcons.keys()));
+
+  let hovered: UnitStack | null = $state(null);
+  const infoUnit = $derived.by(() => {
+    const fresh = hovered ? battle.units.find(u => u.id === hovered!.id && u.count > 0) : undefined;
+    return fresh ?? activeUnit;
   });
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
-    if (state.result !== 'ongoing') return;
-    const unit = state.units.find(u => u.id === state.currentUnitId);
+    if (battle.result !== 'ongoing') return;
+    const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
-      state = applyAction(state, aiTakeTurn(state, unit.id));
+      battle = applyAction(battle, aiTakeTurn(battle, unit.id));
     }, AI_DELAY_MS);
     return () => clearTimeout(timer);
   });
@@ -70,29 +84,37 @@
   function handleCellClick(pos: Pos) {
     if (!isPlayerTurn) return;
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
-    state = applyAction(state, { type: 'move', to: pos });
+    battle = applyAction(battle, { type: 'move', to: pos });
   }
 
   function handleUnitClick(unit: UnitStack) {
     if (!isPlayerTurn || !activeUnit || unit.side === 'player') return;
-    if (meleeTargetIds.has(unit.id)) {
-      state = applyAction(state, { type: 'attack', targetId: unit.id });
-    } else if (canShoot(activeUnit)) {
-      state = applyAction(state, { type: 'shoot', targetId: unit.id });
+    const action = actionIcons.get(unit.id);
+    if (action === 'shoot') {
+      battle = applyAction(battle, { type: 'shoot', targetId: unit.id });
+    } else if (action === 'melee') {
+      const moveTo = meleeApproaches.get(unit.id);
+      battle = applyAction(
+        battle,
+        moveTo
+          ? { type: 'attack', targetId: unit.id, moveTo }
+          : { type: 'attack', targetId: unit.id }
+      );
     }
+    hovered = null;
   }
 
   function handleWait() {
     if (!isPlayerTurn) return;
-    state = applyAction(state, { type: 'wait' });
+    battle = applyAction(battle, { type: 'wait' });
   }
 
   function restart() {
-    state = initBattle(playerArmy, enemyArmy, hero, Date.now());
+    battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
   }
 
   function unitLabel(id: unknown): string {
-    const u = state.units.find(u => u.id === id);
+    const u = battle.units.find(u => u.id === id);
     if (!u) return 'a unit';
     return `${u.side === 'enemy' ? 'enemy ' : ''}${u.definition.name}s`;
   }
@@ -123,17 +145,17 @@
     }
   }
 
-  const logLines = $derived(state.log.map(describe));
+  const logLines = $derived(battle.log.map(describe));
 
   const statusText = $derived.by(() => {
-    if (state.result === 'player_wins') return 'Victory!';
-    if (state.result === 'enemy_wins') return 'Defeat…';
+    if (battle.result === 'player_wins') return 'Victory!';
+    if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
     if (isPlayerTurn) {
-      const hints = ['click a green cell to move'];
-      if (meleeTargetIds.size > 0) hints.push('click an adjacent enemy to attack');
-      if (canShoot(activeUnit)) hints.push(`click any enemy to shoot (${activeUnit.shotsLeft} left)`);
-      return `Your ${activeUnit.definition.name}s' turn — ${hints.join(', ')}.`;
+      const hints = ['green cell to move'];
+      if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack');
+      if (canShoot(activeUnit)) hints.push(`🏹 enemy to shoot (${activeUnit.shotsLeft} left)`);
+      return `Your ${activeUnit.definition.name}s' turn — click a ${hints.join(', ')}.`;
     }
     return `Enemy ${activeUnit.definition.name}s are acting…`;
   });
@@ -142,13 +164,15 @@
 <div class="flex flex-col gap-4 lg:flex-row">
   <div class="relative min-w-0 flex-1">
     <BattleGrid
-      {state}
+      state={battle}
       {reachableKeys}
       {targetIds}
-      activeId={state.currentUnitId}
+      activeId={battle.currentUnitId}
       interactive={isPlayerTurn}
+      {actionIcons}
       oncellclick={handleCellClick}
       onunitclick={handleUnitClick}
+      onunithover={u => (hovered = u)}
     />
 
     <div class="relative z-10 mt-2 flex items-center gap-3">
@@ -164,12 +188,12 @@
       <p class="text-sm text-slate-300">{statusText}</p>
     </div>
 
-    {#if state.result !== 'ongoing'}
+    {#if battle.result !== 'ongoing'}
       <div
         class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-lg bg-black/70"
       >
-        <p class="text-4xl font-bold {state.result === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
-          {state.result === 'player_wins' ? 'Victory!' : 'Defeat'}
+        <p class="text-4xl font-bold {battle.result === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
+          {battle.result === 'player_wins' ? 'Victory!' : 'Defeat'}
         </p>
         <button
           type="button"
@@ -183,7 +207,8 @@
   </div>
 
   <div class="flex w-full shrink-0 flex-col gap-4 lg:w-56">
-    <TurnBar {state} />
+    <UnitInfo unit={infoUnit} />
+    <TurnBar state={battle} />
     <BattleLog lines={logLines} />
   </div>
 </div>

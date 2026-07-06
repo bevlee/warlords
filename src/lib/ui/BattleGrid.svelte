@@ -8,8 +8,10 @@
     targetIds: Set<string>;
     activeId: string | null;
     interactive: boolean;
+    actionIcons: Map<string, 'melee' | 'shoot'>;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack) => void;
+    onunithover: (unit: UnitStack | null) => void;
   }
 
   let {
@@ -18,8 +20,10 @@
     targetIds,
     activeId,
     interactive,
+    actionIcons,
     oncellclick,
     onunitclick,
+    onunithover,
   }: Props = $props();
 
   const TILT_DEG = 38;
@@ -62,6 +66,8 @@
             ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}`
             : `cell ${cell.col},${cell.row}`}
           onclick={() => handleClick(cell.col, cell.row)}
+          onmouseenter={() => onunithover(occupant ?? null)}
+          onmouseleave={() => onunithover(null)}
         >
           {#if occupant}
             <span class="token-shadow" aria-hidden="true"></span>
@@ -71,6 +77,11 @@
                 isActive={occupant.id === activeId}
                 isTarget={targetIds.has(occupant.id)}
               />
+              {#if interactive && actionIcons.has(occupant.id)}
+                <span class="action-icon" aria-hidden="true">
+                  {actionIcons.get(occupant.id) === 'shoot' ? '🏹' : '⚔️'}
+                </span>
+              {/if}
             </div>
           {/if}
         </button>
@@ -109,6 +120,23 @@
     transform: rotateX(calc(-1 * var(--tilt)));
     transform-origin: 50% 100%;
     pointer-events: none;
+  }
+
+  /* Sword/bow appears above the standee while hovering an attackable enemy. */
+  .action-icon {
+    position: absolute;
+    top: -30%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.25rem;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.1s;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
+  }
+
+  .cell:hover .action-icon {
+    opacity: 1;
   }
 
   .token-shadow {
