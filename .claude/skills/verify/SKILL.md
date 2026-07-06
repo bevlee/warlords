@@ -39,7 +39,13 @@ Useful hooks in the battle UI:
 - Melee is two-step: click the enemy → amber origin tiles appear with aria
   labels ending in "attack from here" (`button[aria-label$="attack from here"]`);
   click one to move+attack, click the enemy again to quick-attack, click
-  elsewhere to cancel.
+  elsewhere to cancel. Shift+click forces melee targeting for shooters.
+- Shooters with an adjacent living enemy can't shoot (status says
+  "Shooting blocked — enemy adjacent!"; their targets show ⚔️ not 🏹).
+- `Defend` button next to Wait: logs "brace for defense", shows a 🛡️ badge
+  (`span[title="defending"]`) until the stack's next turn.
+- Obstacles: ~7 rocks per battle, `button[aria-label^="obstacle"]`; clicks
+  on them are no-ops and pathing flows around them.
 
 Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
 retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;

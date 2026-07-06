@@ -15,6 +15,11 @@ export function calculateDamage(
   const atk = attacker.definition.attack + (attacker.side === 'player' ? heroAttack : 0);
   let def = defender.definition.defense;
 
+  // Defensive stance: +30% defense until the stack's own next turn
+  if (defender.isDefending) {
+    def = Math.floor(def * 1.3);
+  }
+
   // Behemoth defense reduction: reduces target defense by 40%
   if (attacker.definition.abilities.includes('defense_reduction')) {
     def = Math.floor(def * 0.6);

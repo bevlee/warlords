@@ -7,6 +7,7 @@
     getAttackOrigins,
     canShoot,
     canShootTarget,
+    isShootingBlocked,
   } from '$lib/engine/selectors';
   import type {
     ArmySlot,
@@ -50,14 +51,19 @@
     isPlayerTurn && activeUnit ? getMeleeApproaches(battle, activeUnit) : new Map<string, null>()
   );
 
+  const shootingBlocked = $derived(
+    isPlayerTurn && activeUnit ? canShoot(activeUnit) && isShootingBlocked(battle, activeUnit) : false
+  );
+
   // What clicking each enemy does: adjacent melee > shoot in range > move+attack.
+  // An adjacent enemy disables shooting entirely (LordsWM rule).
   const actionIcons = $derived.by(() => {
     const icons = new Map<string, 'melee' | 'shoot'>();
     if (!isPlayerTurn || !activeUnit) return icons;
     for (const u of battle.units) {
       if (u.side !== 'enemy' || u.count === 0) continue;
       if (meleeApproaches.get(u.id) === null) icons.set(u.id, 'melee');
-      else if (canShootTarget(activeUnit, u)) icons.set(u.id, 'shoot');
+      else if (!shootingBlocked && canShootTarget(activeUnit, u)) icons.set(u.id, 'shoot');
       else if (meleeApproaches.has(u.id)) icons.set(u.id, 'melee');
     }
     return icons;
@@ -115,7 +121,7 @@
     battle = applyAction(battle, { type: 'move', to: pos });
   }
 
-  function handleUnitClick(unit: UnitStack) {
+  function handleUnitClick(unit: UnitStack, shift = false) {
     if (!isPlayerTurn || !activeUnit) return;
 
     if (unit.side === 'player') {
@@ -129,6 +135,12 @@
     // Second click on the selected enemy = quick attack from the nearest tile.
     if (pendingTarget?.id === unit.id) {
       if (attackOrigins.length > 0) attackFrom(unit.id, attackOrigins[0]);
+      return;
+    }
+
+    // Shift forces melee targeting even when a shot is available (LordsWM parity).
+    if (shift && meleeApproaches.has(unit.id)) {
+      meleeTarget = unit;
       return;
     }
 
@@ -150,6 +162,12 @@
     battle = applyAction(battle, { type: 'wait' });
   }
 
+  function handleDefend() {
+    if (!isPlayerTurn) return;
+    meleeTarget = null;
+    battle = applyAction(battle, { type: 'defend' });
+  }
+
   function restart() {
     meleeTarget = null;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
@@ -168,6 +186,8 @@
         return `— Round ${d.round} —`;
       case 'move':
         return `${unitLabel(d.unitId)} move to (${(d.to as Pos).col}, ${(d.to as Pos).row}).`;
+      case 'defend':
+        return `${unitLabel(d.unitId)} brace for defense.`;
       case 'attack':
         return `${unitLabel(d.attackerId)} strike ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
       case 'retaliate':
@@ -199,8 +219,11 @@
     if (isPlayerTurn) {
       const hints = ['green cell to move'];
       if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack');
-      if (canShoot(activeUnit)) hints.push(`🏹 enemy to shoot (${activeUnit.shotsLeft} left)`);
-      return `Your ${activeUnit.definition.name}s' turn — click a ${hints.join(', ')}.`;
+      if (canShoot(activeUnit) && !shootingBlocked) {
+        hints.push(`🏹 enemy to shoot (${activeUnit.shotsLeft} left)`);
+      }
+      const blockedNote = shootingBlocked ? ' Shooting blocked — enemy adjacent!' : '';
+      return `Your ${activeUnit.definition.name}s' turn — click a ${hints.join(', ')}.${blockedNote}`;
     }
     return `Enemy ${activeUnit.definition.name}s are acting…`;
   });
@@ -236,6 +259,15 @@
         onclick={handleWait}
       >
         Wait
+      </button>
+      <button
+        type="button"
+        class="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-100
+          hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={!isPlayerTurn}
+        onclick={handleDefend}
+      >
+        Defend
       </button>
       <p class="text-sm text-slate-300">{statusText}</p>
     </div>

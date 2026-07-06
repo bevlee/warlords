@@ -41,6 +41,15 @@
     {unit.count}
   </span>
 
+  {#if unit.isDefending}
+    <span
+      class="absolute left-0 top-0 leading-none {small ? 'text-[9px]' : 'text-xs'}"
+      title="defending"
+    >
+      🛡️
+    </span>
+  {/if}
+
   {#if !small}
     <div class="absolute left-1 right-1 top-0.5 h-1 overflow-hidden rounded bg-black/50">
       <div

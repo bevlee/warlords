@@ -28,6 +28,7 @@ export interface UnitStack {
   morale: number;      // -3..3
   luck: number;        // -3..3
   atb: number;         // position on the initiative scale; acts at 1
+  isDefending: boolean; // defensive stance until the start of its own next turn
 }
 
 export interface Cell {
@@ -58,7 +59,7 @@ export interface ArmySlot {
 }
 
 export type BattleEventType =
-  | 'attack' | 'retaliate' | 'shoot' | 'move'
+  | 'attack' | 'retaliate' | 'shoot' | 'move' | 'defend'
   | 'death' | 'morale_boost' | 'morale_freeze'
   | 'round_start' | 'battle_end';
 
@@ -83,4 +84,5 @@ export type BattleAction =
   | { type: 'move'; to: Pos }
   | { type: 'attack'; targetId: string; moveTo?: Pos }
   | { type: 'shoot'; targetId: string }
+  | { type: 'defend' }
   | { type: 'wait' };

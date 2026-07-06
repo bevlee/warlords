@@ -48,6 +48,13 @@ export function canShootTarget(unit: UnitStack, target: UnitStack): boolean {
   return canShoot(unit) && chebyshevDistance(unit.pos, target.pos) <= unit.definition.range;
 }
 
+/** LordsWM rule: a living enemy directly adjacent disables shooting. */
+export function isShootingBlocked(state: BattleState, unit: UnitStack): boolean {
+  return state.units.some(
+    u => u.side !== unit.side && u.count > 0 && chebyshevDistance(unit.pos, u.pos) === 1
+  );
+}
+
 /**
  * Every cell the unit could attack this target from during this turn:
  * its own cell when already adjacent, plus each reachable cell adjacent

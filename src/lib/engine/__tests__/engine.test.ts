@@ -21,6 +21,7 @@ function makeStack(overrides: Partial<UnitStack>): UnitStack {
     morale: 0,
     luck: 0,
     atb: 0,
+    isDefending: false,
     ...overrides,
   };
 }
@@ -163,6 +164,31 @@ describe('checkBattleEnd', () => {
       42
     );
     expect(checkBattleEnd(state)).toBeNull();
+  });
+});
+
+describe('initBattle obstacles', () => {
+  it('scatters impassable rocks in the middle columns, deterministic per seed, never under units', () => {
+    const armies: [ArmySlot[], ArmySlot[]] = [
+      [{ unit: GOBLIN, count: 10 }, { unit: ORC, count: 5 }],
+      [{ unit: WOLF_RIDER, count: 8 }],
+    ];
+    const a = initBattle(armies[0], armies[1], mockHero, 42);
+    const b = initBattle(armies[0], armies[1], mockHero, 42);
+
+    const blocked = (s: typeof a) =>
+      s.grid.cells.flat().filter(c => c.blocked).map(c => `${c.col},${c.row}`);
+
+    expect(blocked(a).length).toBeGreaterThanOrEqual(5); // a real battlefield, not one pebble
+    expect(blocked(a)).toEqual(blocked(b)); // deterministic per seed
+
+    for (const c of a.grid.cells.flat()) {
+      if (c.blocked) {
+        expect(c.col).toBeGreaterThanOrEqual(3);
+        expect(c.col).toBeLessThanOrEqual(8);
+        expect(c.occupantId).toBeNull(); // never under a unit
+      }
+    }
   });
 });
 

@@ -22,6 +22,7 @@ function makeStack(
     morale: 0,
     luck: 0,
     atb: 0,
+    isDefending: false,
     ...overrides,
   };
 }

@@ -1,6 +1,6 @@
 import type { BattleAction, BattleState } from './types';
 import { findPath, chebyshevDistance } from './grid';
-import { canShootTarget, getMeleeApproaches } from './selectors';
+import { canShootTarget, getMeleeApproaches, isShootingBlocked } from './selectors';
 
 export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);
@@ -14,8 +14,8 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
     chebyshevDistance(unit.pos, e.pos) < chebyshevDistance(unit.pos, closest.pos) ? e : closest
   );
 
-  // Ranged: shoot if the target is within range
-  if (canShootTarget(unit, target)) {
+  // Ranged: shoot if the target is within range and no enemy is in our face
+  if (canShootTarget(unit, target) && !isShootingBlocked(state, unit)) {
     return { type: 'shoot', targetId: target.id };
   }
 

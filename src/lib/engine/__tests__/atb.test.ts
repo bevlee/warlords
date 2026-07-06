@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
 import { advanceTurn, predictTurnOrder } from '../turnOrder';
+import { calculateDamage } from '../combat';
 import { initBattle, applyAction } from '../battle';
 import { GOBLIN, WOLF_RIDER, THUNDERBIRD, OGRE } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
@@ -25,6 +26,7 @@ function makeStack(
     morale: 0,
     luck: 0,
     atb: 0,
+    isDefending: false,
     ...overrides,
   };
 }
@@ -106,6 +108,43 @@ describe('wait and re-entry', () => {
     expect(afterWait.currentUnitId).toBe(goblin.id); // acts again either way
     expect(waitCost).toBeCloseTo(moveCost / 2);
     expect(moveCost).toBeCloseTo(10 / GOBLIN.initiative / 10 * 10); // one full cycle
+  });
+});
+
+describe('defend', () => {
+  it('reduces incoming damage while defending', () => {
+    const attacker = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
+    const defender = makeStack(OGRE, { col: 2, row: 1 }, 'enemy');
+    const defending = { ...defender, isDefending: true };
+
+    const rngA = () => 0.5;
+    const rngB = () => 0.5;
+    const normal = calculateDamage(attacker, defender, 0, rngA);
+    const reduced = calculateDamage(attacker, defending, 0, rngB);
+
+    expect(reduced).toBeLessThan(normal);
+  });
+
+  it('applyAction defend sets the stance and logs it; the stance holds through enemy turns', () => {
+    // Enemy initiative 10 < goblin's 11, so the enemy acts next after the defend.
+    const goblin = makeStack(GOBLIN, { col: 1, row: 1 }, 'player');
+    const enemy = makeStack({ ...GOBLIN, name: 'Slowbin', initiative: 10 }, { col: 10, row: 8 }, 'enemy');
+    const state = advanceTurn(makeState([goblin, enemy]));
+    expect(state.currentUnitId).toBe(goblin.id);
+
+    const next = applyAction(state, { type: 'defend' });
+
+    expect(next.log.some(e => e.type === 'defend' && e.data.unitId === goblin.id)).toBe(true);
+    expect(next.currentUnitId).toBe(enemy.id); // enemy's turn now
+    expect(next.units.find(u => u.id === goblin.id)!.isDefending).toBe(true); // stance held
+  });
+
+  it('the stance clears at the start of the stack\'s own next turn', () => {
+    const goblin = makeStack(GOBLIN, { col: 1, row: 1 }, 'player', { isDefending: true });
+    const next = advanceTurn(makeState([goblin]));
+
+    expect(next.currentUnitId).toBe(goblin.id);
+    expect(next.units.find(u => u.id === goblin.id)!.isDefending).toBe(false);
   });
 });
 

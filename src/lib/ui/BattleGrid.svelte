@@ -13,7 +13,7 @@
     pendingTargetId: string | null;
     hoveredId: string | null;
     oncellclick: (pos: Pos) => void;
-    onunitclick: (unit: UnitStack) => void;
+    onunitclick: (unit: UnitStack, shift: boolean) => void;
     onunithover: (unit: UnitStack | null) => void;
   }
 
@@ -40,12 +40,13 @@
     return `${col},${row}`;
   }
 
-  function handleClick(col: number, row: number) {
+  function handleClick(col: number, row: number, shift: boolean) {
     if (!interactive) return;
     const cell = state.grid.cells[row][col];
+    if (cell.blocked) return;
     const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined;
     if (occupant) {
-      onunitclick(occupant);
+      onunitclick(occupant, shift);
     } else {
       oncellclick({ col, row });
     }
@@ -73,10 +74,12 @@
                 : 'bg-slate-900'}
             {occupant && targetIds.has(occupant.id) ? 'cursor-crosshair' : ''}
             {!interactive ? 'cursor-default' : ''}"
-          aria-label={occupant
-            ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`
-            : `cell ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`}
-          onclick={() => handleClick(cell.col, cell.row)}
+          aria-label={cell.blocked
+            ? `obstacle at ${cell.col},${cell.row}`
+            : occupant
+              ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`
+              : `cell ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`}
+          onclick={e => handleClick(cell.col, cell.row, e.shiftKey)}
           onmouseenter={() => onunithover(occupant ?? null)}
           onmouseleave={() => onunithover(null)}
         >
@@ -101,6 +104,11 @@
           {:else if attackFrom}
             <div class="token-standing origin-wrap" aria-hidden="true">
               <span class="origin-icon">⚔️</span>
+            </div>
+          {:else if cell.blocked}
+            <span class="token-shadow" aria-hidden="true"></span>
+            <div class="token-standing origin-wrap rock" aria-hidden="true">
+              <span class="rock-icon">🪨</span>
             </div>
           {/if}
         </button>
@@ -180,6 +188,12 @@
 
   .cell:hover .origin-icon {
     font-size: 1.35rem;
+  }
+
+  .rock-icon {
+    font-size: 1.6rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.7));
   }
 
   .token-shadow {

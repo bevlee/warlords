@@ -36,7 +36,10 @@ export function advanceTurn(state: BattleState): BattleState {
   const units = state.units.map(u => {
     if (u.count === 0) return u;
     const advanced = { ...u, atb: u.atb + dt * rate(u) };
-    if (u.id === actor.id) advanced.hasRetaliated = false;
+    if (u.id === actor.id) {
+      advanced.hasRetaliated = false;
+      advanced.isDefending = false;
+    }
     return advanced;
   });
 

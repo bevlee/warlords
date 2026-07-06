@@ -34,23 +34,18 @@ and play like LordsWM's. This doc is the durable checklist; dated docs in
 Have already: grid with lit move squares · stack tokens with counts and HP ·
 matching damage formula · retaliation · morale/luck · flyers passing over
 occupants · shooter range · player-chosen attack-from tile with ⚔️/🏹
-indicators · owner colours · combat log · 2.5D perspective board.
+indicators · owner colours · combat log · 2.5D perspective board ·
+**ATB initiative bar** (continuous scale, repeat turns, wait = half-cycle,
+0–10% start deviation, bottom strip with two-way hover sync) ·
+**shooter melee-block** (adjacent enemy disables shooting; Shift-click forces
+melee) · **Defend** (+30% defense until own next turn, 🛡️ badge) ·
+**obstacles** (seeded rocks in the middle columns).
 
 ### Gaps, roughly in priority order
 
-1. **ATB initiative bar** — replace the per-round speed-sorted queue with a
-   continuous initiative scale (repeat turns for fast units, wait = half-cycle
-   delay, 0–10% start deviation). Engine change + horizontal bar UI at
-   bottom-center with hover-sync to the battlefield.
-2. **Shooter melee-block** — adjacent enemy disables shooting; add forced
-   melee (Shift-click equivalent).
-3. **Defend action** — reduce incoming damage until next turn (we only have
-   Wait, which is currently a plain skip).
-4. **Obstacles** — the grid supports `blocked` cells but battles never place
-   any; add rocks/terrain to battlefields.
-5. **Hover sync + cursors** — hovering a stack highlights it in the turn bar
-   and vice versa; sword/bow cursor treatment near targets.
-6. **Hero as an actor** — hero portrait on the flank with per-round actions
+1. **Hero as an actor** — hero portrait on the flank with per-round actions
    (attack, later spells).
-7. **Long term** — unit art replacing emoji standees, factions beyond
+2. **Cursor treatment** — LordsWM changes the mouse cursor itself (sword/bow)
+   near targets; we use hover icons above the standee.
+3. **Long term** — unit art replacing emoji standees, factions beyond
    Barbarian, faction skills in the damage formula, PvP/economy layers.

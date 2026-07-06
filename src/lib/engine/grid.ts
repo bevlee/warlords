@@ -59,6 +59,16 @@ export function isInRange(from: Pos, to: Pos, range: number): boolean {
   return chebyshevDistance(from, to) <= range;
 }
 
+export function setBlocked(grid: Grid, pos: Pos): Grid {
+  const newCells = grid.cells.map(row => row.map(cell => {
+    if (cell.col === pos.col && cell.row === pos.row) {
+      return { ...cell, blocked: true };
+    }
+    return cell;
+  }));
+  return { ...grid, cells: newCells };
+}
+
 export function setOccupant(grid: Grid, pos: Pos, id: string | null): Grid {
   const newCells = grid.cells.map(row => row.map(cell => {
     if (cell.col === pos.col && cell.row === pos.row) {

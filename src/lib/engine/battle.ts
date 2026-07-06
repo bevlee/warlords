@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ArmySlot, BattleAction, BattleState, Hero, UnitStack } from './types';
-import { createGrid, placeUnits, setOccupant } from './grid';
+import { createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
 import { mulberry32 } from './rng';
@@ -23,6 +23,7 @@ function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number): U
     morale: 0,
     luck: 0,
     atb: 0,
+    isDefending: false,
   };
 }
 
@@ -42,6 +43,17 @@ export function initBattle(
   const allUnits = [...playerUnits, ...enemyUnits].map(u => ({ ...u, atb: rng() * 0.1 }));
 
   grid = placeUnits(grid, allUnits);
+
+  // Scatter impassable rocks in the middle columns (3–8), away from spawns.
+  const OBSTACLES = 7;
+  for (let placed = 0, guard = 0; placed < OBSTACLES && guard < 100; guard++) {
+    const col = 3 + Math.floor(rng() * 6);
+    const row = Math.floor(rng() * GRID_H);
+    const cell = grid.cells[row][col];
+    if (cell.blocked || cell.occupantId) continue;
+    grid = setBlocked(grid, { col, row });
+    placed++;
+  }
 
   const state: BattleState = {
     grid,
@@ -88,7 +100,12 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     return advanceTurn(reenter(s, 0));
   }
 
-  if (action.type === 'move') {
+  if (action.type === 'defend') {
+    const newUnits = s.units.map((u, i) => (i === actorIdx ? { ...u, isDefending: true } : u));
+    s = { ...s, units: newUnits };
+    s.log = [...s.log, { type: 'defend', data: { unitId: actorId } }];
+
+  } else if (action.type === 'move') {
     const newGrid = setOccupant(setOccupant(s.grid, actor.pos, null), action.to, actor.id);
     const updatedActor = { ...actor, pos: action.to };
     const newUnits = s.units.map((u, i) => i === actorIdx ? updatedActor : u);

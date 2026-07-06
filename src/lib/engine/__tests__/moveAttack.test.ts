@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits, getCell, chebyshevDistance } from '../grid';
 import { applyAction } from '../battle';
 import { aiTakeTurn } from '../ai';
-import { canShootTarget, getMeleeApproaches } from '../selectors';
+import { canShootTarget, getMeleeApproaches, isShootingBlocked } from '../selectors';
 import { GOBLIN, ORC, WOLF_RIDER } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
 
@@ -24,6 +24,7 @@ function makeStack(
     morale: 0,
     luck: 0,
     atb: 0,
+    isDefending: false,
     ...overrides,
   };
 }
@@ -107,7 +108,36 @@ describe('getMeleeApproaches', () => {
   });
 });
 
+describe('isShootingBlocked', () => {
+  it('is true when a living enemy is adjacent (including diagonals)', () => {
+    const orc = makeStack(ORC, { col: 5, row: 5 }, 'player');
+    const adjacentEnemy = makeStack(GOBLIN, { col: 6, row: 6 }, 'enemy');
+    const state = makeState([orc, adjacentEnemy]);
+
+    expect(isShootingBlocked(state, orc)).toBe(true);
+  });
+
+  it('is false for adjacent friends, dead enemies, or distant enemies', () => {
+    const orc = makeStack(ORC, { col: 5, row: 5 }, 'player');
+    const friend = makeStack(GOBLIN, { col: 6, row: 5 }, 'player');
+    const deadEnemy = makeStack(GOBLIN, { col: 5, row: 6 }, 'enemy', { count: 0 });
+    const farEnemy = makeStack(GOBLIN, { col: 9, row: 5 }, 'enemy');
+    const state = makeState([orc, friend, deadEnemy, farEnemy]);
+
+    expect(isShootingBlocked(state, orc)).toBe(false);
+  });
+});
+
 describe('AI with range and move+attack', () => {
+  it('melees the adjacent enemy instead of shooting when blocked', () => {
+    const orc = makeStack(ORC, { col: 5, row: 5 }, 'enemy'); // shooter
+    const adjacent = makeStack(GOBLIN, { col: 6, row: 5 }, 'player');
+    const state = makeState([orc, adjacent]);
+
+    const action = aiTakeTurn(state, orc.id);
+    expect(action).toEqual({ type: 'attack', targetId: adjacent.id });
+  });
+
   it('does not shoot beyond range; walks toward the target instead', () => {
     const orc = makeStack(ORC, { col: 1, row: 1 }, 'enemy'); // range 7, speed 4
     const target = makeStack(GOBLIN, { col: 10, row: 1 }, 'player'); // dist 9
