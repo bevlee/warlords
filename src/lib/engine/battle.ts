@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ArmySlot, BattleAction, BattleState, Hero, UnitStack } from './types';
 import { createGrid, placeUnits, setOccupant } from './grid';
-import { buildTurnQueue, advanceTurn } from './turnOrder';
+import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
 import { mulberry32 } from './rng';
 
@@ -22,6 +22,7 @@ function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number): U
     shotsLeft: slot.unit.shots,
     morale: 0,
     luck: 0,
+    atb: 0,
   };
 }
 
@@ -35,23 +36,25 @@ export function initBattle(
 
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => slotToStack(slot, 'player', i));
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
-  const allUnits = [...playerUnits, ...enemyUnits];
+
+  // LordsWM-style start: every stack gets a seeded random 0–10% head start.
+  const rng = mulberry32(seed);
+  const allUnits = [...playerUnits, ...enemyUnits].map(u => ({ ...u, atb: rng() * 0.1 }));
 
   grid = placeUnits(grid, allUnits);
-  const queue = buildTurnQueue(allUnits);
-  const currentUnitId = queue.shift() ?? null;
 
-  return {
+  const state: BattleState = {
     grid,
     units: allUnits,
     hero,
     round: 1,
-    turnQueue: queue,
-    currentUnitId,
+    battleTime: 0,
+    currentUnitId: null,
     log: [{ type: 'round_start', data: { round: 1 } }],
     result: 'ongoing',
     seed,
   };
+  return advanceTurn(state);
 }
 
 export function checkBattleEnd(state: BattleState): 'player_wins' | 'enemy_wins' | null {
@@ -72,11 +75,17 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   if (actorIdx < 0) return s;
   const actor = s.units[actorIdx];
 
+  // A finished turn re-enters the scale at 0; wait re-enters at 0.5 (half cycle).
+  const reenter = (st: BattleState, atb: number): BattleState => ({
+    ...st,
+    units: st.units.map(u => (u.id === actorId ? { ...u, atb } : u)),
+  });
+
   // Morale check
   const moraleResult = checkMorale(actor, rng);
   if (moraleResult === 'freeze') {
     s.log = [...s.log, { type: 'morale_freeze', data: { unitId: actorId } }];
-    return advanceTurn(s);
+    return advanceTurn(reenter(s, 0));
   }
 
   if (action.type === 'move') {
@@ -89,7 +98,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   } else if (action.type === 'attack') {
     const targetId = action.targetId;
     const targetIdx = s.units.findIndex(u => u.id === targetId);
-    if (targetIdx < 0) return advanceTurn(s);
+    if (targetIdx < 0) return advanceTurn(reenter(s, 0));
     const target = s.units[targetIdx];
 
     // Combined move+attack: relocate the actor before resolving the melee.
@@ -138,10 +147,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   } else if (action.type === 'shoot') {
     const targetId = (action as { type: 'shoot'; targetId: string }).targetId;
     const targetIdx = s.units.findIndex(u => u.id === targetId);
-    if (targetIdx < 0) return advanceTurn(s);
+    if (targetIdx < 0) return advanceTurn(reenter(s, 0));
     const target = s.units[targetIdx];
 
-    if (actor.shotsLeft <= 0) return advanceTurn(s);
+    if (actor.shotsLeft <= 0) return advanceTurn(reenter(s, 0));
 
     const damage = calculateDamage(actor, target, s.hero.attack, rng);
     const { killed, remaining } = applyDamage(target, damage);
@@ -168,5 +177,5 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   const endResult = checkBattleEnd(s);
   if (endResult) return { ...s, result: endResult };
 
-  return advanceTurn(s);
+  return advanceTurn(reenter(s, action.type === 'wait' ? 0.5 : 0));
 }

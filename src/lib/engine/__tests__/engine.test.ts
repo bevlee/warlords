@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mulberry32 } from '../rng';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from '../combat';
-import { buildTurnQueue } from '../turnOrder';
 import { createGrid, findPath, chebyshevDistance } from '../grid';
 import { initBattle, applyAction, checkBattleEnd } from '../battle';
 import { GOBLIN, WOLF_RIDER, ORC, BEHEMOTH } from '../barbarian';
@@ -21,6 +20,7 @@ function makeStack(overrides: Partial<UnitStack>): UnitStack {
     shotsLeft: 0,
     morale: 0,
     luck: 0,
+    atb: 0,
     ...overrides,
   };
 }
@@ -107,30 +107,6 @@ describe('canRetaliate', () => {
   });
 });
 
-describe('buildTurnQueue', () => {
-  it('sorts by speed descending', () => {
-    const fast = makeStack({ id: 'fast', definition: { ...WOLF_RIDER, speed: 7 } });
-    const slow = makeStack({ id: 'slow', definition: { ...GOBLIN, speed: 5 } });
-    const queue = buildTurnQueue([slow, fast]);
-    expect(queue[0]).toBe('fast');
-    expect(queue[1]).toBe('slow');
-  });
-
-  it('player acts before enemy on speed tie', () => {
-    const player = makeStack({ id: 'player', side: 'player', definition: { ...GOBLIN, speed: 5 } });
-    const enemy = makeStack({ id: 'enemy', side: 'enemy', definition: { ...GOBLIN, speed: 5 } });
-    const queue = buildTurnQueue([enemy, player]);
-    expect(queue[0]).toBe('player');
-  });
-
-  it('excludes dead units', () => {
-    const alive = makeStack({ id: 'alive', count: 5 });
-    const dead = makeStack({ id: 'dead', count: 0 });
-    const queue = buildTurnQueue([alive, dead]);
-    expect(queue).not.toContain('dead');
-  });
-});
-
 describe('findPath', () => {
   it('finds a straight path', () => {
     const grid = createGrid(5, 5);
@@ -203,7 +179,7 @@ describe('full battle simulation', () => {
     let iterations = 0;
     while (state.result === 'ongoing' && iterations < 2000) {
       const unitId = state.currentUnitId;
-      if (!unitId) { state = { ...state, turnQueue: [], currentUnitId: null }; break; }
+      if (!unitId) break;
       const unit = state.units.find(u => u.id === unitId)!;
       // Simple: always attack the first enemy
       const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);

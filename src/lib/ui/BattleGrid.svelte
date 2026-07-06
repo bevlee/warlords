@@ -11,6 +11,7 @@
     actionIcons: Map<string, 'melee' | 'shoot'>;
     attackFromKeys: Set<string>;
     pendingTargetId: string | null;
+    hoveredId: string | null;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack) => void;
     onunithover: (unit: UnitStack | null) => void;
@@ -25,6 +26,7 @@
     actionIcons,
     attackFromKeys,
     pendingTargetId,
+    hoveredId,
     oncellclick,
     onunitclick,
     onunithover,
@@ -80,7 +82,7 @@
         >
           {#if occupant}
             <span class="token-shadow" aria-hidden="true"></span>
-            <div class="token-standing">
+            <div class="token-standing" class:hover-glow={occupant.id === hoveredId}>
               <UnitToken
                 unit={occupant}
                 isActive={occupant.id === activeId}
@@ -137,6 +139,11 @@
     transform: rotateX(calc(-1 * var(--tilt)));
     transform-origin: 50% 100%;
     pointer-events: none;
+  }
+
+  /* Turn-bar hover sync: pick the stack out on the battlefield. */
+  .hover-glow {
+    filter: brightness(1.4) drop-shadow(0 0 6px rgb(255 255 255 / 0.5));
   }
 
   /* Sword/bow appears above the standee while hovering an attackable enemy. */

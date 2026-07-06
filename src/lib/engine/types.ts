@@ -3,7 +3,8 @@ export type Pos = { col: number; row: number };
 export interface UnitDef {
   name: string;
   tier: 1 | 2 | 3 | 4 | 5 | 6 | 7;
-  speed: number;
+  speed: number;      // movement range in cells
+  initiative: number; // ATB fill rate; 10 = one turn per round
   hp: number;
   attack: number;
   defense: number;
@@ -26,6 +27,7 @@ export interface UnitStack {
   shotsLeft: number;
   morale: number;      // -3..3
   luck: number;        // -3..3
+  atb: number;         // position on the initiative scale; acts at 1
 }
 
 export interface Cell {
@@ -70,7 +72,7 @@ export interface BattleState {
   units: UnitStack[];
   hero: Hero;
   round: number;
-  turnQueue: string[];
+  battleTime: number;  // in rounds; a baseline init-10 stack acts once per round
   currentUnitId: string | null;
   log: BattleEvent[];
   result: 'ongoing' | 'player_wins' | 'enemy_wins';

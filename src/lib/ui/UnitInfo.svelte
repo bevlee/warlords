@@ -18,6 +18,7 @@
       ['Defense', `${d.defense}`],
       ['Damage', `${d.minDamage}–${d.maxDamage}`],
       ['Speed', `${d.speed}`],
+      ['Initiative', `${d.initiative}`],
       ['Range', d.range > 0 ? `${d.range}` : '—'],
       ['Shots', d.shots > 0 ? `${unit.shotsLeft} / ${d.shots}` : '—'],
     ];

@@ -1,34 +1,45 @@
 <script lang="ts">
   import type { BattleState, UnitStack } from '$lib/engine/types';
+  import { predictTurnOrder } from '$lib/engine/turnOrder';
   import UnitToken from './UnitToken.svelte';
 
   interface Props {
     state: BattleState;
+    hoveredId: string | null;
+    onhover: (unit: UnitStack | null) => void;
   }
 
-  let { state }: Props = $props();
+  let { state, hoveredId, onhover }: Props = $props();
+
+  const ENTRIES = 12;
 
   const entries = $derived(
-    [state.currentUnitId, ...state.turnQueue]
+    predictTurnOrder(state.units, ENTRIES)
       .map(id => state.units.find(u => u.id === id))
-      .filter((u): u is UnitStack => !!u && u.count > 0)
+      .filter((u): u is UnitStack => !!u)
   );
 </script>
 
-<div class="flex flex-col gap-1 rounded-lg border border-slate-700 bg-slate-800 p-2">
-  <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-400">
+<div class="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5">
+  <span class="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
     Round {state.round}
-  </h2>
-  {#each entries as unit, i (unit.id)}
-    <div
-      class="flex items-center gap-2 rounded p-1 {i === 0 ? 'bg-amber-500/20' : ''}"
-    >
-      <div class="h-8 w-8 shrink-0">
+  </span>
+  <div class="flex min-w-0 items-center gap-1 overflow-x-auto">
+    {#each entries as unit, i (`${unit.id}-${i}`)}
+      <button
+        type="button"
+        class="h-9 w-9 shrink-0 rounded p-0.5 transition-transform
+          {i === 0 ? 'bg-amber-500/25' : ''}
+          {unit.id === hoveredId ? 'scale-110 bg-slate-600' : ''}"
+        aria-label="turn {i + 1}: {unit.definition.name} ×{unit.count}"
+        onmouseenter={() => onhover(unit)}
+        onmouseleave={() => onhover(null)}
+      >
         <UnitToken {unit} small isActive={i === 0} />
-      </div>
-      <span class="truncate text-xs {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
-        {unit.definition.name}
-      </span>
-    </div>
-  {/each}
+      </button>
+      {#if i === 0}
+        <div class="h-8 w-px shrink-0 bg-slate-600" aria-hidden="true"></div>
+      {/if}
+    {/each}
+  </div>
 </div>

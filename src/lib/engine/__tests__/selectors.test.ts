@@ -21,6 +21,7 @@ function makeStack(
     shotsLeft: def.shots,
     morale: 0,
     luck: 0,
+    atb: 0,
     ...overrides,
   };
 }
@@ -33,7 +34,7 @@ function makeState(units: UnitStack[]): BattleState {
     units,
     hero: { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0 },
     round: 1,
-    turnQueue: [],
+    battleTime: 0,
     currentUnitId: units[0]?.id ?? null,
     log: [],
     result: 'ongoing',

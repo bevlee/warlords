@@ -15,11 +15,13 @@
   const hpPct = $derived(Math.round((unit.hp / unit.definition.hp) * 100));
   const bgClass = $derived(unit.side === 'player' ? 'bg-sky-950/80' : 'bg-red-950/80');
   // One ring style at a time: target > active > side colour.
+  // Thin rings only: the 2.5D projection magnifies the standee's top edge,
+  // so thick rings render as a solid cap. Emphasis comes from glow instead.
   const ringClass = $derived(
     isTarget
-      ? 'ring-4 ring-red-500 animate-pulse'
+      ? 'ring-2 ring-red-500 animate-pulse shadow-lg shadow-red-500/60'
       : isActive
-        ? 'ring-4 ring-amber-300 shadow-lg shadow-amber-500/40'
+        ? 'ring-2 ring-amber-300 shadow-lg shadow-amber-400/50'
         : unit.side === 'player'
           ? 'ring-2 ring-sky-400'
           : 'ring-2 ring-red-400'

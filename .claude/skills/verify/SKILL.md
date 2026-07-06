@@ -28,7 +28,12 @@ Useful hooks in the battle UI:
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
 - `Wait` and `New battle` are role=button by name.
 - Unit info panel: the sidebar `dl` — hover any unit's cell to populate it
-  (count, HP, attack, defense, damage, speed, range, shots).
+  (count, HP, attack, defense, damage, speed, initiative, range, shots).
+- ATB turn bar: horizontal strip under the board; entries are
+  `button[aria-label^="turn "]` ("turn N: <Unit> ×<count>"), current unit
+  first. Fast units repeat. Hovering an entry glows the matching field token
+  (`div.token-standing.hover-glow`). Waiting re-enters at half a cycle —
+  the waiter drops down the bar, it doesn't just go to the back.
 - Hover an attackable enemy to reveal `.action-icon` (⚔️ melee/move+attack,
   🏹 shoot) on its cell.
 - Melee is two-step: click the enemy → amber origin tiles appear with aria

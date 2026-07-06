@@ -217,10 +217,15 @@
       {actionIcons}
       {attackFromKeys}
       pendingTargetId={pendingTarget?.id ?? null}
+      hoveredId={hovered?.id ?? null}
       oncellclick={handleCellClick}
       onunitclick={handleUnitClick}
       onunithover={u => (hovered = u)}
     />
+
+    <div class="relative z-10 mt-2">
+      <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
+    </div>
 
     <div class="relative z-10 mt-2 flex items-center gap-3">
       <button
@@ -255,7 +260,6 @@
 
   <div class="flex w-full shrink-0 flex-col gap-4 lg:w-56">
     <UnitInfo unit={infoUnit} />
-    <TurnBar state={battle} />
     <BattleLog lines={logLines} />
   </div>
 </div>
