@@ -4,6 +4,7 @@
   import {
     getReachableCells,
     getMeleeApproaches,
+    getAttackOrigins,
     canShoot,
     canShootTarget,
   } from '$lib/engine/selectors';
@@ -64,6 +65,18 @@
 
   const targetIds = $derived(new Set(actionIcons.keys()));
 
+  // Two-step melee: click an enemy, then choose which tile to attack from.
+  let meleeTarget: UnitStack | null = $state(null);
+  const pendingTarget = $derived(
+    meleeTarget && isPlayerTurn
+      ? (battle.units.find(u => u.id === meleeTarget!.id && u.count > 0) ?? null)
+      : null
+  );
+  const attackOrigins = $derived(
+    pendingTarget && activeUnit ? getAttackOrigins(battle, activeUnit, pendingTarget) : []
+  );
+  const attackFromKeys = $derived(new Set(attackOrigins.map(p => `${p.col},${p.row}`)));
+
   let hovered: UnitStack | null = $state(null);
   const infoUnit = $derived.by(() => {
     const fresh = hovered ? battle.units.find(u => u.id === hovered!.id && u.count > 0) : undefined;
@@ -81,35 +94,64 @@
     return () => clearTimeout(timer);
   });
 
+  function attackFrom(targetId: string, origin: Pos) {
+    const inPlace = activeUnit && origin.col === activeUnit.pos.col && origin.row === activeUnit.pos.row;
+    battle = applyAction(
+      battle,
+      inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin }
+    );
+    meleeTarget = null;
+    hovered = null;
+  }
+
   function handleCellClick(pos: Pos) {
     if (!isPlayerTurn) return;
+    if (pendingTarget) {
+      if (attackFromKeys.has(`${pos.col},${pos.row}`)) attackFrom(pendingTarget.id, pos);
+      else meleeTarget = null; // clicking elsewhere cancels targeting
+      return;
+    }
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
     battle = applyAction(battle, { type: 'move', to: pos });
   }
 
   function handleUnitClick(unit: UnitStack) {
-    if (!isPlayerTurn || !activeUnit || unit.side === 'player') return;
+    if (!isPlayerTurn || !activeUnit) return;
+
+    if (unit.side === 'player') {
+      // Clicking your own active stack while targeting = attack in place.
+      if (pendingTarget && unit.id === activeUnit.id && attackFromKeys.has(`${unit.pos.col},${unit.pos.row}`)) {
+        attackFrom(pendingTarget.id, unit.pos);
+      }
+      return;
+    }
+
+    // Second click on the selected enemy = quick attack from the nearest tile.
+    if (pendingTarget?.id === unit.id) {
+      if (attackOrigins.length > 0) attackFrom(unit.id, attackOrigins[0]);
+      return;
+    }
+
     const action = actionIcons.get(unit.id);
     if (action === 'shoot') {
       battle = applyAction(battle, { type: 'shoot', targetId: unit.id });
+      meleeTarget = null;
+      hovered = null;
     } else if (action === 'melee') {
-      const moveTo = meleeApproaches.get(unit.id);
-      battle = applyAction(
-        battle,
-        moveTo
-          ? { type: 'attack', targetId: unit.id, moveTo }
-          : { type: 'attack', targetId: unit.id }
-      );
+      meleeTarget = unit; // enter targeting: choose the tile to attack from
+    } else {
+      meleeTarget = null;
     }
-    hovered = null;
   }
 
   function handleWait() {
     if (!isPlayerTurn) return;
+    meleeTarget = null;
     battle = applyAction(battle, { type: 'wait' });
   }
 
   function restart() {
+    meleeTarget = null;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
   }
 
@@ -151,6 +193,9 @@
     if (battle.result === 'player_wins') return 'Victory!';
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
+    if (pendingTarget) {
+      return `Attacking enemy ${pendingTarget.definition.name}s — click a ⚔️ tile to attack from, or click elsewhere to cancel.`;
+    }
     if (isPlayerTurn) {
       const hints = ['green cell to move'];
       if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack');
@@ -165,11 +210,13 @@
   <div class="relative min-w-0 flex-1">
     <BattleGrid
       state={battle}
-      {reachableKeys}
+      reachableKeys={pendingTarget ? new Set() : reachableKeys}
       {targetIds}
       activeId={battle.currentUnitId}
       interactive={isPlayerTurn}
       {actionIcons}
+      {attackFromKeys}
+      pendingTargetId={pendingTarget?.id ?? null}
       oncellclick={handleCellClick}
       onunitclick={handleUnitClick}
       onunithover={u => (hovered = u)}

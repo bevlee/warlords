@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
-import { getReachableCells, getMeleeTargets, canShoot } from '../selectors';
-import { GOBLIN, ORC, THUNDERBIRD } from '../barbarian';
+import { getReachableCells, getMeleeTargets, getAttackOrigins, canShoot } from '../selectors';
+import { GOBLIN, ORC, THUNDERBIRD, WOLF_RIDER } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
 
 function makeStack(
@@ -115,6 +115,52 @@ describe('getMeleeTargets', () => {
     const state = makeState([goblin, deadEnemy]);
 
     expect(getMeleeTargets(state, goblin)).toHaveLength(0);
+  });
+});
+
+describe('getAttackOrigins', () => {
+  it('returns every reachable cell adjacent to the target, plus own cell when already adjacent', () => {
+    const rider = makeStack(WOLF_RIDER, { col: 4, row: 4 }, 'player'); // speed 7
+    const enemy = makeStack(ORC, { col: 5, row: 4 }, 'enemy');
+    const state = makeState([rider, enemy]);
+
+    const origins = getAttackOrigins(state, rider, enemy);
+
+    // own cell first: already adjacent, can attack in place
+    expect(has(origins, 4, 4)).toBe(true);
+    // all 7 other cells ringing the enemy are empty and within speed
+    expect(has(origins, 6, 4)).toBe(true);
+    expect(has(origins, 5, 3)).toBe(true);
+    expect(has(origins, 5, 5)).toBe(true);
+    expect(has(origins, 4, 3)).toBe(true);
+    expect(has(origins, 4, 5)).toBe(true);
+    expect(has(origins, 6, 3)).toBe(true);
+    expect(has(origins, 6, 5)).toBe(true);
+    expect(origins).toHaveLength(8);
+    // enemy's own cell is never an origin
+    expect(has(origins, 5, 4)).toBe(false);
+  });
+
+  it('excludes occupied ring cells and cells beyond speed', () => {
+    const goblin = makeStack(GOBLIN, { col: 2, row: 4 }, 'player'); // speed 5
+    const enemy = makeStack(ORC, { col: 6, row: 4 }, 'enemy');
+    const blocker = makeStack(ORC, { col: 5, row: 4 }, 'enemy'); // occupies a ring cell
+    const state = makeState([goblin, enemy, blocker]);
+
+    const origins = getAttackOrigins(state, goblin, enemy);
+
+    expect(has(origins, 5, 4)).toBe(false); // occupied
+    expect(has(origins, 5, 3)).toBe(true);  // 4 steps
+    expect(has(origins, 7, 4)).toBe(false); // 5+ steps behind the enemy, path around > speed
+    expect(origins.length).toBeGreaterThan(0);
+  });
+
+  it('is empty when the target is out of reach', () => {
+    const goblin = makeStack(GOBLIN, { col: 0, row: 0 }, 'player'); // speed 5
+    const enemy = makeStack(ORC, { col: 11, row: 9 }, 'enemy');
+    const state = makeState([goblin, enemy]);
+
+    expect(getAttackOrigins(state, goblin, enemy)).toHaveLength(0);
   });
 });
 

@@ -31,6 +31,10 @@ Useful hooks in the battle UI:
   (count, HP, attack, defense, damage, speed, range, shots).
 - Hover an attackable enemy to reveal `.action-icon` (⚔️ melee/move+attack,
   🏹 shoot) on its cell.
+- Melee is two-step: click the enemy → amber origin tiles appear with aria
+  labels ending in "attack from here" (`button[aria-label$="attack from here"]`);
+  click one to move+attack, click the enemy again to quick-attack, click
+  elsewhere to cancel.
 
 Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
 retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;

@@ -9,6 +9,8 @@
     activeId: string | null;
     interactive: boolean;
     actionIcons: Map<string, 'melee' | 'shoot'>;
+    attackFromKeys: Set<string>;
+    pendingTargetId: string | null;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack) => void;
     onunithover: (unit: UnitStack | null) => void;
@@ -21,6 +23,8 @@
     activeId,
     interactive,
     actionIcons,
+    attackFromKeys,
+    pendingTargetId,
     oncellclick,
     onunitclick,
     onunithover,
@@ -56,15 +60,20 @@
       {#each row as cell (cellKey(cell.col, cell.row))}
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
         {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row))}
+        {@const attackFrom = attackFromKeys.has(cellKey(cell.col, cell.row))}
         <button
           type="button"
           class="cell relative aspect-square rounded-sm p-0
-            {reachable ? 'bg-emerald-800/60 hover:bg-emerald-600/70 cursor-pointer' : 'bg-slate-900'}
+            {attackFrom
+              ? 'bg-amber-700/60 hover:bg-amber-500/70 cursor-pointer'
+              : reachable
+                ? 'bg-emerald-800/60 hover:bg-emerald-600/70 cursor-pointer'
+                : 'bg-slate-900'}
             {occupant && targetIds.has(occupant.id) ? 'cursor-crosshair' : ''}
             {!interactive ? 'cursor-default' : ''}"
           aria-label={occupant
-            ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}`
-            : `cell ${cell.col},${cell.row}`}
+            ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`
+            : `cell ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`}
           onclick={() => handleClick(cell.col, cell.row)}
           onmouseenter={() => onunithover(occupant ?? null)}
           onmouseleave={() => onunithover(null)}
@@ -77,11 +86,19 @@
                 isActive={occupant.id === activeId}
                 isTarget={targetIds.has(occupant.id)}
               />
-              {#if interactive && actionIcons.has(occupant.id)}
-                <span class="action-icon" aria-hidden="true">
+              {#if interactive && (actionIcons.has(occupant.id) || attackFrom)}
+                <span
+                  class="action-icon"
+                  class:pinned={occupant.id === pendingTargetId || attackFrom}
+                  aria-hidden="true"
+                >
                   {actionIcons.get(occupant.id) === 'shoot' ? '🏹' : '⚔️'}
                 </span>
               {/if}
+            </div>
+          {:else if attackFrom}
+            <div class="token-standing origin-wrap" aria-hidden="true">
+              <span class="origin-icon">⚔️</span>
             </div>
           {/if}
         </button>
@@ -135,8 +152,27 @@
     filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
   }
 
-  .cell:hover .action-icon {
+  .cell:hover .action-icon,
+  .action-icon.pinned {
     opacity: 1;
+  }
+
+  /* Standing sword marking a tile you can attack from. */
+  .origin-wrap {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10%;
+  }
+
+  .origin-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
+  }
+
+  .cell:hover .origin-icon {
+    font-size: 1.35rem;
   }
 
   .token-shadow {

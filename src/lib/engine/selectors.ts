@@ -49,6 +49,22 @@ export function canShootTarget(unit: UnitStack, target: UnitStack): boolean {
 }
 
 /**
+ * Every cell the unit could attack this target from during this turn:
+ * its own cell when already adjacent, plus each reachable cell adjacent
+ * to the target. Empty when the target is out of reach.
+ */
+export function getAttackOrigins(state: BattleState, unit: UnitStack, target: UnitStack): Pos[] {
+  const origins: Pos[] = [];
+  if (chebyshevDistance(unit.pos, target.pos) === 1) {
+    origins.push({ col: unit.pos.col, row: unit.pos.row });
+  }
+  for (const cell of getReachableCells(state.grid, unit)) {
+    if (chebyshevDistance(cell, target.pos) === 1) origins.push(cell);
+  }
+  return origins;
+}
+
+/**
  * Melee options this turn: enemy id → where to stand to hit them.
  * `null` means already adjacent (attack in place); otherwise the first
  * reachable cell (BFS order, so near-minimal walking) adjacent to that enemy.

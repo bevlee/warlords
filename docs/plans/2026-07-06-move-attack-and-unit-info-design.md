@@ -32,6 +32,16 @@ indicators for attacking vs moving (sword for melee, arrow for shooting).
   damage range, speed, range, shots left/total, abilities. Grid emits hover
   events; glyph map moves to a shared `glyphs.ts`.
 
+## Update (2026-07-07): player-chosen attack tile
+
+Melee is now two-step: clicking a melee-reachable enemy enters targeting mode —
+every valid attack-from tile (via new `getAttackOrigins`: own cell when
+adjacent, plus each reachable cell adjacent to the target) is highlighted amber
+with a standing ⚔️, and the target keeps a pinned ⚔️. Clicking a tile moves
+there and attacks; clicking the enemy again quick-attacks from the nearest
+tile; clicking anywhere else cancels. Green move highlights hide during
+targeting. Shooting remains single-click.
+
 ## Testing
 
 Vitest first for the engine work (moveTo relocation + retaliation, range
