@@ -42,3 +42,30 @@ export function getMeleeTargets(state: BattleState, unit: UnitStack): UnitStack[
 export function canShoot(unit: UnitStack): boolean {
   return unit.definition.shots > 0 && unit.shotsLeft > 0;
 }
+
+/** Whether the unit can shoot this specific target: shots left and within range. */
+export function canShootTarget(unit: UnitStack, target: UnitStack): boolean {
+  return canShoot(unit) && chebyshevDistance(unit.pos, target.pos) <= unit.definition.range;
+}
+
+/**
+ * Melee options this turn: enemy id → where to stand to hit them.
+ * `null` means already adjacent (attack in place); otherwise the first
+ * reachable cell (BFS order, so near-minimal walking) adjacent to that enemy.
+ * Enemies no reachable cell touches are absent.
+ */
+export function getMeleeApproaches(state: BattleState, unit: UnitStack): Map<string, Pos | null> {
+  const approaches = new Map<string, Pos | null>();
+  const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
+  const reachable = getReachableCells(state.grid, unit);
+
+  for (const enemy of enemies) {
+    if (chebyshevDistance(unit.pos, enemy.pos) === 1) {
+      approaches.set(enemy.id, null);
+      continue;
+    }
+    const dest = reachable.find(cell => chebyshevDistance(cell, enemy.pos) === 1);
+    if (dest) approaches.set(enemy.id, dest);
+  }
+  return approaches;
+}

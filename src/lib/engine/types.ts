@@ -10,6 +10,7 @@ export interface UnitDef {
   minDamage: number;
   maxDamage: number;
   shots: number;       // 0 = melee only
+  range: number;       // max shooting distance in cells (Chebyshev); 0 = melee only
   isLarge: boolean;
   abilities: string[]; // 'no_retaliation' | 'flying' | 'defense_reduction'
 }
@@ -78,6 +79,6 @@ export interface BattleState {
 
 export type BattleAction =
   | { type: 'move'; to: Pos }
-  | { type: 'attack'; targetId: string }
+  | { type: 'attack'; targetId: string; moveTo?: Pos }
   | { type: 'shoot'; targetId: string }
   | { type: 'wait' };

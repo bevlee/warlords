@@ -92,7 +92,17 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     if (targetIdx < 0) return advanceTurn(s);
     const target = s.units[targetIdx];
 
-    const damage = calculateDamage(actor, target, s.hero.attack, rng);
+    // Combined move+attack: relocate the actor before resolving the melee.
+    let attacker = actor;
+    if (action.moveTo) {
+      const newGrid = setOccupant(setOccupant(s.grid, actor.pos, null), action.moveTo, actor.id);
+      attacker = { ...actor, pos: action.moveTo };
+      const movedUnits = s.units.map((u, i) => (i === actorIdx ? attacker : u));
+      s = { ...s, grid: newGrid, units: movedUnits };
+      s.log = [...s.log, { type: 'move', data: { unitId: actorId, to: action.moveTo } }];
+    }
+
+    const damage = calculateDamage(attacker, target, s.hero.attack, rng);
     const { killed, remaining } = applyDamage(target, damage);
 
     const newUnits = s.units.map((u, i) => i === targetIdx ? remaining : u);
@@ -110,8 +120,8 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     // Retaliation (only on regular attack, not on ranged)
     if (action.type === 'attack' && canRetaliate(remaining)) {
-      const retDamage = calculateDamage(remaining, actor, 0, rng);
-      const { killed: retKilled, remaining: retActor } = applyDamage(actor, retDamage);
+      const retDamage = calculateDamage(remaining, attacker, 0, rng);
+      const { killed: retKilled, remaining: retActor } = applyDamage(attacker, retDamage);
       const updatedUnits = s.units.map(u => {
         if (u.id === targetId) return { ...remaining, hasRetaliated: true };
         if (u.id === actorId) return retActor;

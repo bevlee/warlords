@@ -1,5 +1,6 @@
-import type { BattleAction, BattleState, UnitStack } from './types';
+import type { BattleAction, BattleState } from './types';
 import { findPath, chebyshevDistance } from './grid';
+import { canShootTarget, getMeleeApproaches } from './selectors';
 
 export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);
@@ -13,23 +14,25 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
     chebyshevDistance(unit.pos, e.pos) < chebyshevDistance(unit.pos, closest.pos) ? e : closest
   );
 
-  const dist = chebyshevDistance(unit.pos, target.pos);
-
-  // Ranged: shoot if we have shots and target is anywhere (simplified: range = whole board)
-  if (unit.shotsLeft > 0 && unit.definition.shots > 0) {
+  // Ranged: shoot if the target is within range
+  if (canShootTarget(unit, target)) {
     return { type: 'shoot', targetId: target.id };
   }
 
-  // Melee: if adjacent, attack
-  if (dist <= 1) {
-    return { type: 'attack', targetId: target.id };
+  // Melee: attack in place if adjacent, else move+attack if reachable
+  const approaches = getMeleeApproaches(state, unit);
+  if (approaches.has(target.id)) {
+    const dest = approaches.get(target.id);
+    return dest
+      ? { type: 'attack', targetId: target.id, moveTo: dest }
+      : { type: 'attack', targetId: target.id };
   }
 
-  // Move toward target
+  // Out of reach: walk toward the target
   const path = findPath(state.grid, unit.pos, target.pos, unit.id);
   if (path.length > 0) {
-    // Move up to `speed` cells
-    const steps = Math.min(unit.definition.speed, path.length - 1); // -1: don't step onto target's cell
+    // Move up to `speed` cells; -1: don't step onto the target's cell
+    const steps = Math.min(unit.definition.speed, path.length - 1);
     const moveTo = steps > 0 ? path[steps - 1] : path[0];
     return { type: 'move', to: moveTo };
   }
