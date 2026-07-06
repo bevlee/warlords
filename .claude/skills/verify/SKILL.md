@@ -1,0 +1,36 @@
+---
+name: verify
+description: Build, launch, and drive the Warlords battle UI to verify changes end-to-end
+---
+
+# Verifying Warlords
+
+SvelteKit + Vite app; the whole game runs client-side (no backend).
+
+## Launch
+
+```bash
+npm run dev -- --port 5199   # background; ready when curl localhost:5199 → 200
+```
+
+## Drive (headless Chrome via playwright-core)
+
+No Playwright browsers are installed; use system Chrome:
+`chromium.launch({ channel: 'chrome', headless: true })` with `playwright-core`
+installed in a scratch dir (`npm i playwright-core`).
+
+Useful hooks in the battle UI:
+
+- Status line: first `p.text-sm.text-slate-300` — starts with "Your …" on the
+  player's turn, "Enemy … are acting…" during AI turns, "Victory!"/"Defeat" at end.
+- Reachable cells: `button.bg-emerald-800\/60` (click to move).
+- Attackable enemies: `div.grid button:has(div.ring-red-500)` (click to attack/shoot).
+- All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
+- `Wait` and `New battle` are role=button by name.
+
+Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
+retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;
+poll status ~every 300 ms, a full battle finishes in ~1–2 min), restart.
+
+Gotchas: capture `pageerror`/console errors; a stray dev-only 404 (Chrome
+devtools probe) is environment noise, not a bug.

@@ -1,0 +1,55 @@
+<script lang="ts">
+  import type { UnitStack } from '$lib/engine/types';
+
+  interface Props {
+    unit: UnitStack;
+    isActive?: boolean;
+    isTarget?: boolean;
+    small?: boolean;
+  }
+
+  let { unit, isActive = false, isTarget = false, small = false }: Props = $props();
+
+  const GLYPHS: Record<string, string> = {
+    Goblin: '👺',
+    'Wolf Rider': '🐺',
+    Orc: '🪓',
+    Ogre: '👹',
+    Cyclops: '👁️',
+    Thunderbird: '🦅',
+    Behemoth: '🦍',
+  };
+
+  const glyph = $derived(GLYPHS[unit.definition.name] ?? '❓');
+  const hpPct = $derived(Math.round((unit.hp / unit.definition.hp) * 100));
+  const sideClasses = $derived(
+    unit.side === 'player'
+      ? 'ring-sky-400 bg-sky-950/80'
+      : 'ring-red-400 bg-red-950/80'
+  );
+</script>
+
+<div
+  class="relative flex h-full w-full flex-col items-center justify-center rounded ring-2 {sideClasses}
+    {isActive ? 'ring-4 ring-amber-300 shadow-lg shadow-amber-500/40' : ''}
+    {isTarget ? 'ring-4 ring-red-500 animate-pulse' : ''}"
+  title="{unit.definition.name} ×{unit.count}"
+>
+  <span class={small ? 'text-base leading-none' : 'text-xl leading-none sm:text-2xl'}>{glyph}</span>
+
+  <span
+    class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 font-mono leading-tight text-slate-100
+      {small ? 'text-[9px]' : 'text-[10px] sm:text-xs'}"
+  >
+    {unit.count}
+  </span>
+
+  {#if !small}
+    <div class="absolute left-1 right-1 top-0.5 h-1 overflow-hidden rounded bg-black/50">
+      <div
+        class="h-full {hpPct > 50 ? 'bg-green-400' : hpPct > 25 ? 'bg-yellow-400' : 'bg-red-400'}"
+        style="width: {hpPct}%"
+      ></div>
+    </div>
+  {/if}
+</div>

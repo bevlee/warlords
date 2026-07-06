@@ -1,44 +1,25 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { initBattle, applyAction, checkBattleEnd } from '$lib/engine/battle';
-  import { aiTakeTurn } from '$lib/engine/ai';
-  import { GOBLIN, WOLF_RIDER, ORC } from '$lib/engine/barbarian';
-  import type { Hero, BattleState } from '$lib/engine/types';
+  import Battle from '$lib/ui/Battle.svelte';
+  import { GOBLIN, WOLF_RIDER, ORC, OGRE } from '$lib/engine/barbarian';
+  import type { ArmySlot, Hero } from '$lib/engine/types';
 
-  let log: string[] = $state([]);
+  const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0 };
 
-  onMount(() => {
-    const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 8, defense: 4, statPoints: 0 };
-    let state: BattleState = initBattle(
-      [{ unit: WOLF_RIDER, count: 10 }, { unit: ORC, count: 5 }],
-      [{ unit: GOBLIN, count: 30 }, { unit: WOLF_RIDER, count: 8 }],
-      hero,
-      12345
-    );
+  const playerArmy: ArmySlot[] = [
+    { unit: GOBLIN, count: 20 },
+    { unit: WOLF_RIDER, count: 10 },
+    { unit: ORC, count: 8 },
+    { unit: OGRE, count: 3 },
+  ];
 
-    log = ['Battle started!'];
-    let turns = 0;
-
-    while (state.result === 'ongoing' && turns < 500) {
-      const unitId = state.currentUnitId;
-      if (!unitId) break;
-      const unit = state.units.find(u => u.id === unitId);
-      if (!unit) break;
-
-      const action = aiTakeTurn(state, unitId);
-      state = applyAction(state, action);
-      turns++;
-    }
-
-    log = [...log, `Battle ended after ${turns} turns: ${state.result}`];
-    log = [...log, ...state.log.slice(-10).map(e => `${e.type}: ${JSON.stringify(e.data)}`)];
-    console.log('Battle result:', state.result, state.log);
-  });
+  const enemyArmy: ArmySlot[] = [
+    { unit: GOBLIN, count: 30 },
+    { unit: WOLF_RIDER, count: 8 },
+    { unit: ORC, count: 6 },
+  ];
 </script>
 
-<main class="p-8">
-  <h1 class="text-3xl font-bold mb-4">Warlords — Engine Demo</h1>
-  {#each log as line}
-    <p class="font-mono text-sm">{line}</p>
-  {/each}
+<main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
+  <h1 class="mb-4 text-2xl font-bold">Warlords</h1>
+  <Battle {playerArmy} {enemyArmy} {hero} />
 </main>
