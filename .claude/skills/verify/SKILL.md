@@ -15,6 +15,12 @@ npm run dev -- --port 5199   # background; ready when curl localhost:5199 → 20
 
 ## Drive (headless Chrome via playwright-core)
 
+The app opens on the **army setup screen**: stepper buttons
+`button[aria-label="add 5 Goblin"]` etc., gold in the first
+`span.text-amber-300`, then `Start battle` (role=button; disabled until
+something is bought). Battles end with "New battle" (same armies, new seed)
+or "Change army" (back to setup, fresh generated enemy).
+
 No Playwright browsers are installed; use system Chrome:
 `chromium.launch({ channel: 'chrome', headless: true })` with `playwright-core`
 installed in a scratch dir (`npm i playwright-core`).
