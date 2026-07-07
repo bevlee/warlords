@@ -24,3 +24,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Git worktrees
+.worktrees
