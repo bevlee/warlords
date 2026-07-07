@@ -207,10 +207,13 @@
     transform: rotateX(var(--tilt)) scale(0.97);
     transform-style: preserve-3d;
     transform-origin: 50% 50%;
-    /* Reclaim the vertical space the tilt foreshortens away at the far edge.
-       No negative bottom margin: the perspective-magnified near edge projects
-       below the layout box and would cover the controls. */
-    margin-top: -4%;
+    /* Reclaim the vertical space the tilt foreshortens away: the layout box
+       is the untilted height, ~20% taller than the projected board. The
+       controls and turn bar below sit in their own z-raised stacking
+       contexts, so the projected near edge overlapping this margin cannot
+       swallow their clicks (that was the old reason to avoid this). */
+    margin-top: -5%;
+    margin-bottom: -11%;
   }
 
   .cell {
