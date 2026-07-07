@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { BattleState, Pos, UnitStack } from '$lib/engine/types';
   import type { DamagePreview } from '$lib/engine/selectors';
+  import type { AnimStep } from './animSteps';
   import UnitToken from './UnitToken.svelte';
   import Sprite from './Sprite.svelte';
+  import BattleFx from './BattleFx.svelte';
 
   interface Props {
     state: BattleState;
@@ -14,6 +16,8 @@
     originsByTarget: Map<string, Pos[]>;
     previews: Map<string, DamagePreview>;
     hoveredId: string | null;
+    activeSteps: { unitId: string; step: AnimStep }[];
+    dyingIds: Set<string>;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
     onmeleeaim: (targetId: string, origin: Pos) => void;
@@ -30,6 +34,8 @@
     originsByTarget,
     previews,
     hoveredId,
+    activeSteps,
+    dyingIds,
     oncellclick,
     onunitclick,
     onmeleeaim,
@@ -38,7 +44,12 @@
 
   const TILT_DEG = 38;
 
-  const unitsById = $derived(new Map(battleState.units.filter(u => u.count > 0).map(u => [u.id, u])));
+  // A dying stack's count already reads 0 (patched by applyLogEntry ahead of
+  // the engine's real state) but must keep rendering — still occupying its
+  // grid cell — through the death-fade transition.
+  const unitsById = $derived(
+    new Map(battleState.units.filter(u => u.count > 0 || dyingIds.has(u.id)).map(u => [u.id, u]))
+  );
 
   // LordsWM-style cursors: the pointer itself becomes a sword/bow near targets.
   function emojiCursor(emoji: string): string {
@@ -199,6 +210,16 @@
       {/each}
     {/each}
   </div>
+  <BattleFx
+    gridWidth={battleState.grid.width}
+    gridHeight={battleState.grid.height}
+    steps={activeSteps
+      .map(({ unitId, step }) => {
+        const u = unitsById.get(unitId);
+        return u ? { step, pos: u.pos, key: `${unitId}-${step.kind}-${battleState.log.length}` } : null;
+      })
+      .filter((s): s is { step: AnimStep; pos: Pos; key: string } => s !== null)}
+  />
 </div>
 </div>
 
