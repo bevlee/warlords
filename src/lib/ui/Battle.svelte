@@ -24,6 +24,7 @@
   import UnitInfo from './UnitInfo.svelte';
   import Sprite from './Sprite.svelte';
   import SpellBook from './SpellBook.svelte';
+  import { stepsFromLogEntry, applyLogEntry, type AnimStep } from './animSteps';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -53,6 +54,41 @@
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
   let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero));
+
+  // Incremental reveal: an action's sub-events (hit, retaliate, death) play
+  // as separate beats. While a sequence runs, `animating` locks player input
+  // and the AI timer. `revealToken` invalidates an in-flight sequence when
+  // restart/forfeit replaces the battle out from under it — a resumed await
+  // must not clobber the fresh state.
+  let animating = $state(false);
+  let activeSteps = $state<{ unitId: string; step: AnimStep }[]>([]);
+  let dyingIds = $state(new Set<string>());
+  let revealToken = 0;
+
+  const STEP_DELAY_MS = $derived({ slow: 700, normal: 450, fast: 200 }[battleSpeed]);
+
+  async function revealAction(result: BattleState) {
+    const token = ++revealToken;
+    animating = true;
+    const newEntries = result.log.slice(battle.log.length);
+    let working = battle;
+
+    for (const entry of newEntries) {
+      working = applyLogEntry(working, entry);
+      activeSteps = stepsFromLogEntry(entry).map(step => ({ unitId: step.unitId, step }));
+      if (entry.type === 'death') {
+        dyingIds = new Set([...dyingIds, (entry.data as { unitId: string }).unitId]);
+      }
+      battle = working;
+      await new Promise(r => setTimeout(r, STEP_DELAY_MS));
+      if (token !== revealToken) return;
+    }
+
+    activeSteps = [];
+    dyingIds = new Set();
+    battle = result; // ground-truth correction
+    animating = false;
+  }
 
   const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
   const heroUnit = $derived(battle.units.find(u => u.isHero) ?? null);
@@ -171,50 +207,53 @@
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
-    if (battle.result !== 'ongoing') return;
+    if (battle.result !== 'ongoing' || animating) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
-      if (battle.result !== 'ongoing') return; // forfeited while the timer was pending
-      battle = applyAction(battle, aiTakeTurn(battle, unit.id));
+      // Re-check at fire time: forfeited or still animating while pending.
+      if (battle.result !== 'ongoing' || animating) return;
+      revealAction(applyAction(battle, aiTakeTurn(battle, unit.id)));
     }, AI_DELAY_MS);
     return () => clearTimeout(timer);
   });
 
   function attackFrom(targetId: string, origin: Pos) {
     const inPlace = activeUnit && origin.col === activeUnit.pos.col && origin.row === activeUnit.pos.row;
-    battle = applyAction(
-      battle,
-      inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin }
+    revealAction(
+      applyAction(
+        battle,
+        inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin }
+      )
     );
     hovered = null;
   }
 
   function castAt(unit: UnitStack) {
     if (!pendingSpell) return;
-    battle = applyAction(battle, { type: 'cast', spell: pendingSpell, targetId: unit.id });
+    revealAction(applyAction(battle, { type: 'cast', spell: pendingSpell, targetId: unit.id }));
     pendingSpell = null;
     hovered = null;
   }
 
   function handleCellClick(pos: Pos) {
-    if (!isPlayerTurn) return;
+    if (!isPlayerTurn || animating) return;
     if (pendingSpell) {
       pendingSpell = null; // clicking empty ground cancels the cast
       return;
     }
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
-    battle = applyAction(battle, { type: 'move', to: pos });
+    revealAction(applyAction(battle, { type: 'move', to: pos }));
   }
 
   // The grid resolved an aimed melee: move to the chosen tile and strike.
   function handleMeleeAim(targetId: string, origin: Pos) {
-    if (!isPlayerTurn || !activeUnit) return;
+    if (!isPlayerTurn || animating || !activeUnit) return;
     attackFrom(targetId, origin);
   }
 
   function handleUnitClick(unit: UnitStack, _shift = false) {
-    if (!isPlayerTurn || !activeUnit) return;
+    if (!isPlayerTurn || animating || !activeUnit) return;
 
     if (pendingSpell) {
       if (spellTargetIds?.has(unit.id)) castAt(unit);
@@ -226,7 +265,7 @@
 
     const action = actionIcons.get(unit.id);
     if (action === 'shoot') {
-      battle = applyAction(battle, { type: 'shoot', targetId: unit.id });
+      revealAction(applyAction(battle, { type: 'shoot', targetId: unit.id }));
       hovered = null;
     } else if (action === 'melee') {
       // Fallback for non-mouse activation (keyboard): nearest origin.
@@ -236,24 +275,32 @@
   }
 
   function handleWait() {
-    if (!isPlayerTurn) return;
+    if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    battle = applyAction(battle, { type: 'wait' });
+    revealAction(applyAction(battle, { type: 'wait' }));
   }
 
   function handleDefend() {
-    if (!isPlayerTurn) return;
+    if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    battle = applyAction(battle, { type: 'defend' });
+    revealAction(applyAction(battle, { type: 'defend' }));
   }
 
   function handleForfeit() {
     if (battle.result !== 'ongoing') return;
+    revealToken++; // abort any in-flight reveal so it can't clobber the forfeit
+    animating = false;
+    activeSteps = [];
+    dyingIds = new Set();
     pendingSpell = null;
     battle = { ...battle, result: 'enemy_wins', log: [...battle.log, { type: 'battle_end', data: { result: 'enemy_wins', forfeit: true } }] };
   }
 
   function restart() {
+    revealToken++; // abort any in-flight reveal so it can't clobber the new battle
+    animating = false;
+    activeSteps = [];
+    dyingIds = new Set();
     pendingSpell = null;
     resultAnnounced = false;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
@@ -383,11 +430,13 @@
           reachableKeys={pendingSpell ? new Set() : reachableKeys}
           targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
-          interactive={isPlayerTurn}
+          interactive={isPlayerTurn && !animating}
           actionIcons={gridActionIcons}
           originsByTarget={pendingSpell ? new Map() : originsByTarget}
           {previews}
           hoveredId={hovered?.id ?? null}
+          {activeSteps}
+          {dyingIds}
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
