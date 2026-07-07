@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { xpToReach, applyXp, budgetForLevel } from '../progression';
 import type { Hero } from '../types';
 
-const freshHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0 };
+const freshHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [] };
 
 describe('progression', () => {
   it('xp curve: level 2 at 200, level 3 at 600, level 4 at 1200', () => {

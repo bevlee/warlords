@@ -58,5 +58,15 @@ army's value, levels give +1 attack/defense (mana, strike, and Lightning
 already scale), battle budgets grow 50/level, and the hero persists in
 IndexedDB with a reset option.
 
-1. **Long term** — unit art replacing emoji standees, factions beyond
-   Barbarian, faction skills in the damage formula, PvP/economy layers.
+Also done: **Knight and Wizard factions** (7-tier rosters each, picked on
+the army setup screen alongside Barbarian) and **faction skills** —
+Barbarian Offense/Armorer/Leadership, Knight Tactics/Armorer/Leadership,
+Wizard Sorcery/Intelligence/Mysticism — unlocking and levelling with the
+hero and feeding the damage formula (Offense/Armorer) and starting morale
+(Leadership). Knight Cavalier/Champion have Jousting (+5% damage per cell
+charged); Wizard Gorgon has Death Stare (10% chance to instantly kill the
+top defending creature).
+
+1. **Long term** — unit art replacing emoji standees, PvP/economy layers,
+   remaining faction skills without combat effects yet (Tactics, Sorcery's
+   spell-damage hookup, Intelligence, Mysticism).

@@ -46,12 +46,15 @@ export function advanceTurn(state: BattleState): BattleState {
   const battleTime = state.battleTime + dt;
   let { round, log } = state;
   const newRound = Math.floor(battleTime) + 1;
+  let finalUnits = units;
   if (newRound > round) {
     round = newRound;
     log = [...log, { type: 'round_start', data: { round } }];
+    // Knight jousting only counts movement made within the same charge.
+    finalUnits = units.map(u => (u.lastMovedFrom ? { ...u, lastMovedFrom: undefined } : u));
   }
 
-  return { ...state, units, battleTime, round, log, currentUnitId: actor.id };
+  return { ...state, units: finalUnits, battleTime, round, log, currentUnitId: actor.id };
 }
 
 /**

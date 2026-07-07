@@ -1,5 +1,6 @@
 import type { UnitStack, Hero } from './types';
 import type { Rng } from './rng';
+import { chebyshevDistance } from './grid';
 
 /**
  * HoMM3-style damage formula.
@@ -39,6 +40,13 @@ export function modifiedDamage(
     const penalty = Math.min(def - atk, 20);
     totalDamage /= 1 + 0.05 * penalty;
   }
+
+  // Knight Jousting: cavalry deals +5% damage per cell moved before this attack.
+  if (attacker.definition.abilities.includes('jousting') && attacker.lastMovedFrom) {
+    const cellsMoved = chebyshevDistance(attacker.pos, attacker.lastMovedFrom);
+    if (cellsMoved > 0) totalDamage *= 1 + 0.05 * cellsMoved;
+  }
+
   return totalDamage;
 }
 
@@ -60,6 +68,11 @@ export function calculateDamage(
   // Bad luck: 12.5% * abs(luck) chance to halve
   if (attacker.luck < 0 && rng() < 0.125 * Math.abs(attacker.luck)) {
     totalDamage *= 0.5;
+  }
+
+  // Wizard Gorgon Death Stare: 10% chance to instantly kill the top defending creature.
+  if (attacker.definition.abilities.includes('death_stare') && rng() < 0.1) {
+    totalDamage += defender.definition.hp;
   }
 
   return Math.max(1, Math.round(totalDamage));

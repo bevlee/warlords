@@ -11,6 +11,22 @@ export const UNIT_COSTS: Record<string, number> = {
   Cyclops: 40,
   Thunderbird: 60,
   Behemoth: 100,
+
+  Peasant: 2,
+  Archer: 8,
+  Griffin: 30,
+  Swordsman: 35,
+  Monk: 45,
+  Cavalier: 90,
+  Champion: 150,
+
+  Gremlin: 3,
+  'Stone Golem': 20,
+  Mage: 25,
+  Gorgon: 40,
+  Naga: 65,
+  Giant: 90,
+  Titan: 150,
 };
 
 export const DEFAULT_BUDGET = 300;

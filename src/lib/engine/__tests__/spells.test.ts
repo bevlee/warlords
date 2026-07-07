@@ -5,7 +5,7 @@ import { mulberry32 } from '../rng';
 import { GOBLIN, OGRE, WOLF_RIDER } from '../barbarian';
 import type { BattleState, Hero } from '../types';
 
-const hero: Hero = { class: 'barbarian', level: 2, xp: 0, attack: 4, defense: 2, statPoints: 0 };
+const hero: Hero = { class: 'barbarian', level: 2, xp: 0, attack: 4, defense: 2, statPoints: 0, factionSkills: [] };
 
 function newBattle(seed = 11): BattleState {
   return initBattle(

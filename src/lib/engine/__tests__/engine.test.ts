@@ -4,9 +4,12 @@ import { calculateDamage, applyDamage, canRetaliate, checkMorale } from '../comb
 import { createGrid, findPath, chebyshevDistance } from '../grid';
 import { initBattle, applyAction, checkBattleEnd } from '../battle';
 import { GOBLIN, WOLF_RIDER, ORC, BEHEMOTH } from '../barbarian';
+import { CAVALIER, ARCHER } from '../knight';
+import { GORGON, MAGE } from '../wizard';
+import { updateFactionSkills } from '../factionSkills';
 import type { UnitStack, Hero, ArmySlot } from '../types';
 
-const mockHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 5, defense: 3, statPoints: 0 };
+const mockHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 5, defense: 3, statPoints: 0, factionSkills: [] };
 
 function makeStack(overrides: Partial<UnitStack>): UnitStack {
   return {
@@ -194,7 +197,7 @@ describe('initBattle obstacles', () => {
 
 describe('full battle simulation', () => {
   it('eventually ends with a winner', () => {
-    const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 10, defense: 5, statPoints: 0 };
+    const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 10, defense: 5, statPoints: 0, factionSkills: [] };
     let state = initBattle(
       [{ unit: WOLF_RIDER, count: 20 }, { unit: ORC, count: 10 }],
       [{ unit: GOBLIN, count: 50 }],
@@ -208,6 +211,34 @@ describe('full battle simulation', () => {
       if (!unitId) break;
       const unit = state.units.find(u => u.id === unitId)!;
       // Simple: always attack the first enemy
+      const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
+      if (enemies.length === 0) break;
+      const action = unit.shotsLeft > 0
+        ? { type: 'shoot' as const, targetId: enemies[0].id }
+        : { type: 'attack' as const, targetId: enemies[0].id };
+      state = applyAction(state, action);
+      iterations++;
+    }
+
+    expect(['player_wins', 'enemy_wins']).toContain(state.result);
+  });
+
+  it('eventually ends with a winner when Knight and Wizard units are involved', () => {
+    const hero: Hero = updateFactionSkills({
+      class: 'knight', level: 1, xp: 0, attack: 10, defense: 5, statPoints: 0, factionSkills: [],
+    });
+    let state = initBattle(
+      [{ unit: CAVALIER, count: 15 }, { unit: ARCHER, count: 10 }],
+      [{ unit: GORGON, count: 8 }, { unit: MAGE, count: 10 }],
+      hero,
+      123
+    );
+
+    let iterations = 0;
+    while (state.result === 'ongoing' && iterations < 2000) {
+      const unitId = state.currentUnitId;
+      if (!unitId) break;
+      const unit = state.units.find(u => u.id === unitId)!;
       const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
       if (enemies.length === 0) break;
       const action = unit.shotsLeft > 0

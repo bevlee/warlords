@@ -33,7 +33,7 @@ function makeState(units: UnitStack[]): BattleState {
   return {
     grid,
     units,
-    hero: { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0 },
+    hero: { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] },
     round: 1,
     battleTime: 0,
     currentUnitId: units[0]?.id ?? null,

@@ -4,6 +4,17 @@ import { createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
 import { mulberry32 } from './rng';
+import { applyOffenseBonus, applyArmorerBonus, getMoraleBonus } from './factionSkills';
+
+/** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
+ *  reduces damage a player stack takes. Both are hero-wide, so they're applied
+ *  here rather than inside calculateDamage (which only knows per-unit abilities). */
+function withHeroBonus(hero: Hero, attacker: UnitStack, defender: UnitStack, damage: number): number {
+  let d = damage;
+  if (attacker.side === 'player') d = applyOffenseBonus(d, hero);
+  if (defender.side === 'player') d = applyArmorerBonus(d, hero);
+  return d;
+}
 
 const GRID_W = 12;
 const GRID_H = 10;
@@ -46,7 +57,11 @@ export function initBattle(
 ): BattleState {
   let grid = createGrid(GRID_W, GRID_H);
 
-  const playerUnits: UnitStack[] = playerArmy.map((slot, i) => slotToStack(slot, 'player', i));
+  const moraleBonus = getMoraleBonus(hero);
+  const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
+    const stack = slotToStack(slot, 'player', i);
+    return moraleBonus > 0 ? { ...stack, morale: stack.morale + moraleBonus } : stack;
+  });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
 
   // The hero fights too: off-grid on the flank, ATB-scheduled, untargetable.
@@ -185,7 +200,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
   } else if (action.type === 'move') {
     const newGrid = setOccupant(setOccupant(s.grid, actor.pos, null), action.to, actor.id);
-    const updatedActor = { ...actor, pos: action.to };
+    const updatedActor = { ...actor, pos: action.to, lastMovedFrom: actor.pos };
     const newUnits = s.units.map((u, i) => i === actorIdx ? updatedActor : u);
     s = { ...s, grid: newGrid, units: newUnits };
     s.log = [...s.log, { type: 'move', data: { unitId: actorId, to: action.to } }];
@@ -200,13 +215,13 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     let attacker = actor;
     if (action.moveTo) {
       const newGrid = setOccupant(setOccupant(s.grid, actor.pos, null), action.moveTo, actor.id);
-      attacker = { ...actor, pos: action.moveTo };
+      attacker = { ...actor, pos: action.moveTo, lastMovedFrom: actor.pos };
       const movedUnits = s.units.map((u, i) => (i === actorIdx ? attacker : u));
       s = { ...s, grid: newGrid, units: movedUnits };
       s.log = [...s.log, { type: 'move', data: { unitId: actorId, to: action.moveTo } }];
     }
 
-    const damage = calculateDamage(attacker, target, s.hero.attack, rng);
+    const damage = withHeroBonus(s.hero, attacker, target, calculateDamage(attacker, target, s.hero.attack, rng));
     const { killed, remaining } = applyDamage(target, damage);
 
     const newUnits = s.units.map((u, i) => i === targetIdx ? remaining : u);
@@ -224,7 +239,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     // Retaliation (only on regular attack, not on ranged)
     if (action.type === 'attack' && canRetaliate(remaining)) {
-      const retDamage = calculateDamage(remaining, attacker, 0, rng);
+      const retDamage = withHeroBonus(s.hero, remaining, attacker, calculateDamage(remaining, attacker, 0, rng));
       const { killed: retKilled, remaining: retActor } = applyDamage(attacker, retDamage);
       const updatedUnits = s.units.map(u => {
         if (u.id === targetId) return { ...remaining, hasRetaliated: true };
@@ -247,7 +262,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     if (actor.shotsLeft <= 0) return advanceTurn(reenter(s, 0));
 
-    const damage = calculateDamage(actor, target, s.hero.attack, rng);
+    const damage = withHeroBonus(s.hero, actor, target, calculateDamage(actor, target, s.hero.attack, rng));
     const { killed, remaining } = applyDamage(target, damage);
     const shootingActor = { ...actor, shotsLeft: actor.shotsLeft - 1 };
     const newUnits = s.units.map((u, i) => {

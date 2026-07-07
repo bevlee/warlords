@@ -32,6 +32,7 @@ export interface UnitStack {
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
   attackBuff?: number;  // battle-long spell bonus to attack
   defenseBuff?: number; // battle-long spell bonus to defense
+  lastMovedFrom?: Pos;  // set when a unit moves this turn; cleared at round start (Knight jousting)
 }
 
 export interface Cell {
@@ -47,13 +48,23 @@ export interface Grid {
   cells: Cell[][];
 }
 
+export type FactionClass = 'barbarian' | 'knight' | 'wizard';
+
+export interface FactionSkill {
+  id: string;
+  name: string;
+  description: string;
+  level: 1 | 2 | 3; // basic, advanced, expert
+}
+
 export interface Hero {
-  class: 'barbarian';
+  class: FactionClass;
   level: number;
   xp: number;
   attack: number;
   defense: number;
   statPoints: number;
+  factionSkills: FactionSkill[];
   mana?: number;       // set by initBattle (5 + 3·level) unless provided
 }
 

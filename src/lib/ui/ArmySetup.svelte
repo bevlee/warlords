@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { BARBARIAN_UNITS } from '$lib/engine/barbarian';
+  import { FACTION_UNITS, FACTION_INFO } from '$lib/engine/factions';
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
   import { xpToReach } from '$lib/engine/progression';
   import Sprite from './Sprite.svelte';
-  import type { ArmySlot, Hero } from '$lib/engine/types';
+  import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
   interface Props {
     hero: Hero;
@@ -11,20 +11,26 @@
     lastBattle: { xp: number; levels: number } | null;
     onstart: (army: ArmySlot[]) => void;
     onreset: () => void;
+    onclass: (cls: FactionClass) => void;
   }
 
-  let { hero, budget, lastBattle, onstart, onreset }: Props = $props();
+  let { hero, budget, lastBattle, onstart, onreset, onclass }: Props = $props();
 
   const xpFloor = $derived(xpToReach(hero.level));
   const xpCeil = $derived(xpToReach(hero.level + 1));
   const xpPct = $derived(Math.round(((hero.xp - xpFloor) / (xpCeil - xpFloor)) * 100));
 
-  let counts: Record<string, number> = $state(
-    Object.fromEntries(BARBARIAN_UNITS.map(u => [u.name, 0]))
-  );
+  const units = $derived(FACTION_UNITS[hero.class]);
+
+  let counts: Record<string, number> = $state({});
+
+  // Switching faction shows a different roster, so any prior picks no longer apply.
+  $effect(() => {
+    counts = Object.fromEntries(units.map(u => [u.name, 0]));
+  });
 
   const slots = $derived(
-    BARBARIAN_UNITS.filter(u => counts[u.name] > 0).map(u => ({ unit: u, count: counts[u.name] }))
+    units.filter(u => counts[u.name] > 0).map(u => ({ unit: u, count: counts[u.name] }))
   );
   const spent = $derived(armyCost(slots));
   const goldLeft = $derived(budget - spent);
@@ -57,7 +63,7 @@
       <Sprite name="Hero" class="h-12 w-10" />
       <div>
         <p class="text-sm font-semibold text-amber-200">
-          Level {hero.level} Barbarian
+          Level {hero.level} {FACTION_INFO[hero.class].name}
           <span class="ml-2 font-mono text-xs text-slate-300">⚔{hero.attack} 🛡{hero.defense} 💧{5 + 3 * hero.level}</span>
         </p>
         <div class="mt-1 flex items-center gap-2">
@@ -83,6 +89,20 @@
     </button>
   </div>
 
+  <div class="mb-4 grid grid-cols-3 gap-3">
+    {#each Object.entries(FACTION_INFO) as [cls, info] (cls)}
+      <button
+        type="button"
+        class="rounded-lg border px-3 py-2 text-left transition
+          {hero.class === cls ? 'border-amber-500 bg-slate-700' : 'border-slate-700 bg-slate-800 hover:bg-slate-700/60'}"
+        onclick={() => onclass(cls as typeof hero.class)}
+      >
+        <p class="text-sm font-semibold text-slate-100">{info.name}</p>
+        <p class="mt-0.5 text-[11px] leading-tight text-slate-400">{info.description}</p>
+      </button>
+    {/each}
+  </div>
+
   <div class="mb-4 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-4 py-3">
     <div class="flex items-center gap-6">
       <span class="text-lg font-semibold text-amber-300">🪙 {goldLeft} <span class="text-sm font-normal text-slate-400">/ {budget} gold</span></span>
@@ -100,7 +120,7 @@
   </div>
 
   <div class="overflow-hidden rounded-lg border border-slate-700">
-    {#each BARBARIAN_UNITS as unit (unit.name)}
+    {#each units as unit (unit.name)}
       {@const n = counts[unit.name]}
       <div
         class="flex items-center gap-3 border-b border-slate-700/60 bg-slate-800 px-4 py-2 last:border-b-0

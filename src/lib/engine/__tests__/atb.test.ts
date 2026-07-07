@@ -4,9 +4,9 @@ import { advanceTurn, predictTurnOrder } from '../turnOrder';
 import { calculateDamage } from '../combat';
 import { initBattle, applyAction } from '../battle';
 import { GOBLIN, WOLF_RIDER, THUNDERBIRD, OGRE } from '../barbarian';
-import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
+import type { BattleState, Hero, UnitDef, UnitStack, Pos } from '../types';
 
-const mockHero = { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0 } as const;
+const mockHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] };
 
 function makeStack(
   def: UnitDef,
