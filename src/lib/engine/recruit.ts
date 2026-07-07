@@ -27,6 +27,30 @@ export const UNIT_COSTS: Record<string, number> = {
   Naga: 65,
   Giant: 90,
   Titan: 150,
+
+  Skeleton: 3,
+  Zombie: 10,
+  Ghost: 25,
+  Vampire: 45,
+  Lich: 65,
+  'Black Knight': 100,
+  'Bone Dragon': 170,
+
+  Sprite: 4,
+  'Wood Elf': 12,
+  Dendroid: 28,
+  Pegasus: 42,
+  'Grand Elf': 70,
+  'Battle Dwarf': 95,
+  Unicorn: 175,
+
+  Imp: 3,
+  Gog: 11,
+  'Hell Hound': 22,
+  Demon: 45,
+  'Pit Fiend': 65,
+  Efreet: 105,
+  Devil: 180,
 };
 
 export const DEFAULT_BUDGET = 300;

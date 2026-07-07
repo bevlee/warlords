@@ -75,6 +75,11 @@ export function calculateDamage(
     totalDamage += defender.definition.hp;
   }
 
+  // Necromancer Black Knight Death Blow: 20% chance to deal double damage.
+  if (attacker.definition.abilities.includes('death_blow') && rng() < 0.2) {
+    totalDamage *= 2;
+  }
+
   return Math.max(1, Math.round(totalDamage));
 }
 

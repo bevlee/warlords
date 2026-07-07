@@ -80,6 +80,9 @@
           {#if lastBattle.levels > 0}<span class="ml-1 font-bold text-amber-300">Level up!</span>{/if}
         </p>
       {/if}
+      {#if hero.bonusSkeletons}
+        <p class="ml-3 text-sm text-slate-300">💀 +{hero.bonusSkeletons} free Skeletons next battle (Necromancy)</p>
+      {/if}
     </div>
     <button
       type="button"

@@ -1,6 +1,6 @@
 import type { BattleAction, BattleState } from './types';
 import { findPath, chebyshevDistance } from './grid';
-import { canShootTarget, getMeleeApproaches, isShootingBlocked } from './selectors';
+import { canShootTarget, effectiveSpeed, getMeleeApproaches, isShootingBlocked } from './selectors';
 
 export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);
@@ -32,7 +32,7 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const path = findPath(state.grid, unit.pos, target.pos, unit.id);
   if (path.length > 0) {
     // Move up to `speed` cells; -1: don't step onto the target's cell
-    const steps = Math.min(unit.definition.speed, path.length - 1);
+    const steps = Math.min(effectiveSpeed(unit), path.length - 1);
     const moveTo = steps > 0 ? path[steps - 1] : path[0];
     return { type: 'move', to: moveTo };
   }

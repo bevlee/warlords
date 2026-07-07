@@ -2,6 +2,11 @@ import type { BattleState, Grid, Pos, UnitStack } from './types';
 import { getNeighbours, chebyshevDistance } from './grid';
 import { modifiedDamage, applyDamage } from './combat';
 
+/** Movement range for this turn: base speed, plus Logistics, minus any active slow (Zombie slow_on_hit). */
+export function effectiveSpeed(unit: UnitStack): number {
+  return Math.max(0, unit.definition.speed + (unit.speedBonus ?? 0) - (unit.speedPenalty ?? 0));
+}
+
 /**
  * Empty cells the unit can move to this turn: BFS from its position,
  * at most `speed` steps. Walkers cannot path through occupants; flyers
@@ -14,7 +19,7 @@ export function getReachableCells(grid: Grid, unit: UnitStack): Pos[] {
   const reachable: Pos[] = [];
   let frontier: Pos[] = [unit.pos];
 
-  for (let step = 0; step < unit.definition.speed; step++) {
+  for (let step = 0; step < effectiveSpeed(unit); step++) {
     const next: Pos[] = [];
     for (const pos of frontier) {
       for (const nb of getNeighbours(grid, pos.col, pos.row)) {

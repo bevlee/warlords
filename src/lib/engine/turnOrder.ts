@@ -51,7 +51,12 @@ export function advanceTurn(state: BattleState): BattleState {
     round = newRound;
     log = [...log, { type: 'round_start', data: { round } }];
     // Knight jousting only counts movement made within the same charge.
-    finalUnits = units.map(u => (u.lastMovedFrom ? { ...u, lastMovedFrom: undefined } : u));
+    // Zombie slow_on_hit's speed penalty lasts until the round ends.
+    finalUnits = units.map(u =>
+      u.lastMovedFrom || u.speedPenalty !== undefined
+        ? { ...u, lastMovedFrom: undefined, speedPenalty: undefined }
+        : u
+    );
   }
 
   return { ...state, units: finalUnits, battleTime, round, log, currentUnitId: actor.id };

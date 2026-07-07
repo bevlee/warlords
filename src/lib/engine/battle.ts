@@ -1,27 +1,122 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { ArmySlot, BattleAction, BattleState, Hero, SpellId, UnitStack } from './types';
-import { createGrid, placeUnits, setBlocked, setOccupant } from './grid';
+import type { ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, UnitStack } from './types';
+import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
-import { mulberry32 } from './rng';
+import { mulberry32, type Rng } from './rng';
 import {
   applyOffenseBonus,
   applyArmorerBonus,
+  applyArcheryBonus,
+  applyDeathMagicBonus,
+  applyFireMagicBonus,
+  getGatingChance,
   getMoraleBonus,
+  getLogisticsBonus,
+  getNatureLuckBonus,
   getSorceryMultiplier,
   getMysticismRegen,
   getTacticsShift,
   maxMana,
 } from './factionSkills';
+import { DEMON_UNITS } from './demon';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
- *  reduces damage a player stack takes. Both are hero-wide, so they're applied
+ *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon
+ *  Fire Magic scale specific attack shapes. All are hero-wide, so they're applied
  *  here rather than inside calculateDamage (which only knows per-unit abilities). */
-function withHeroBonus(hero: Hero, attacker: UnitStack, defender: UnitStack, damage: number): number {
+function withHeroBonus(
+  hero: Hero,
+  attacker: UnitStack,
+  defender: UnitStack,
+  damage: number,
+  ranged = false
+): number {
   let d = damage;
-  if (attacker.side === 'player') d = applyOffenseBonus(d, hero);
+  if (attacker.side === 'player') {
+    d = applyOffenseBonus(d, hero);
+    if (ranged) d = applyArcheryBonus(d, hero);
+    if (attacker.definition.abilities.includes('area_shot')) d = applyDeathMagicBonus(d, hero);
+    if (attacker.definition.abilities.includes('burn')) d = applyFireMagicBonus(d, hero);
+  }
   if (defender.side === 'player') d = applyArmorerBonus(d, hero);
   return d;
+}
+
+/**
+ * Per-hit status abilities that mutate the striker or the victim rather than
+ * just the damage number (those live in combat.ts's calculateDamage instead):
+ * Vampire life_drain, Zombie slow_on_hit, Ghost drain_morale, Unicorn
+ * blind_on_hit, Efreet burn, Dendroid bind. Called after damage has already
+ * been applied via applyDamage.
+ */
+function applyOnHitEffects(
+  rng: Rng,
+  striker: UnitStack,
+  victim: UnitStack,
+  damageDealt: number,
+  round: number,
+  hero: Hero
+): { striker: UnitStack; victim: UnitStack; events: BattleEvent[] } {
+  let a = striker;
+  let v = victim;
+  const events: BattleEvent[] = [];
+  const abilities = striker.definition.abilities;
+
+  if (abilities.includes('life_drain') && a.count > 0) {
+    const heal = Math.round(damageDealt / a.count);
+    const newHp = Math.min(a.definition.hp, a.hp + heal);
+    if (heal > 0 && newHp !== a.hp) {
+      a = { ...a, hp: newHp };
+      events.push({ type: 'status', data: { effect: 'life_drain', unitId: a.id, heal } });
+    }
+  }
+
+  if (v.count > 0 && !v.isHero) {
+    if (abilities.includes('slow_on_hit') && rng() < 0.3) {
+      v = { ...v, speedPenalty: (v.speedPenalty ?? 0) + 1 };
+      events.push({ type: 'status', data: { effect: 'slow', unitId: v.id } });
+    }
+    if (abilities.includes('drain_morale')) {
+      v = { ...v, morale: Math.max(-3, v.morale - 1) };
+      events.push({ type: 'status', data: { effect: 'drain_morale', unitId: v.id } });
+    }
+    if (abilities.includes('blind_on_hit') && rng() < 0.2) {
+      v = { ...v, blindedUntilRound: round };
+      events.push({ type: 'status', data: { effect: 'blind', unitId: v.id } });
+    }
+    if (abilities.includes('burn')) {
+      const burnDamage = striker.side === 'player' ? applyFireMagicBonus(3, hero) : 3;
+      v = { ...v, burnDamage, burnRoundsLeft: 2 };
+      events.push({ type: 'status', data: { effect: 'burn_apply', unitId: v.id } });
+    }
+    if (abilities.includes('bind')) {
+      v = { ...v, boundUntilRound: round };
+      events.push({ type: 'status', data: { effect: 'bind', unitId: v.id } });
+    }
+  }
+
+  return { striker: a, victim: v, events };
+}
+
+/**
+ * Logs a death and clears its grid cell. Demon Gating gives a fallen
+ * Demon-faction stack on the hero's side a chance to respawn at 1 creature
+ * instead, in the same cell.
+ */
+function handleDeath(s: BattleState, dead: UnitStack, rng: Rng): BattleState {
+  const next: BattleState = { ...s, log: [...s.log, { type: 'death', data: { unitId: dead.id } }] };
+  const gatingChance = dead.side === 'player' ? getGatingChance(next.hero) : 0;
+  if (gatingChance > 0 && DEMON_UNITS.some(u => u.name === dead.definition.name) && rng() < gatingChance) {
+    const revived: UnitStack = { ...dead, count: 1, hp: dead.definition.hp };
+    return {
+      ...next,
+      units: next.units.map(u => (u.id === dead.id ? revived : u)),
+      grid: setOccupant(next.grid, dead.pos, dead.id),
+      log: [...next.log, { type: 'status', data: { effect: 'gating', unitId: dead.id } }],
+    };
+  }
+  return { ...next, grid: setOccupant(next.grid, dead.pos, null) };
 }
 
 const GRID_W = 12;
@@ -67,9 +162,14 @@ export function initBattle(
 
   const moraleBonus = getMoraleBonus(hero);
   const tacticsShift = getTacticsShift(hero);
+  const logisticsBonus = getLogisticsBonus(hero);
+  const luckBonus = getNatureLuckBonus(hero);
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
-    const stack = slotToStack(slot, 'player', i, tacticsShift);
-    return moraleBonus > 0 ? { ...stack, morale: stack.morale + moraleBonus } : stack;
+    let stack = slotToStack(slot, 'player', i, tacticsShift);
+    if (moraleBonus > 0) stack = { ...stack, morale: stack.morale + moraleBonus };
+    if (logisticsBonus > 0) stack = { ...stack, speedBonus: logisticsBonus };
+    if (luckBonus > 0) stack = { ...stack, luck: stack.luck + luckBonus };
+    return stack;
   });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
 
@@ -155,7 +255,54 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   if (!actorId) return s;
   const actorIdx = s.units.findIndex(u => u.id === actorId);
   if (actorIdx < 0) return s;
-  const actor = s.units[actorIdx];
+  let actor = s.units[actorIdx];
+
+  // A finished turn re-enters the scale at 0; wait re-enters at 0.5 (half cycle).
+  const reenter = (st: BattleState, atb: number): BattleState => ({
+    ...st,
+    units: st.units.map(u => (u.id === actorId ? { ...u, atb } : u)),
+  });
+
+  // Status effects resolve at the start of the acting unit's turn: burn damage first, then a blind skip.
+  if (!actor.isHero && actor.count > 0) {
+    if ((actor.burnRoundsLeft ?? 0) > 0) {
+      const burnDamage = actor.burnDamage ?? 0;
+      const { killed, remaining } = applyDamage(actor, burnDamage);
+      const roundsLeft = (actor.burnRoundsLeft ?? 0) - 1;
+      const burned: UnitStack = {
+        ...remaining,
+        burnRoundsLeft: roundsLeft > 0 ? roundsLeft : undefined,
+        burnDamage: roundsLeft > 0 ? actor.burnDamage : undefined,
+      };
+      s = { ...s, units: s.units.map((u, i) => (i === actorIdx ? burned : u)) };
+      s.log = [...s.log, { type: 'status', data: { effect: 'burn', unitId: actorId, damage: burnDamage, killed } }];
+      if (burned.count === 0) {
+        s = handleDeath(s, burned, rng);
+        const endResult = checkBattleEnd(s);
+        if (endResult) {
+          s.log = [...s.log, { type: 'battle_end', data: { result: endResult } }];
+          return { ...s, result: endResult };
+        }
+        return advance(reenter(s, 0));
+      }
+      actor = burned;
+    }
+
+    if (actor.blindedUntilRound !== undefined) {
+      const cleared = { ...actor, blindedUntilRound: undefined };
+      s = { ...s, units: s.units.map((u, i) => (i === actorIdx ? cleared : u)) };
+      s.log = [...s.log, { type: 'status', data: { effect: 'blind', unitId: actorId } }];
+      return advance(reenter(s, 0));
+    }
+  }
+
+  // Bind blocks movement for exactly one upcoming turn, then clears.
+  const wasBound = actor.boundUntilRound !== undefined;
+  if (wasBound) {
+    const cleared = { ...actor, boundUntilRound: undefined };
+    s = { ...s, units: s.units.map((u, i) => (i === actorIdx ? cleared : u)) };
+    actor = cleared;
+  }
 
   // Invalid casts are rejected outright: turn is kept, nothing changes.
   if (action.type === 'cast') {
@@ -173,12 +320,6 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       return state;
     }
   }
-
-  // A finished turn re-enters the scale at 0; wait re-enters at 0.5 (half cycle).
-  const reenter = (st: BattleState, atb: number): BattleState => ({
-    ...st,
-    units: st.units.map(u => (u.id === actorId ? { ...u, atb } : u)),
-  });
 
   // Morale check
   const moraleResult = checkMorale(actor, rng);
@@ -198,8 +339,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? remaining : u)) };
       s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id, damage, killed } }];
       if (remaining.count === 0) {
-        s.log = [...s.log, { type: 'death', data: { unitId: target.id } }];
-        s = { ...s, grid: setOccupant(s.grid, remaining.pos, null) };
+        s = handleDeath(s, remaining, rng);
       }
     } else {
       const buffed =
@@ -218,6 +358,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     s.log = [...s.log, { type: 'defend', data: { unitId: actorId } }];
 
   } else if (action.type === 'move') {
+    if (wasBound) {
+      s.log = [...s.log, { type: 'status', data: { effect: 'bind_block', unitId: actorId } }];
+      return advance(reenter(s, 0));
+    }
     const newGrid = setOccupant(setOccupant(s.grid, actor.pos, null), action.to, actor.id);
     const updatedActor = { ...actor, pos: action.to, lastMovedFrom: actor.pos };
     const newUnits = s.units.map((u, i) => i === actorIdx ? updatedActor : u);
@@ -230,9 +374,11 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     if (targetIdx < 0) return advance(reenter(s, 0));
     const target = s.units[targetIdx];
 
-    // Combined move+attack: relocate the actor before resolving the melee.
+    // Combined move+attack: relocate the actor before resolving the melee (blocked while bound).
     let attacker = actor;
-    if (action.moveTo) {
+    if (action.moveTo && wasBound) {
+      s.log = [...s.log, { type: 'status', data: { effect: 'bind_block', unitId: actorId } }];
+    } else if (action.moveTo) {
       const newGrid = setOccupant(setOccupant(s.grid, actor.pos, null), action.moveTo, actor.id);
       attacker = { ...actor, pos: action.moveTo, lastMovedFrom: actor.pos };
       const movedUnits = s.units.map((u, i) => (i === actorIdx ? attacker : u));
@@ -241,15 +387,22 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     }
 
     const damage = withHeroBonus(s.hero, attacker, target, calculateDamage(attacker, target, s.hero.attack, rng));
-    const { killed, remaining } = applyDamage(target, damage);
+    const { killed, remaining: hitTarget } = applyDamage(target, damage);
+    const { striker: attackerAfterHit, victim: remaining, events: hitEvents } =
+      applyOnHitEffects(rng, attacker, hitTarget, damage, s.round, s.hero);
 
-    const newUnits = s.units.map((u, i) => i === targetIdx ? remaining : u);
-    s = { ...s, units: newUnits };
-    s.log = [...s.log, { type: 'attack', data: { attackerId: actorId, targetId, damage, killed } }];
+    s = {
+      ...s,
+      units: s.units.map((u, i) => {
+        if (i === targetIdx) return remaining;
+        if (i === actorIdx) return attackerAfterHit;
+        return u;
+      }),
+    };
+    s.log = [...s.log, { type: 'attack', data: { attackerId: actorId, targetId, damage, killed } }, ...hitEvents];
 
     if (remaining.count === 0) {
-      s.log = [...s.log, { type: 'death', data: { unitId: targetId } }];
-      s = { ...s, grid: setOccupant(s.grid, remaining.pos, null) };
+      s = handleDeath(s, remaining, rng);
     }
 
     // Check end before retaliation
@@ -260,19 +413,20 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     }
 
     // Retaliation (only on regular attack, not on ranged)
-    if (action.type === 'attack' && canRetaliate(remaining, attacker)) {
-      const retDamage = withHeroBonus(s.hero, remaining, attacker, calculateDamage(remaining, attacker, 0, rng));
-      const { killed: retKilled, remaining: retActor } = applyDamage(attacker, retDamage);
+    if (canRetaliate(remaining, attackerAfterHit)) {
+      const retDamage = withHeroBonus(s.hero, remaining, attackerAfterHit, calculateDamage(remaining, attackerAfterHit, 0, rng));
+      const { killed: retKilled, remaining: hitAttacker } = applyDamage(attackerAfterHit, retDamage);
+      const { striker: retaliatorAfterHit, victim: retActor, events: retEvents } =
+        applyOnHitEffects(rng, remaining, hitAttacker, retDamage, s.round, s.hero);
       const updatedUnits = s.units.map(u => {
-        if (u.id === targetId) return { ...remaining, hasRetaliated: true };
+        if (u.id === targetId) return { ...retaliatorAfterHit, hasRetaliated: true };
         if (u.id === actorId) return retActor;
         return u;
       });
       s = { ...s, units: updatedUnits };
-      s.log = [...s.log, { type: 'retaliate', data: { attackerId: targetId, targetId: actorId, damage: retDamage, killed: retKilled } }];
+      s.log = [...s.log, { type: 'retaliate', data: { attackerId: targetId, targetId: actorId, damage: retDamage, killed: retKilled } }, ...retEvents];
       if (retActor.count === 0) {
-        s.log = [...s.log, { type: 'death', data: { unitId: actorId } }];
-        s = { ...s, grid: setOccupant(s.grid, retActor.pos, null) };
+        s = handleDeath(s, retActor, rng);
       }
     }
 
@@ -284,19 +438,47 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     if (actor.shotsLeft <= 0) return advance(reenter(s, 0));
 
-    const damage = withHeroBonus(s.hero, actor, target, calculateDamage(actor, target, s.hero.attack, rng));
-    const { killed, remaining } = applyDamage(target, damage);
-    const shootingActor = { ...actor, shotsLeft: actor.shotsLeft - 1 };
-    const newUnits = s.units.map((u, i) => {
-      if (i === actorIdx) return shootingActor;
-      if (i === targetIdx) return remaining;
-      return u;
-    });
-    s = { ...s, units: newUnits };
-    s.log = [...s.log, { type: 'shoot', data: { attackerId: actorId, targetId, damage, killed } }];
-    if (remaining.count === 0) {
-      s.log = [...s.log, { type: 'death', data: { unitId: targetId } }];
-      s = { ...s, grid: setOccupant(s.grid, remaining.pos, null) };
+    // Grand Elf double_shot fires twice, consuming 2 shots.
+    const shotCount = actor.definition.abilities.includes('double_shot') ? 2 : 1;
+    let currentTarget = target;
+    let firstShotDamage = 0;
+    for (let shot = 0; shot < shotCount && currentTarget.count > 0; shot++) {
+      const shotDamage = withHeroBonus(s.hero, actor, currentTarget, calculateDamage(actor, currentTarget, s.hero.attack, rng), true);
+      if (shot === 0) firstShotDamage = shotDamage;
+      const { killed, remaining } = applyDamage(currentTarget, shotDamage);
+      currentTarget = remaining;
+      s.log = [...s.log, { type: 'shoot', data: { attackerId: actorId, targetId, damage: shotDamage, killed } }];
+    }
+
+    const shootingActor = { ...actor, shotsLeft: Math.max(0, actor.shotsLeft - shotCount) };
+    s = {
+      ...s,
+      units: s.units.map((u, i) => {
+        if (i === actorIdx) return shootingActor;
+        if (i === targetIdx) return currentTarget;
+        return u;
+      }),
+    };
+    if (currentTarget.count === 0) {
+      s = handleDeath(s, currentTarget, rng);
+    }
+
+    // Lich area_shot: 50% splash damage to enemy stacks adjacent to the target.
+    if (actor.definition.abilities.includes('area_shot')) {
+      const splashDamage = Math.max(1, Math.round(firstShotDamage * 0.5));
+      const splashTargets = s.units.filter(
+        u => u.id !== targetId && u.count > 0 && !u.isHero && u.side !== actor.side
+          && chebyshevDistance(u.pos, target.pos) === 1
+      );
+      for (const victim of splashTargets) {
+        const idx = s.units.findIndex(u => u.id === victim.id);
+        const { killed: splashKilled, remaining: splashRemaining } = applyDamage(s.units[idx], splashDamage);
+        s = { ...s, units: s.units.map((u, i) => (i === idx ? splashRemaining : u)) };
+        s.log = [...s.log, { type: 'shoot', data: { attackerId: actorId, targetId: victim.id, damage: splashDamage, killed: splashKilled, splash: true } }];
+        if (splashRemaining.count === 0) {
+          s = handleDeath(s, splashRemaining, rng);
+        }
+      }
     }
   }
 

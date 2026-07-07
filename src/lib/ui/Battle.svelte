@@ -275,6 +275,20 @@
         return `High morale! ${unitLabel(d.unitId)} act again.`;
       case 'morale_freeze':
         return `Low morale — ${unitLabel(d.unitId)} freeze and skip their turn.`;
+      case 'status': {
+        const label = unitLabel(d.unitId);
+        switch (d.effect) {
+          case 'life_drain': return `${label} drain ${d.heal} HP of life.`;
+          case 'slow': return `${label} are slowed.`;
+          case 'drain_morale': return `${label} morale is drained.`;
+          case 'blind': return `${label} are blinded and skip their turn.`;
+          case 'burn_apply': return `${label} catch fire.`;
+          case 'burn': return `${label} burn for ${d.damage} damage.`;
+          case 'bind': return `${label} are bound in place.`;
+          case 'bind_block': return `${label} strain against their bindings and cannot move.`;
+          default: return `${label} are affected by ${d.effect}.`;
+        }
+      }
       case 'battle_end':
         return 'The battle is over.';
       default:

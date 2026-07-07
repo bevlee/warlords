@@ -67,6 +67,24 @@ hero and feeding the damage formula (Offense/Armorer) and starting morale
 charged); Wizard Gorgon has Death Stare (10% chance to instantly kill the
 top defending creature).
 
+Also done: **Necromancer, Ranger, and Demon factions** (7-tier rosters
+each), with new combat mechanics backing their unique abilities — slow on
+hit, morale drain, life drain, double shot, blind on hit, burn (a
+damage-over-time status), bind (blocks movement), area-of-effect shots,
+and death-blow double damage — plus their faction skills: Necromancer
+Necromancy (raises free Skeletons from a defeated army's HP)/Death
+Magic/Sorcery, Ranger Archery/Logistics/Nature's Luck, and Demon
+Offense/Fire Magic/Gating (a chance for a fallen Demon-faction unit to
+respawn for free). Demon's Gate, Devil's Teleport, and Pit Fiend's Haste
+cast remain stubs for a future milestone.
+
+Also done: a **single-player campaign** — 5 chapters of linear encounters
+with procedurally generated enemy armies that scale with hero level, a
+visual campaign map (locked/available/completed nodes) between the
+faction picker and army setup, and IndexedDB-persisted campaign progress
+alongside the hero record.
+
 1. **Long term** — unit art replacing emoji standees, PvP/economy layers,
    remaining faction skills without combat effects yet (Tactics, Sorcery's
-   spell-damage hookup, Intelligence, Mysticism).
+   spell-damage hookup, Intelligence, Mysticism), and the deferred Demon
+   Gate/Teleport/Haste abilities.

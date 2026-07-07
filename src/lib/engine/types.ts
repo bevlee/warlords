@@ -33,6 +33,12 @@ export interface UnitStack {
   attackBuff?: number;  // battle-long spell bonus to attack
   defenseBuff?: number; // battle-long spell bonus to defense
   lastMovedFrom?: Pos;  // set when a unit moves this turn; cleared at round start (Knight jousting)
+  speedBonus?: number;        // battle-long movement bonus (Ranger Logistics), set once at battle start
+  speedPenalty?: number;      // temporary movement reduction (Zombie slow_on_hit); cleared at round start
+  blindedUntilRound?: number; // set on blind_on_hit proc; cleared after skipping this stack's next turn
+  burnDamage?: number;        // flat damage applied at the start of this stack's turn while burnRoundsLeft > 0
+  burnRoundsLeft?: number;    // remaining turns of burn damage (Efreet)
+  boundUntilRound?: number;   // set on bind proc; blocks movement on this stack's next turn, then clears
 }
 
 export interface Cell {
@@ -48,7 +54,7 @@ export interface Grid {
   cells: Cell[][];
 }
 
-export type FactionClass = 'barbarian' | 'knight' | 'wizard';
+export type FactionClass = 'barbarian' | 'knight' | 'wizard' | 'necromancer' | 'ranger' | 'demon';
 
 export interface FactionSkill {
   id: string;
@@ -66,6 +72,7 @@ export interface Hero {
   statPoints: number;
   factionSkills: FactionSkill[];
   mana?: number;       // set by initBattle (5 + 3·level) unless provided
+  bonusSkeletons?: number; // Necromancer Necromancy: free Skeletons queued for the hero's next battle
 }
 
 export type SpellId = 'lightning' | 'bloodlust' | 'stoneskin';
@@ -77,7 +84,7 @@ export interface ArmySlot {
 
 export type BattleEventType =
   | 'attack' | 'retaliate' | 'shoot' | 'move' | 'defend' | 'cast'
-  | 'death' | 'morale_boost' | 'morale_freeze'
+  | 'death' | 'morale_boost' | 'morale_freeze' | 'status'
   | 'round_start' | 'battle_end';
 
 export interface BattleEvent {

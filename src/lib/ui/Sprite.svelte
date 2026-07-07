@@ -272,6 +272,214 @@
       <path d="M31 12 q4 -8 10 -6 q-2 6 -6 8z" fill="#dc2626" />
       <circle cx="29" cy="27" r="1.6" fill="#3f2d20" stroke="none" />
       <circle cx="37" cy="27" r="1.6" fill="#3f2d20" stroke="none" />
+    {:else if name === 'Skeleton'}
+      <path d="M26 58 l0 18 M38 58 l0 18" stroke="#e7e5e4" stroke-width="3" />
+      <path d="M22 40 q10 -8 20 0 l0 20 h-20 z" fill="none" />
+      <path d="M24 42 h16 M24 47 h16 M24 52 h16" stroke="#e7e5e4" stroke-width="2" />
+      <path d="M16 44 l6 -2 M48 44 l-6 -2" stroke="#e7e5e4" stroke-width="2" />
+      <circle cx="32" cy="26" r="10" fill="#f5f5f4" />
+      <path d="M27 24 q5 4 10 0" stroke="#1c1917" fill="none" />
+      <circle cx="27" cy="23" r="2.2" fill="#1c1917" stroke="none" />
+      <circle cx="37" cy="23" r="2.2" fill="#1c1917" stroke="none" />
+      <path d="M30 30 l1 3 h2 l1 -3z" fill="#1c1917" stroke="none" />
+    {:else if name === 'Zombie'}
+      <path d="M24 60 l-4 16 h9 l1 -13" fill="#3f6212" />
+      <path d="M39 60 l4 16 h-9 l-1 -13" fill="#3f6212" />
+      <path d="M20 40 q12 -8 24 2 l1 20 h-27 z" fill="#65805c" />
+      <path d="M18 42 q-8 8 -3 18 l6 -1" fill="#65805c" />
+      <path d="M45 44 q7 6 4 16 l-6 -1" fill="#65805c" />
+      <circle cx="31" cy="26" r="10" fill="#84936f" />
+      <path d="M24 24 q9 -10 16 -2" stroke="#3f6212" fill="none" />
+      <circle cx="27" cy="26" r="1.8" fill="#1c1917" stroke="none" />
+      <circle cx="35" cy="24" r="1.4" fill="#1c1917" stroke="none" />
+      <path d="M28 32 q4 1 7 -1" fill="none" />
+    {:else if name === 'Ghost'}
+      <path d="M18 40 q14 -18 28 0 l2 30 q-4 4 -6 0 q-3 5 -6 0 q-3 5 -6 0 q-3 5 -6 0 q-3 5 -6 0 z" fill="#e0e7ff" fill-opacity="0.85" />
+      <circle cx="32" cy="30" r="9" fill="#f8fafc" fill-opacity="0.9" />
+      <circle cx="28" cy="29" r="2" fill="#4338ca" stroke="none" />
+      <circle cx="36" cy="29" r="2" fill="#4338ca" stroke="none" />
+      <path d="M28 36 q4 -3 8 0" fill="none" stroke="#4338ca" />
+    {:else if name === 'Vampire'}
+      <path d="M16 34 q16 -6 16 10 l0 8 q-10 6 -16 -2 z" fill="#1e1b1b" />
+      <path d="M48 34 q-16 -6 -16 10 l0 8 q10 6 16 -2 z" fill="#1e1b1b" />
+      <path d="M23 40 q9 -8 18 0 l2 24 h-22 z" fill="#27272a" />
+      <path d="M23 60 l-2 16 h8 M39 60 l2 16 h-8" stroke="#18181b" />
+      <circle cx="32" cy="27" r="9" fill="#e4d4c8" />
+      <path d="M23 25 q9 -11 18 0 l0 -3 q-9 -7 -18 0z" fill="#18181b" />
+      <circle cx="28" cy="27" r="1.8" fill="#dc2626" stroke="none" />
+      <circle cx="36" cy="27" r="1.8" fill="#dc2626" stroke="none" />
+      <path d="M29 32 l1 3 M35 32 l-1 3" stroke="#f8fafc" stroke-width="1.5" />
+    {:else if name === 'Lich'}
+      <path d="M20 38 q12 -10 24 0 l3 32 h-30 z" fill="#3730a3" />
+      <path d="M17 42 q-8 8 -3 18 l6 -1" fill="#3730a3" />
+      <path d="M46 42 q7 6 4 16 l-6 -1" fill="#3730a3" />
+      <path d="M50 18 l0 36" stroke="#78716c" stroke-width="3" />
+      <circle cx="50" cy="16" r="4" fill="#a855f7" />
+      <path d="M22 24 q10 -12 20 0 l-2 6 q-8 -6 -16 0z" fill="#4c1d95" />
+      <circle cx="27" cy="26" r="2.2" fill="#a855f7" stroke="none" />
+      <circle cx="37" cy="26" r="2.2" fill="#a855f7" stroke="none" />
+    {:else if name === 'Black Knight'}
+      <path d="M22 60 l-3 16 h9 l2 -13" fill="#1e1b1b" />
+      <path d="M40 60 l3 16 h-9 l-2 -13" fill="#1e1b1b" />
+      <path d="M19 38 q13 -10 26 0 l2 24 h-30 z" fill="#27272a" />
+      <rect x="22" y="52" width="20" height="5" fill="#4c1d95" />
+      <path d="M48 18 l0 32" stroke="#3f3f46" stroke-width="4" />
+      <path d="M44 16 l4 -7 l4 7z" fill="#71717a" />
+      <path d="M16 40 q-9 5 -6 18 l7 -1z" fill="#27272a" />
+      <circle cx="32" cy="25" r="10" fill="#18181b" />
+      <path d="M22 25 q10 -14 20 0 l0 -6 q-10 -8 -20 0z" fill="#3f3f46" />
+      <circle cx="28" cy="25" r="1.6" fill="#a855f7" stroke="none" />
+      <circle cx="36" cy="25" r="1.6" fill="#a855f7" stroke="none" />
+    {:else if name === 'Bone Dragon'}
+      <path d="M32 44 q-18 -16 -30 -10 q5 11 17 14 q-8 3 -13 9 q11 5 20 0z" fill="#e7e5e4" />
+      <path d="M32 44 q18 -16 30 -10 q-5 11 -17 14 q8 3 13 9 q-11 5 -20 0z" fill="#e7e5e4" />
+      <path d="M25 38 q7 -8 14 0 l0 24 q-7 4 -14 0z" fill="#f5f5f4" />
+      <path d="M27 38 l3 22 M35 38 l-3 22" stroke="#a8a29e" />
+      <circle cx="32" cy="28" r="9" fill="#f5f5f4" />
+      <path d="M25 22 l-3 -8 M39 22 l3 -8" stroke="#a8a29e" stroke-width="2" />
+      <circle cx="28" cy="27" r="1.8" fill="#dc2626" stroke="none" />
+      <circle cx="36" cy="27" r="1.8" fill="#dc2626" stroke="none" />
+      <path d="M28 33 q4 3 8 0" fill="none" />
+    {:else if name === 'Sprite'}
+      <path d="M32 40 q-10 -14 -20 -8 q3 9 12 11 q-6 3 -9 8 q8 3 15 -2z" fill="#facc15" fill-opacity="0.8" />
+      <path d="M32 40 q10 -14 20 -8 q-3 9 -12 11 q6 3 9 8 q-8 3 -15 -2z" fill="#facc15" fill-opacity="0.8" />
+      <circle cx="32" cy="34" r="8" fill="#4ade80" />
+      <circle cx="29" cy="33" r="1.4" fill="#14532d" stroke="none" />
+      <circle cx="35" cy="33" r="1.4" fill="#14532d" stroke="none" />
+      <path d="M28 46 q4 6 0 14 M36 46 q-4 6 0 14" stroke="#22c55e" stroke-width="2" fill="none" />
+    {:else if name === 'Wood Elf'}
+      <path d="M25 58 l-2 18 h8 l1 -15" fill="#365314" />
+      <path d="M38 58 l2 18 h-8 l-1 -15" fill="#365314" />
+      <path d="M22 38 q10 -8 20 0 l2 22 h-24 z" fill="#4d7c0f" />
+      <path d="M44 20 q6 18 -2 34" fill="none" stroke="#8b5a2b" stroke-width="2.5" />
+      <path d="M44 20 l-6 5 M44 54 l-6 -4" stroke="#bef264" stroke-width="1.2" />
+      <path d="M20 40 q-8 8 -4 18 l5 1" fill="#4d7c0f" />
+      <circle cx="32" cy="26" r="9" fill="#d8ab72" />
+      <path d="M23 24 q9 -9 18 0 l-1 -4 q-8 -6 -16 0z" fill="#166534" />
+      <circle cx="29" cy="26" r="1.5" fill="#3f2d20" stroke="none" />
+      <circle cx="35" cy="26" r="1.5" fill="#3f2d20" stroke="none" />
+    {:else if name === 'Dendroid'}
+      <path d="M18 64 l-4 14 h10 M42 64 l4 14 h-10" fill="none" stroke="#4d3319" stroke-width="2" />
+      <path d="M16 34 q16 -14 32 0 l2 30 h-36 z" fill="#6b4423" />
+      <path d="M20 40 l-8 -6 M44 40 l8 -6 M18 50 l-9 2 M46 50 l9 2" stroke="#4d3319" stroke-width="2.5" />
+      <circle cx="32" cy="20" r="12" fill="#3f6212" />
+      <path d="M22 16 q10 -10 20 0 M24 26 q8 6 16 0" stroke="#1a2e05" fill="none" />
+      <circle cx="27" cy="19" r="1.8" fill="#1a2e05" stroke="none" />
+      <circle cx="37" cy="19" r="1.8" fill="#1a2e05" stroke="none" />
+    {:else if name === 'Pegasus'}
+      <path d="M10 56 q4 -14 26 -13 q18 1 24 9 q5 7 -3 10 q-22 5 -42 0 q-7 -2 -5 -6z" fill="#f8fafc" />
+      <path d="M50 46 q13 -6 16 4 l-8 1 l6 6 q-10 4 -14 -4z" fill="#f1f5f9" />
+      <path d="M52 42 l-2 -8 l7 6z" fill="#e2e8f0" />
+      <circle cx="58" cy="52" r="1.8" fill="#1e293b" stroke="none" />
+      <path d="M8 56 l-6 6 l8 1z" fill="#f1f5f9" />
+      <path d="M6 58 l-2 14 h7 l2 -11 M44 62 l2 14 h-7 l-1 -11" fill="#cbd5e1" />
+      <circle cx="30" cy="30" r="9" fill="#f8fafc" />
+      <path d="M22 27 l-8 -4 l7 8z M38 27 l8 -4 l-7 8z" fill="#fde68a" />
+      <circle cx="27" cy="29" r="1.6" fill="#1e293b" stroke="none" />
+      <circle cx="33" cy="29" r="1.6" fill="#1e293b" stroke="none" />
+    {:else if name === 'Grand Elf'}
+      <path d="M25 58 l-2 18 h8 l1 -15" fill="#14532d" />
+      <path d="M38 58 l2 18 h-8 l-1 -15" fill="#14532d" />
+      <path d="M22 38 q10 -8 20 0 l2 22 h-24 z" fill="#15803d" />
+      <path d="M46 18 q7 20 -2 36" fill="none" stroke="#8b5a2b" stroke-width="2.5" />
+      <path d="M46 18 l-6 5 M44 54 l-6 -4" stroke="#fde68a" stroke-width="1.2" />
+      <path d="M20 40 q-8 8 -4 18 l5 1" fill="#15803d" />
+      <circle cx="32" cy="26" r="9" fill="#e2c9a8" />
+      <path d="M22 22 q10 -12 20 0 l-1 -5 q-9 -7 -18 0z" fill="#166534" />
+      <path d="M22 20 l-3 -3 M42 20 l3 -3" stroke="#166534" stroke-width="1.5" />
+      <circle cx="29" cy="26" r="1.5" fill="#3f2d20" stroke="none" />
+      <circle cx="35" cy="26" r="1.5" fill="#3f2d20" stroke="none" />
+    {:else if name === 'Battle Dwarf'}
+      <path d="M22 62 l-3 14 h9 l2 -11" fill="#78350f" />
+      <path d="M40 62 l3 14 h-9 l-2 -11" fill="#78350f" />
+      <path d="M17 36 q15 -12 30 0 l3 28 h-36 z" fill="#b45309" />
+      <path d="M13 40 q-8 8 -3 18 l6 -1" fill="#b45309" />
+      <path d="M48 40 q7 6 4 16 l-6 -1" fill="#b45309" />
+      <path d="M8 44 l10 -6 l3 5 l-10 6z" fill="#94a3b8" />
+      <circle cx="32" cy="22" r="10" fill="#e2c9a8" />
+      <path d="M23 30 q9 6 18 0 l1 -10 q-10 5 -20 0z" fill="#78350f" />
+      <circle cx="27" cy="21" r="1.8" fill="#1c1917" stroke="none" />
+      <circle cx="37" cy="21" r="1.8" fill="#1c1917" stroke="none" />
+    {:else if name === 'Unicorn'}
+      <path d="M8 58 q4 -14 26 -13 q18 1 24 9 q5 7 -3 10 q-22 5 -42 0 q-7 -2 -5 -6z" fill="#fafaf9" />
+      <path d="M48 48 q13 -6 16 4 l-8 1 l6 6 q-10 4 -14 -4z" fill="#f5f5f4" />
+      <path d="M6 58 l-6 6 l8 1z" fill="#f5f5f4" />
+      <path d="M4 60 l-2 14 h7 l2 -11 M42 64 l2 14 h-7 l-1 -11" fill="#e7e5e4" />
+      <circle cx="28" cy="30" r="9" fill="#fafaf9" />
+      <path d="M28 21 l3 -14 l3 14z" fill="#fde68a" />
+      <path d="M20 27 l-8 -4 l7 8z" fill="#fef08a" />
+      <circle cx="25" cy="29" r="1.6" fill="#1e293b" stroke="none" />
+      <circle cx="31" cy="29" r="1.6" fill="#1e293b" stroke="none" />
+    {:else if name === 'Imp'}
+      <path d="M24 56 l-2 14 h7 l1 -11" fill="#7f1d1d" />
+      <path d="M37 56 l2 14 h-7 l-1 -11" fill="#7f1d1d" />
+      <path d="M22 42 q9 -8 18 0 l1 16 h-20 z" fill="#dc2626" />
+      <path d="M40 46 q10 4 12 14 q-6 0 -8 -4z" fill="#dc2626" />
+      <circle cx="32" cy="28" r="9" fill="#ef4444" />
+      <path d="M22 24 l-6 -8 M42 24 l6 -8" stroke="#7f1d1d" stroke-width="2.5" />
+      <circle cx="28" cy="28" r="1.8" fill="#fef08a" stroke="none" />
+      <circle cx="36" cy="28" r="1.8" fill="#fef08a" stroke="none" />
+      <path d="M28 34 q4 -2 8 0" fill="none" />
+    {:else if name === 'Gog'}
+      <path d="M23 58 l-2 16 h8 l1 -13" fill="#7c2d12" />
+      <path d="M38 58 l2 16 h-8 l-1 -13" fill="#7c2d12" />
+      <path d="M20 40 q10 -8 20 0 l2 20 h-24 z" fill="#c2410c" />
+      <rect x="16" y="44" width="6" height="14" rx="2" fill="#57534e" />
+      <path d="M18 40 q-8 8 -4 18 l5 1" fill="#c2410c" />
+      <circle cx="32" cy="26" r="9" fill="#ea580c" />
+      <path d="M23 22 l-6 -6 M41 22 l6 -6" stroke="#7c2d12" stroke-width="2" />
+      <circle cx="28" cy="26" r="1.6" fill="#fef08a" stroke="none" />
+      <circle cx="36" cy="26" r="1.6" fill="#fef08a" stroke="none" />
+    {:else if name === 'Hell Hound'}
+      <path d="M8 56 q4 -12 22 -12 q16 0 20 8 q4 6 -3 9 q-18 4 -34 0 q-6 -2 -5 -5z" fill="#292524" />
+      <path d="M44 44 q10 -4 12 4 l-6 1 l4 5 q-8 3 -12 -3z" fill="#292524" />
+      <path d="M6 56 l-4 5 l7 1z" fill="#292524" />
+      <path d="M4 58 l-2 12 h6 l2 -10 M36 60 l2 12 h-6 l-2 -10" fill="#1c1917" />
+      <circle cx="26" cy="28" r="9" fill="#3f3f46" />
+      <path d="M18 25 l-6 -3 l5 7z M30 22 l0 -8 l4 7z" fill="#dc2626" />
+      <circle cx="23" cy="28" r="1.6" fill="#f97316" stroke="none" />
+      <circle cx="29" cy="28" r="1.6" fill="#f97316" stroke="none" />
+    {:else if name === 'Demon'}
+      <path d="M14 40 q-14 -16 -22 -8 q4 12 16 14 q-8 3 -12 9 q11 5 20 -1z" fill="#7f1d1d" />
+      <path d="M50 40 q14 -16 22 -8 q-4 12 -16 14 q8 3 12 9 q-11 5 -20 -1z" fill="#7f1d1d" />
+      <path d="M22 42 q10 -8 20 0 l2 22 h-24 z" fill="#b91c1c" />
+      <path d="M24 62 l-3 14 h8 M38 62 l3 14 h-8" stroke="#7f1d1d" />
+      <circle cx="32" cy="26" r="10" fill="#dc2626" />
+      <path d="M23 20 l-4 -10 M41 20 l4 -10" stroke="#450a0a" stroke-width="2.5" />
+      <circle cx="28" cy="26" r="1.8" fill="#fde047" stroke="none" />
+      <circle cx="36" cy="26" r="1.8" fill="#fde047" stroke="none" />
+      <path d="M28 32 q4 -2 8 0" fill="none" />
+    {:else if name === 'Pit Fiend'}
+      <path d="M12 38 q-16 -16 -24 -6 q5 12 17 13 q-8 4 -12 10 q12 4 21 -3z" fill="#581c1c" />
+      <path d="M52 38 q16 -16 24 -6 q-5 12 -17 13 q8 4 12 10 q-12 4 -21 -3z" fill="#581c1c" />
+      <path d="M20 40 q12 -9 24 0 l2 24 h-28 z" fill="#991b1b" />
+      <path d="M50 18 l0 24" stroke="#292524" stroke-width="3" />
+      <path d="M46 16 l4 -7 l4 7z" fill="#ef4444" />
+      <circle cx="32" cy="24" r="10" fill="#b91c1c" />
+      <path d="M22 18 l-5 -10 M42 18 l5 -10" stroke="#450a0a" stroke-width="2.5" />
+      <circle cx="27" cy="24" r="1.9" fill="#fde047" stroke="none" />
+      <circle cx="37" cy="24" r="1.9" fill="#fde047" stroke="none" />
+    {:else if name === 'Efreet'}
+      <path d="M32 46 q-16 -20 -28 -14 q4 12 16 16 q-7 3 -12 9 q10 5 20 0z" fill="#f97316" />
+      <path d="M32 46 q16 -20 28 -14 q-4 12 -16 16 q7 3 12 9 q-10 5 -20 0z" fill="#f97316" />
+      <path d="M24 40 q8 -8 16 0 l0 24 q-8 4 -16 0z" fill="#fb923c" />
+      <path d="M22 66 q-2 10 4 12 M42 66 q2 10 -4 12" fill="none" stroke="#ea580c" stroke-width="3" />
+      <circle cx="32" cy="26" r="10" fill="#fdba74" />
+      <path d="M22 18 q10 -10 20 0" fill="none" stroke="#c2410c" stroke-width="2.5" />
+      <circle cx="28" cy="26" r="2" fill="#7c2d12" stroke="none" />
+      <circle cx="36" cy="26" r="2" fill="#7c2d12" stroke="none" />
+      <path d="M28 33 q4 3 8 0" fill="none" />
+    {:else if name === 'Devil'}
+      <path d="M10 36 q-18 -18 -28 -6 q5 13 19 14 q-9 4 -14 11 q13 5 23 -3z" fill="#450a0a" />
+      <path d="M54 36 q18 -18 28 -6 q-5 13 -19 14 q9 4 14 11 q-13 5 -23 -3z" fill="#450a0a" />
+      <path d="M18 40 q14 -10 28 0 l3 28 h-34 z" fill="#7f1d1d" />
+      <path d="M50 20 l4 30 l-6 2 l-4 -30z" fill="#292524" />
+      <path d="M46 16 l6 -3 l0 6z M56 16 l-4 4 l6 2z" fill="#292524" />
+      <circle cx="32" cy="24" r="11" fill="#991b1b" />
+      <path d="M20 18 l-6 -12 M44 18 l6 -12" stroke="#1c1917" stroke-width="3" />
+      <circle cx="27" cy="24" r="2.1" fill="#fde047" stroke="none" />
+      <circle cx="37" cy="24" r="2.1" fill="#fde047" stroke="none" />
+      <path d="M27 31 q5 -3 10 0" fill="none" />
     {:else if name === 'Rock'}
       <path d="M10 70 q-4 -18 12 -26 q14 -8 26 2 q10 8 6 24 q-22 8 -44 0z" fill="#78716c" />
       <path d="M22 46 l6 24 M40 48 l-4 22" stroke="#57534e" stroke-width="1.5" />
