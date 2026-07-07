@@ -41,11 +41,14 @@ Useful hooks in the battle UI:
   melee. A damage forecast (`.preview`, 💀 kills / 💥 damage) floats by the
   hovered target.
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
-- Actions are circular icon buttons at the top-right of the battlefield:
+- Actions are large circular buttons in a rail to the RIGHT of the board:
   `Wait` ⏳, `Defend` 🛡️, `Spellbook` 📖 (hero turn only; opens the book panel —
   role=dialog 'Spellbook', spells are `Cast <Name>` buttons with hover
-  role=tooltip descriptions, ✕ is 'Close spellbook', backdrop click closes), `Forfeit` 🏳️, plus the speed pills — all role=button by
-  aria-label. The status line + last two log lines sit in a translucent
+  role=tooltip descriptions, ✕ is 'Close spellbook', backdrop click closes).
+  A ⚙️ `Settings` cog at the top-left opens a popover with the combat-speed
+  pills and `Resign`. The hero is a bare sprite on the left flank
+  (`button[aria-label^="Hero"]`); hovering it fills the bottom-right info
+  panel with hero rows (Level, Mana x/y, XP…).
   top-center strip (`p.text-sm.font-medium.text-slate-100` is the status
   now); the full BattleLog panel is gone.
 - Unit info panel: the sidebar `dl` — hover any unit's cell to populate it
