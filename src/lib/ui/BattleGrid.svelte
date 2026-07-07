@@ -361,5 +361,27 @@
     border-radius: 50%;
     filter: drop-shadow(0 0 3px rgb(250 204 21 / 0.7));
     pointer-events: none;
+    overflow: hidden;
+  }
+
+  /* Rotating light sweep so the acting stack is unmissable. */
+  .active-arc::after {
+    content: '';
+    position: absolute;
+    inset: -20%;
+    background: conic-gradient(from 0deg, transparent 0%, rgb(253 230 138 / 0.9) 6%, transparent 16%);
+    animation: shimmer-spin 1.6s linear infinite;
+  }
+
+  @keyframes shimmer-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .active-arc::after {
+      animation: none;
+    }
   }
 </style>
