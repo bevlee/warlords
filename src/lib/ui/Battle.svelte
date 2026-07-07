@@ -341,7 +341,17 @@
 <div class="flex justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
        turns bar) fits without scrolling on laptop screens. -->
-  <div class="w-full min-w-0" style="max-width: calc((100dvh - 250px) * 1.45 + 220px)">
+  <div class="w-full min-w-0" style="max-width: calc((100dvh - 300px) * 1.45 + 220px)">
+    <!-- Combat indicator: status + last log lines, above the battlefield. -->
+    <div class="mb-1 flex justify-center">
+      <div class="min-h-12 max-w-2xl rounded-lg border border-slate-600/60 bg-slate-900/85 px-5 py-1.5 text-center shadow-lg">
+        <p class="text-sm font-medium text-slate-100">{statusText}</p>
+        {#each logTail as line, i (i)}
+          <p class="font-mono text-[11px] leading-snug text-slate-400">{line}</p>
+        {/each}
+      </div>
+    </div>
+
     <!-- Battlefield stage: everything battle-related overlays this box. -->
     <div class="relative flex items-stretch gap-2">
       {#if heroUnit && heroUnit.count > 0}
@@ -380,18 +390,9 @@
         />
       </div>
 
-      <!-- Top-center strip: status + the last combat-log lines (LordsWM style). -->
-      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center">
-        <div class="max-w-2xl rounded-b-lg border border-t-0 border-slate-600/60 bg-slate-900/85 px-5 py-1.5 text-center shadow-lg">
-          <p class="text-sm font-medium text-slate-100">{statusText}</p>
-          {#each logTail as line, i (i)}
-            <p class="font-mono text-[11px] leading-snug text-slate-400">{line}</p>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Right rail: the big action buttons live beside the board, never over it. -->
-      <div class="flex w-32 shrink-0 flex-col items-center gap-3 self-center">
+      <!-- Right rail: big action buttons, top-aligned where the board's
+           projected far edge is narrow — clear of every tile. -->
+      <div class="ml-2 flex w-32 shrink-0 flex-col items-center gap-3 self-start pt-1">
         <button
           type="button"
           class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
