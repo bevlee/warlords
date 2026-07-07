@@ -36,3 +36,27 @@ describe('stepsFromLogEntry: damage', () => {
     expect(steps).toEqual([{ unitId: 't1', kind: 'damage', value: 20 }]);
   });
 });
+
+describe('stepsFromLogEntry: buffs', () => {
+  it('maps a bloodlust cast to an attack buff step', () => {
+    const entry: BattleEvent = {
+      type: 'cast',
+      data: { spell: 'bloodlust', casterId: 'h1', targetId: 't1' },
+    };
+
+    const steps = stepsFromLogEntry(entry);
+
+    expect(steps).toEqual([{ unitId: 't1', kind: 'buff', value: 4, label: 'ATK' }]);
+  });
+
+  it('maps a stoneskin cast to a defense buff step', () => {
+    const entry: BattleEvent = {
+      type: 'cast',
+      data: { spell: 'stoneskin', casterId: 'h1', targetId: 't1' },
+    };
+
+    const steps = stepsFromLogEntry(entry);
+
+    expect(steps).toEqual([{ unitId: 't1', kind: 'buff', value: 4, label: 'DEF' }]);
+  });
+});

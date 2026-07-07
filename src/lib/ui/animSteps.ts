@@ -16,10 +16,16 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       return [{ unitId: targetId, kind: 'damage', value: damage }];
     }
     case 'cast': {
-      const { targetId, damage } = entry.data as { targetId: string; damage?: number };
+      const { targetId, damage, spell } = entry.data as {
+        targetId: string;
+        damage?: number;
+        spell: 'lightning' | 'bloodlust' | 'stoneskin';
+      };
       if (damage !== undefined) {
         return [{ unitId: targetId, kind: 'damage', value: damage }];
       }
+      if (spell === 'bloodlust') return [{ unitId: targetId, kind: 'buff', value: 4, label: 'ATK' }];
+      if (spell === 'stoneskin') return [{ unitId: targetId, kind: 'buff', value: 4, label: 'DEF' }];
       return [];
     }
     default:
