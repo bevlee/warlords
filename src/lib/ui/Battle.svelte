@@ -335,7 +335,7 @@
 <div class="flex flex-col gap-4 lg:flex-row lg:justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
        turn bar + controls) fits without scrolling on laptop screens. -->
-  <div class="relative min-w-0 flex-1" style="max-width: calc((100dvh - 230px) * 1.5)">
+  <div class="relative min-w-0 flex-1" style="max-width: calc((100dvh - 230px) * 1.45)">
     <div class="flex items-stretch gap-2">
       {#if heroUnit && heroUnit.count > 0}
         <button

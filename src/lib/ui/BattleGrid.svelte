@@ -135,7 +135,11 @@
 
 <svelte:window onkeydown={onKey} onkeyup={onKey} />
 
-<!-- Perspective viewport: tilts the board like a tabletop. -->
+<!-- Perspective viewport: tilts the board like a tabletop. The stage is a
+     size container so the perspective distance scales with board width —
+     without that, browser zoom changes the board's px size against a fixed
+     perspective and the projection balloons past its layout box. -->
+<div class="board-stage">
 <div class="board-viewport">
   <div
     class="board grid rounded-md border border-indigo-300/20 bg-slate-800/60 p-0.5"
@@ -196,10 +200,17 @@
     {/each}
   </div>
 </div>
+</div>
 
 <style>
+  .board-stage {
+    container-type: inline-size;
+  }
+
   .board-viewport {
-    perspective: 1400px;
+    /* 155cqw ≈ the old 1400px at a ~900px board, but zoom/size-invariant:
+       the projected shape is now always the same fraction of board width. */
+    perspective: 155cqw;
     perspective-origin: 50% 40%;
   }
 
@@ -212,8 +223,10 @@
        controls and turn bar below sit in their own z-raised stacking
        contexts, so the projected near edge overlapping this margin cannot
        swallow their clicks (that was the old reason to avoid this). */
-    margin-top: -5%;
-    margin-bottom: -11%;
+    /* Measured with the cqw perspective: these make the layout box hug the
+       projected board (visual height ≈ 0.68 × width) at every size/zoom. */
+    margin-top: -13%;
+    margin-bottom: -2%;
   }
 
   .cell {
