@@ -49,10 +49,11 @@ Stoneskin battle-long buffs; spell bar on the hero's turn).
 
 ### Gaps, roughly in priority order
 
-All LordsWM combat mechanics are in. What remains is content and meta-game:
+All LordsWM combat mechanics are in, plus the **army setup screen**
+(300-gold recruiting, generated matching enemy, setup → battle → result →
+setup loop). What remains is content and meta-game:
 
-1. **Army setup screen** — rosters are hardcoded in `+page.svelte`; a
-   pre-battle screen (recruiting, per LordsWM) is the next structural piece.
+1. **Hero progression** — XP from battles, level-ups (stats/mana growth),
+   persistence between battles (idb is already a dependency).
 2. **Long term** — unit art replacing emoji standees, factions beyond
-   Barbarian, faction skills in the damage formula, hero XP/levelling between
-   battles, PvP/economy layers.
+   Barbarian, faction skills in the damage formula, PvP/economy layers.
