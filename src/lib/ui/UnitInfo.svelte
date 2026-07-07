@@ -1,16 +1,30 @@
 <script lang="ts">
-  import type { UnitStack } from '$lib/engine/types';
+  import type { Hero, UnitStack } from '$lib/engine/types';
+  import { maxMana } from '$lib/engine/factionSkills';
   import Sprite from './Sprite.svelte';
 
   interface Props {
     unit: UnitStack | null;
+    hero?: Hero | null;
   }
 
-  let { unit }: Props = $props();
+  let { unit, hero = null }: Props = $props();
 
   const rows = $derived.by(() => {
     if (!unit) return [];
     const d = unit.definition;
+    if (unit.isHero && hero) {
+      return [
+        ['Level', `${hero.level}`],
+        ['Mana', `${hero.mana ?? 0} / ${maxMana(hero)}`],
+        ['Attack', `${hero.attack}`],
+        ['Defense', `${hero.defense}`],
+        ['Damage', `${d.minDamage}–${d.maxDamage}`],
+        ['Initiative', `${d.initiative}`],
+        ['Range', '∞'],
+        ['XP', `${hero.xp}`],
+      ];
+    }
     return [
       ['Count', `${unit.count}`],
       ['HP', `${unit.hp} / ${d.hp}`],
@@ -30,7 +44,7 @@
     <div class="mb-1 flex items-center gap-2">
       <Sprite name={unit.definition.name} class="h-9 w-8" />
       <span class="text-sm font-semibold {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
-        {unit.definition.name}
+        {unit.isHero ? `Hero — level ${hero?.level ?? '?'}` : unit.definition.name}
       </span>
     </div>
     <dl class="grid grid-cols-2 gap-x-3 text-xs leading-relaxed">

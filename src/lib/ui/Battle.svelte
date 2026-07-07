@@ -149,8 +149,9 @@
     return fresh ?? activeUnit;
   });
 
-  // Spellbook popout for the top-right action buttons.
+  // Spellbook panel and the settings popover.
   let spellbookOpen = $state(false);
+  let settingsOpen = $state(false);
 
   // Spell selection is per-turn state: whoever acts next starts clean.
   $effect(() => {
@@ -340,25 +341,25 @@
 <div class="flex justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
        turns bar) fits without scrolling on laptop screens. -->
-  <div class="w-full min-w-0" style="max-width: calc((100dvh - 250px) * 1.45)">
+  <div class="w-full min-w-0" style="max-width: calc((100dvh - 250px) * 1.45 + 220px)">
     <!-- Battlefield stage: everything battle-related overlays this box. -->
     <div class="relative flex items-stretch gap-2">
       {#if heroUnit && heroUnit.count > 0}
+        <!-- Hero on the flank: a bare sprite like any other unit; its
+             attributes appear in the bottom-right info panel on hover. -->
         <button
           type="button"
-          class="flex w-16 shrink-0 flex-col items-center justify-center gap-1 self-center rounded-lg
-            border border-slate-700 bg-slate-800 py-3 transition
-            {heroUnit.id === battle.currentUnitId ? 'ring-2 ring-amber-300 shadow-lg shadow-amber-400/50' : ''}
+          class="hero-standee relative flex w-20 shrink-0 flex-col items-center justify-end self-center pb-2 transition
             {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
           aria-label="Hero — level {hero.level}"
           onmouseenter={() => (hovered = heroUnit)}
           onmouseleave={() => (hovered = null)}
         >
-          <Sprite name="Hero" class="h-12 w-10" />
-          <span class="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Hero</span>
-          <span class="font-mono text-[10px] text-slate-300">⚔{hero.attack} 🛡{hero.defense}</span>
-          <span class="font-mono text-[10px] text-sky-300">💧{battle.hero.mana ?? 0}</span>
-          <span class="font-mono text-[10px] text-slate-400">Lv {hero.level}</span>
+          <span class="hero-shadow" aria-hidden="true"></span>
+          {#if heroUnit.id === battle.currentUnitId}
+            <span class="hero-arc" aria-hidden="true"></span>
+          {/if}
+          <Sprite name="Hero" class="relative h-24 w-20" />
         </button>
       {/if}
       <div class="min-w-0 flex-1">
@@ -389,33 +390,35 @@
         </div>
       </div>
 
-      <!-- Top-right action buttons (over the empty foreshortened corner). -->
-      <div class="absolute right-1 top-1 z-20 flex flex-col items-end gap-1.5">
+      <!-- Right rail: the big action buttons live beside the board, never over it. -->
+      <div class="flex w-32 shrink-0 flex-col items-center gap-3 self-center">
         <button
           type="button"
-          class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-500
-            bg-slate-800/90 text-xl shadow hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
+            bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Wait"
           title="Wait — act again in half a cycle"
           disabled={!isPlayerTurn}
           onclick={handleWait}
         >
-          ⏳
+          <span class="text-5xl leading-none">⏳</span>
+          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Wait</span>
         </button>
         <button
           type="button"
-          class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-500
-            bg-slate-800/90 text-xl shadow hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
+            bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Defend"
           title="Defend — +30% defense until your next turn"
           disabled={!isPlayerTurn}
           onclick={handleDefend}
         >
-          🛡️
+          <span class="text-5xl leading-none">🛡️</span>
+          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Defend</span>
         </button>
         <button
           type="button"
-          class="flex h-11 w-11 items-center justify-center rounded-full border text-xl shadow
+          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 shadow-lg
             disabled:cursor-not-allowed disabled:opacity-40
             {spellbookOpen ? 'border-violet-300 bg-violet-700' : 'border-violet-500/70 bg-violet-950/90 hover:bg-violet-800'}"
           aria-label="Spellbook"
@@ -423,31 +426,54 @@
           disabled={!isHeroTurn}
           onclick={() => (spellbookOpen = !spellbookOpen)}
         >
-          📖
+          <span class="text-5xl leading-none">📖</span>
+          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-violet-200">Spells</span>
         </button>
+      </div>
+
+      <!-- Settings: cog at the top-left, under the page title. -->
+      <div class="absolute left-1 top-1 z-30 flex flex-col items-start gap-1.5">
         <button
           type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-full border border-red-800
-            bg-red-950/90 text-sm shadow hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Forfeit"
-          title="Forfeit the battle"
-          disabled={battle.result !== 'ongoing'}
-          onclick={handleForfeit}
+          class="flex h-12 w-12 items-center justify-center rounded-full border border-slate-500
+            bg-slate-800/90 text-2xl shadow hover:bg-slate-700
+            {settingsOpen ? 'bg-slate-600' : ''}"
+          aria-label="Settings"
+          title="Battle settings"
+          onclick={() => (settingsOpen = !settingsOpen)}
         >
-          🏳️
+          ⚙️
         </button>
-        <div class="flex items-center gap-0.5 rounded-full bg-slate-800/90 p-0.5" role="group" aria-label="battle speed">
-          {#each Object.keys(AI_SPEEDS) as speed (speed)}
+        {#if settingsOpen}
+          <div class="w-48 rounded-lg border border-slate-600 bg-slate-900/95 p-3 shadow-xl">
+            <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Combat speed</p>
+            <div class="mb-3 flex items-center gap-1 rounded bg-slate-800 p-0.5" role="group" aria-label="battle speed">
+              {#each Object.keys(AI_SPEEDS) as speed (speed)}
+                <button
+                  type="button"
+                  class="flex-1 rounded px-2 py-1 text-xs font-medium capitalize
+                    {battleSpeed === speed ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}"
+                  onclick={() => (battleSpeed = speed as BattleSpeed)}
+                >
+                  {speed}
+                </button>
+              {/each}
+            </div>
             <button
               type="button"
-              class="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize
-                {battleSpeed === speed ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}"
-              onclick={() => (battleSpeed = speed as BattleSpeed)}
+              class="w-full rounded bg-red-900 px-3 py-1.5 text-sm font-medium text-red-100
+                hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Resign"
+              disabled={battle.result !== 'ongoing'}
+              onclick={() => {
+                settingsOpen = false;
+                handleForfeit();
+              }}
             >
-              {speed}
+              🏳️ Resign battle
             </button>
-          {/each}
-        </div>
+          </div>
+        {/if}
       </div>
 
     {#if spellbookOpen && isHeroTurn}
@@ -498,8 +524,33 @@
         <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
       </div>
       <div class="w-56 shrink-0">
-        <UnitInfo unit={infoUnit} />
+        <UnitInfo unit={infoUnit} hero={battle.hero} />
       </div>
     </div>
   </div>
 </div>
+
+<style>
+  .hero-shadow {
+    position: absolute;
+    bottom: 4px;
+    left: 15%;
+    right: 15%;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.55), transparent 70%);
+  }
+
+  .hero-arc {
+    position: absolute;
+    bottom: 0;
+    left: 12%;
+    right: 12%;
+    height: 22px;
+    border: 3px solid #facc15;
+    border-top-color: transparent;
+    border-radius: 50%;
+    filter: drop-shadow(0 0 3px rgb(250 204 21 / 0.7));
+    pointer-events: none;
+  }
+</style>

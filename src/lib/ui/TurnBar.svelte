@@ -25,7 +25,10 @@
   <span class="mr-1 shrink-0 text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-slate-400">
     Round<br />{state.round}
   </span>
-  <div class="flex min-w-0 items-center gap-1 overflow-x-auto">
+  <!-- overflow-x-scroll (not auto): the horizontal scrollbar is always there,
+       so entries never shift vertically; overflow-y-hidden + padding keeps the
+       hover scale-up from spawning a vertical scrollbar. -->
+  <div class="turnbar-scroll flex min-w-0 items-center gap-1 overflow-x-scroll overflow-y-hidden py-1.5">
     {#each entries as unit, i (`${unit.id}-${i}`)}
       <button
         type="button"
@@ -50,3 +53,25 @@
     {/each}
   </div>
 </div>
+
+<style>
+  /* Persistent scrollbar even with macOS overlay scrollbars: custom-styled
+     WebKit scrollbars always render. */
+  .turnbar-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .turnbar-scroll::-webkit-scrollbar-track {
+    background: rgb(30 41 59 / 0.8);
+    border-radius: 4px;
+  }
+
+  .turnbar-scroll::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+  }
+
+  /* No scrollbar-width here: in Chrome the standard property would override
+     and disable the ::-webkit-scrollbar styling above (which is what keeps
+     the bar permanently visible instead of macOS overlay auto-hiding). */
+</style>
