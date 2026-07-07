@@ -6,6 +6,7 @@ export const GLYPHS: Record<string, string> = {
   Cyclops: '👁️',
   Thunderbird: '🦅',
   Behemoth: '🦍',
+  Hero: '👑',
 };
 
 export function glyphFor(name: string): string {

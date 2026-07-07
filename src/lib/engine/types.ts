@@ -29,6 +29,7 @@ export interface UnitStack {
   luck: number;        // -3..3
   atb: number;         // position on the initiative scale; acts at 1
   isDefending: boolean; // defensive stance until the start of its own next turn
+  isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
 }
 
 export interface Cell {

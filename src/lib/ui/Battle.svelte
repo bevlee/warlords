@@ -37,6 +37,7 @@
   let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero));
 
   const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
+  const heroUnit = $derived(battle.units.find(u => u.isHero) ?? null);
   const isPlayerTurn = $derived(
     battle.result === 'ongoing' && activeUnit !== null && activeUnit.side === 'player'
   );
@@ -89,6 +90,14 @@
     return fresh ?? activeUnit;
   });
 
+  // Targeting is per-turn state: whoever acts next starts without a selection.
+  // Without this, a stale selection turns clicks on that enemy into no-ops
+  // for actors that can't melee it (empty attack origins short-circuit).
+  $effect(() => {
+    void battle.currentUnitId;
+    meleeTarget = null;
+  });
+
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
     if (battle.result !== 'ongoing') return;
@@ -134,8 +143,11 @@
 
     // Second click on the selected enemy = quick attack from the nearest tile.
     if (pendingTarget?.id === unit.id) {
-      if (attackOrigins.length > 0) attackFrom(unit.id, attackOrigins[0]);
-      return;
+      if (attackOrigins.length > 0) {
+        attackFrom(unit.id, attackOrigins[0]);
+        return;
+      }
+      meleeTarget = null; // unreachable selection: drop it and fall through
     }
 
     // Shift forces melee targeting even when a shot is available (LordsWM parity).
@@ -176,6 +188,7 @@
   function unitLabel(id: unknown): string {
     const u = battle.units.find(u => u.id === id);
     if (!u) return 'a unit';
+    if (u.isHero) return u.side === 'enemy' ? 'the enemy hero' : 'your hero';
     return `${u.side === 'enemy' ? 'enemy ' : ''}${u.definition.name}s`;
   }
 
@@ -216,6 +229,9 @@
     if (pendingTarget) {
       return `Attacking enemy ${pendingTarget.definition.name}s — click a ⚔️ tile to attack from, or click elsewhere to cancel.`;
     }
+    if (isPlayerTurn && activeUnit.isHero) {
+      return 'Your hero\'s turn — click any enemy to strike, or Wait.';
+    }
     if (isPlayerTurn) {
       const hints = ['green cell to move'];
       if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack');
@@ -231,20 +247,41 @@
 
 <div class="flex flex-col gap-4 lg:flex-row">
   <div class="relative min-w-0 flex-1">
-    <BattleGrid
-      state={battle}
-      reachableKeys={pendingTarget ? new Set() : reachableKeys}
-      {targetIds}
-      activeId={battle.currentUnitId}
-      interactive={isPlayerTurn}
-      {actionIcons}
-      {attackFromKeys}
-      pendingTargetId={pendingTarget?.id ?? null}
-      hoveredId={hovered?.id ?? null}
-      oncellclick={handleCellClick}
-      onunitclick={handleUnitClick}
-      onunithover={u => (hovered = u)}
-    />
+    <div class="flex items-stretch gap-2">
+      {#if heroUnit && heroUnit.count > 0}
+        <button
+          type="button"
+          class="flex w-16 shrink-0 flex-col items-center justify-center gap-1 self-center rounded-lg
+            border border-slate-700 bg-slate-800 py-3 transition
+            {heroUnit.id === battle.currentUnitId ? 'ring-2 ring-amber-300 shadow-lg shadow-amber-400/50' : ''}
+            {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
+          aria-label="Hero — level {hero.level}"
+          onmouseenter={() => (hovered = heroUnit)}
+          onmouseleave={() => (hovered = null)}
+        >
+          <span class="text-3xl leading-none">👑</span>
+          <span class="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Hero</span>
+          <span class="font-mono text-[10px] text-slate-300">⚔{hero.attack} 🛡{hero.defense}</span>
+          <span class="font-mono text-[10px] text-slate-400">Lv {hero.level}</span>
+        </button>
+      {/if}
+      <div class="min-w-0 flex-1">
+        <BattleGrid
+          state={battle}
+          reachableKeys={pendingTarget ? new Set() : reachableKeys}
+          {targetIds}
+          activeId={battle.currentUnitId}
+          interactive={isPlayerTurn}
+          {actionIcons}
+          {attackFromKeys}
+          pendingTargetId={pendingTarget?.id ?? null}
+          hoveredId={hovered?.id ?? null}
+          oncellclick={handleCellClick}
+          onunitclick={handleUnitClick}
+          onunithover={u => (hovered = u)}
+        />
+      </div>
+    </div>
 
     <div class="relative z-10 mt-2">
       <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />

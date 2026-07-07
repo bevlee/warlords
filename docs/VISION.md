@@ -39,13 +39,14 @@ indicators · owner colours · combat log · 2.5D perspective board ·
 0–10% start deviation, bottom strip with two-way hover sync) ·
 **shooter melee-block** (adjacent enemy disables shooting; Shift-click forces
 melee) · **Defend** (+30% defense until own next turn, 🛡️ badge) ·
-**obstacles** (seeded rocks in the middle columns).
+**obstacles** (seeded rocks in the middle columns) · **hero as an actor**
+(flank portrait, own ATB turn, whole-board no-retaliation strike,
+untargetable, army death = defeat).
 
 ### Gaps, roughly in priority order
 
-1. **Hero as an actor** — hero portrait on the flank with per-round actions
-   (attack, later spells).
-2. **Cursor treatment** — LordsWM changes the mouse cursor itself (sword/bow)
+1. **Cursor treatment** — LordsWM changes the mouse cursor itself (sword/bow)
    near targets; we use hover icons above the standee.
+2. **Hero spells** — the hero only strikes; LordsWM heroes also cast.
 3. **Long term** — unit art replacing emoji standees, factions beyond
    Barbarian, faction skills in the damage formula, PvP/economy layers.

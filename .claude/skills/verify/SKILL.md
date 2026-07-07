@@ -51,5 +51,26 @@ Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
 retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;
 poll status ~every 300 ms, a full battle finishes in ~1–2 min), restart.
 
+- Hero: flank portrait `button[aria-label^="Hero"]` left of the board; on
+  "Your hero's turn" every enemy is a target — click one to strike.
+
 Gotchas: capture `pageerror`/console errors; a stray dev-only 404 (Chrome
 devtools probe) is environment noise, not a bug.
+
+**Clicking the tilted board**: standees are clickable and lean over the cell
+behind them, so never click cells/targets at their bounding-box center —
+Playwright either times out ("subtree intercepts pointer events") or, worse
+historically, the click silently vanished. Click cells on their visible top
+strip and rotate through candidates on retries:
+
+```js
+async function clickTop(loc) {
+  const box = await loc.boundingBox();
+  return loc.click({ position: { x: box.width / 2, y: Math.min(8, box.height / 4) } });
+}
+```
+
+Never reintroduce `pointer-events: none` on elements inside the 3D-transformed
+board subtree — Chromium's real-input hit-testing goes inconsistent with
+`elementFromPoint` and clicks land on the wrong cell (that was the cause of a
+whole class of "click does nothing" stalls).

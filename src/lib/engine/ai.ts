@@ -6,7 +6,7 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);
   if (!unit || unit.count === 0) return { type: 'wait' };
 
-  const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
+  const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0 && !u.isHero);
   if (enemies.length === 0) return { type: 'wait' };
 
   // Find nearest enemy (Chebyshev)

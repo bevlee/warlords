@@ -38,9 +38,33 @@ export function initBattle(
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => slotToStack(slot, 'player', i));
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
 
+  // The hero fights too: off-grid on the flank, ATB-scheduled, untargetable.
+  // Whole-board ranged strike via the shoot action (no retaliation). attack: 0
+  // because the hero's real attack already reaches player damage as heroAttack.
+  const heroStack: UnitStack = {
+    id: uuidv4(),
+    definition: {
+      name: 'Hero', tier: 7, speed: 0, initiative: 10, hp: 1,
+      attack: 0, defense: hero.defense,
+      minDamage: 2 + 3 * hero.level, maxDamage: 5 + 6 * hero.level,
+      shots: 9999, range: 99, isLarge: false, abilities: [],
+    },
+    count: 1,
+    hp: 1,
+    pos: { col: -2, row: Math.floor(GRID_H / 2) },
+    side: 'player',
+    hasRetaliated: false,
+    shotsLeft: 9999,
+    morale: 0,
+    luck: 0,
+    atb: 0,
+    isDefending: false,
+    isHero: true,
+  };
+
   // LordsWM-style start: every stack gets a seeded random 0–10% head start.
   const rng = mulberry32(seed);
-  const allUnits = [...playerUnits, ...enemyUnits].map(u => ({ ...u, atb: rng() * 0.1 }));
+  const allUnits = [...playerUnits, ...enemyUnits, heroStack].map(u => ({ ...u, atb: rng() * 0.1 }));
 
   grid = placeUnits(grid, allUnits);
 
@@ -70,8 +94,9 @@ export function initBattle(
 }
 
 export function checkBattleEnd(state: BattleState): 'player_wins' | 'enemy_wins' | null {
-  const playerAlive = state.units.some(u => u.side === 'player' && u.count > 0);
-  const enemyAlive = state.units.some(u => u.side === 'enemy' && u.count > 0);
+  // Heroes don't hold the field: a side with only its hero left has lost.
+  const playerAlive = state.units.some(u => u.side === 'player' && u.count > 0 && !u.isHero);
+  const enemyAlive = state.units.some(u => u.side === 'enemy' && u.count > 0 && !u.isHero);
   if (!enemyAlive) return 'player_wins';
   if (!playerAlive) return 'enemy_wins';
   return null;

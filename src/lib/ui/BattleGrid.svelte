@@ -137,24 +137,36 @@
     transform-style: preserve-3d;
   }
 
-  /* Token rises out of the board plane, like a cardboard standee. */
+  /* Token rises out of the board plane, like a cardboard standee.
+     pointer-events stays ON: the standee is a child of its cell button, so
+     clicks anywhere on the visible token (including the part leaning over
+     the cell behind) bubble to the right cell. With pointer-events: none,
+     real-input hit testing through the 3D transform intermittently routed
+     clicks to a neighbouring cell — a silent no-op. */
   .token-standing {
     position: absolute;
-    inset: 0;
-    height: 115%;
+    left: 7%;
+    right: 7%;
+    height: 110%;
     top: auto;
     bottom: 0;
     transform: rotateX(calc(-1 * var(--tilt)));
     transform-origin: 50% 100%;
-    pointer-events: none;
   }
+
+  /* Origin ⚔️ markers and rocks stay clickable on purpose: their clicks
+     bubble to their own cell button (attack-from / blocked no-op). A
+     pointer-events:none element inside the 3D subtree makes real-input
+     hit-testing unreliable in Chromium. */
 
   /* Turn-bar hover sync: pick the stack out on the battlefield. */
   .hover-glow {
     filter: brightness(1.4) drop-shadow(0 0 6px rgb(255 255 255 / 0.5));
   }
 
-  /* Sword/bow appears above the standee while hovering an attackable enemy. */
+  /* Sword/bow appears above the standee while hovering an attackable enemy.
+     Decorative: must never intercept clicks (even at opacity 0 it would
+     swallow clicks meant for the cell behind the standee). */
   .action-icon {
     position: absolute;
     top: -30%;
@@ -165,6 +177,7 @@
     opacity: 0;
     transition: opacity 0.1s;
     filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
+    pointer-events: none;
   }
 
   .cell:hover .action-icon,
@@ -204,6 +217,5 @@
     height: 26%;
     border-radius: 50%;
     background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.55), transparent 70%);
-    pointer-events: none;
   }
 </style>

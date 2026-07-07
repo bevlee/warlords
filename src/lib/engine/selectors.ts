@@ -31,10 +31,10 @@ export function getReachableCells(grid: Grid, unit: UnitStack): Pos[] {
   return reachable;
 }
 
-/** Living enemy stacks adjacent to the unit (Chebyshev distance 1). */
+/** Living enemy stacks adjacent to the unit (Chebyshev distance 1). Heroes are untargetable. */
 export function getMeleeTargets(state: BattleState, unit: UnitStack): UnitStack[] {
   return state.units.filter(
-    u => u.side !== unit.side && u.count > 0 && chebyshevDistance(unit.pos, u.pos) === 1
+    u => u.side !== unit.side && u.count > 0 && !u.isHero && chebyshevDistance(unit.pos, u.pos) === 1
   );
 }
 
@@ -79,7 +79,7 @@ export function getAttackOrigins(state: BattleState, unit: UnitStack, target: Un
  */
 export function getMeleeApproaches(state: BattleState, unit: UnitStack): Map<string, Pos | null> {
   const approaches = new Map<string, Pos | null>();
-  const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
+  const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0 && !u.isHero);
   const reachable = getReachableCells(state.grid, unit);
 
   for (const enemy of enemies) {
