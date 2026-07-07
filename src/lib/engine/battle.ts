@@ -3,6 +3,7 @@ import type { ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, U
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
+import { isShootingBlocked } from './selectors';
 import { mulberry32, type Rng } from './rng';
 import {
   applyOffenseBonus,
@@ -437,6 +438,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     const target = s.units[targetIdx];
 
     if (actor.shotsLeft <= 0) return advance(reenter(s, 0));
+    if (isShootingBlocked(s, actor)) return advance(reenter(s, 0));
 
     // Grand Elf double_shot fires twice, consuming 2 shots.
     const shotCount = actor.definition.abilities.includes('double_shot') ? 2 : 1;

@@ -128,6 +128,21 @@ describe('isShootingBlocked', () => {
   });
 });
 
+describe('applyAction shoot', () => {
+  it('rejects a shoot action when a living enemy is adjacent to the shooter', () => {
+    const orc = makeStack(ORC, { col: 5, row: 5 }, 'player'); // shooter
+    const blocker = makeStack(GOBLIN, { col: 6, row: 5 }, 'enemy'); // adjacent
+    const target = makeStack(GOBLIN, { col: 8, row: 5 }, 'enemy'); // in range
+    const state = makeState([orc, blocker, target]);
+
+    const next = applyAction(state, { type: 'shoot', targetId: target.id });
+
+    const unhurtTarget = next.units.find(u => u.id === target.id)!;
+    expect(unhurtTarget.count).toBe(target.count);
+    expect(next.log.some(e => e.type === 'shoot')).toBe(false);
+  });
+});
+
 describe('AI with range and move+attack', () => {
   it('melees the adjacent enemy instead of shooting when blocked', () => {
     const orc = makeStack(ORC, { col: 5, row: 5 }, 'enemy'); // shooter

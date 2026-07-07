@@ -8,6 +8,7 @@ import {
   applyPick,
   recordBattle,
   survivorsFrom,
+  mixSeed,
 } from '../run';
 import { armyCost, UNIT_COSTS } from '../../engine/recruit';
 import { FACTION_UNITS } from '../../engine/factions';
@@ -43,6 +44,19 @@ describe('gauntlet run', () => {
     expect(actOf(4)).toBe(2);
     expect(actOf(7)).toBe(2);
     expect(actOf(8)).toBe(3);
+  });
+
+  it('mixSeed does not collide for seed/node pairs a linear seed*31+n*977 mix would collapse', () => {
+    // The old formula seed*31 + n*977 maps (seed, n) and (seed+977, n-31) to
+    // the same combined value, so nearby run seeds could draw identical
+    // enemies at different nodes. A hash-based mix must not repeat this.
+    const seedA = 1_753_000_000_000;
+    const nA = 5;
+    const seedB = seedA + 977;
+    const nB = nA - 31; // deliberately out of the normal 1..10 range, but the
+    // mixing function itself must still not collide for any integer inputs.
+
+    expect(mixSeed(seedA, nA)).not.toBe(mixSeed(seedB, nB));
   });
 
   it('enemy armies are deterministic per seed and spend most of the budget', () => {

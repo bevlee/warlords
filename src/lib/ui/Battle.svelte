@@ -175,6 +175,7 @@
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
+      if (battle.result !== 'ongoing') return; // forfeited while the timer was pending
       battle = applyAction(battle, aiTakeTurn(battle, unit.id));
     }, AI_DELAY_MS);
     return () => clearTimeout(timer);

@@ -30,6 +30,18 @@ export function actOf(n: number): 1 | 2 | 3 {
   return n <= 3 ? 1 : n <= 7 ? 2 : 3;
 }
 
+/** Hash-mixes a run seed with a salt into a well-distributed 32-bit seed.
+ *  Unlike a linear combination (seed*a + salt*b), this doesn't collide for
+ *  seed/salt pairs a fixed offset apart — important since seeds are commonly
+ *  Date.now()-derived and close together across runs. */
+export function mixSeed(seed: number, salt: number): number {
+  let h = (seed | 0) ^ salt;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = h ^ (h >>> 16);
+  return h;
+}
+
 /** Power budget: 90 × 1.32^(n−1), bosses (3/7/10) pay a 10% premium. */
 export function encounterBudget(n: number): number {
   const base = 90 * 1.32 ** (n - 1);
@@ -107,7 +119,7 @@ export interface GauntletEncounter {
 /** Deterministic enemy for the run's current node. */
 export function generateGauntletEnemy(run: RunState): GauntletEncounter {
   const n = run.encounterIndex;
-  const rng = mulberry32(run.seed * 31 + n * 977);
+  const rng = mulberry32(mixSeed(run.seed, n * 977));
   const faction = FACTIONS[Math.floor(rng() * FACTIONS.length)];
   const act = actOf(n);
   const maxTier = act === 1 ? 3 : act === 2 ? 5 : 7;
@@ -133,7 +145,7 @@ export function draftOptions(run: RunState): UnitCard[] {
     if (owned.length >= 1) pool = owned;
   }
 
-  const rng = mulberry32(run.seed * 17 + run.encounterIndex * 449 + run.battlesWon);
+  const rng = mulberry32(mixSeed(run.seed, run.encounterIndex * 449 + run.battlesWon));
   const cards: UnitCard[] = [];
   const used = new Set<string>();
   for (let guard = 0; cards.length < Math.min(3, pool.length) && guard < 50; guard++) {
