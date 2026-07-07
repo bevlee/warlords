@@ -42,8 +42,9 @@ Useful hooks in the battle UI:
   hovered target.
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
 - Actions are circular icon buttons at the top-right of the battlefield:
-  `Wait` ⏳, `Defend` 🛡️, `Spellbook` 📖 (hero turn only; opens the spell
-  pills), `Forfeit` 🏳️, plus the speed pills — all role=button by
+  `Wait` ⏳, `Defend` 🛡️, `Spellbook` 📖 (hero turn only; opens the book panel —
+  role=dialog 'Spellbook', spells are `Cast <Name>` buttons with hover
+  role=tooltip descriptions, ✕ is 'Close spellbook', backdrop click closes), `Forfeit` 🏳️, plus the speed pills — all role=button by
   aria-label. The status line + last two log lines sit in a translucent
   top-center strip (`p.text-sm.font-medium.text-slate-100` is the status
   now); the full BattleLog panel is gone.

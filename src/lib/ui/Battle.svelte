@@ -23,6 +23,7 @@
   import TurnBar from './TurnBar.svelte';
   import UnitInfo from './UnitInfo.svelte';
   import Sprite from './Sprite.svelte';
+  import SpellBook from './SpellBook.svelte';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -424,26 +425,6 @@
         >
           📖
         </button>
-        {#if spellbookOpen && isHeroTurn}
-          <div class="flex flex-col items-end gap-1">
-            {#each Object.entries(SPELL_META) as [id, meta] (id)}
-              {@const spellId = id as SpellId}
-              <button
-                type="button"
-                class="rounded-full px-3 py-1.5 text-sm font-medium text-slate-100 shadow
-                  disabled:cursor-not-allowed disabled:opacity-40
-                  {pendingSpell === spellId ? 'bg-violet-600 ring-2 ring-violet-300' : 'bg-violet-900/95 hover:bg-violet-700'}"
-                disabled={(battle.hero.mana ?? 0) < SPELLS[spellId].cost}
-                onclick={() => {
-                  pendingSpell = pendingSpell === spellId ? null : spellId;
-                  spellbookOpen = false;
-                }}
-              >
-                {meta.glyph} {meta.label} ({SPELLS[spellId].cost})
-              </button>
-            {/each}
-          </div>
-        {/if}
         <button
           type="button"
           class="flex h-8 w-8 items-center justify-center rounded-full border border-red-800
@@ -468,6 +449,17 @@
           {/each}
         </div>
       </div>
+
+    {#if spellbookOpen && isHeroTurn}
+      <SpellBook
+        hero={battle.hero}
+        onpick={spell => {
+          pendingSpell = spell;
+          spellbookOpen = false;
+        }}
+        onclose={() => (spellbookOpen = false)}
+      />
+    {/if}
 
     {#if battle.result !== 'ongoing'}
       <div
