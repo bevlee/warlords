@@ -28,9 +28,10 @@
     enemyArmy: ArmySlot[];
     hero: Hero;
     onexit?: () => void;
+    onresult?: (result: 'player_wins' | 'enemy_wins') => void;
   }
 
-  let { playerArmy, enemyArmy, hero, onexit }: Props = $props();
+  let { playerArmy, enemyArmy, hero, onexit, onresult }: Props = $props();
 
   const AI_DELAY_MS = 450;
 
@@ -128,6 +129,15 @@
     void battle.currentUnitId;
     meleeTarget = null;
     pendingSpell = null;
+  });
+
+  // Announce each battle's result exactly once (re-armed by restart()).
+  let resultAnnounced = false;
+  $effect(() => {
+    if (battle.result !== 'ongoing' && !resultAnnounced) {
+      resultAnnounced = true;
+      onresult?.(battle.result);
+    }
   });
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
@@ -233,6 +243,8 @@
 
   function restart() {
     meleeTarget = null;
+    pendingSpell = null;
+    resultAnnounced = false;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
   }
 

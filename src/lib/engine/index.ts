@@ -8,3 +8,4 @@ export * from './ai';
 export * from './selectors';
 export * from './battle';
 export * from './recruit';
+export * from './progression';
