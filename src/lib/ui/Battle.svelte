@@ -21,7 +21,6 @@
   } from '$lib/engine/types';
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
-  import BattleLog from './BattleLog.svelte';
   import UnitInfo from './UnitInfo.svelte';
   import Sprite from './Sprite.svelte';
 
@@ -149,10 +148,14 @@
     return fresh ?? activeUnit;
   });
 
+  // Spellbook popout for the top-right action buttons.
+  let spellbookOpen = $state(false);
+
   // Spell selection is per-turn state: whoever acts next starts clean.
   $effect(() => {
     void battle.currentUnitId;
     pendingSpell = null;
+    spellbookOpen = false;
   });
 
   // Announce each battle's result exactly once (re-armed by restart()).
@@ -307,6 +310,7 @@
   }
 
   const logLines = $derived(battle.log.map(describe));
+  const logTail = $derived(logLines.filter(l => l.trim()).slice(-2));
 
   const statusText = $derived.by(() => {
     if (battle.result === 'player_wins') return 'Victory!';
@@ -332,11 +336,12 @@
   });
 </script>
 
-<div class="flex flex-col gap-4 lg:flex-row lg:justify-center">
+<div class="flex justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
-       turn bar + controls) fits without scrolling on laptop screens. -->
-  <div class="relative min-w-0 flex-1" style="max-width: calc((100dvh - 230px) * 1.45)">
-    <div class="flex items-stretch gap-2">
+       turns bar) fits without scrolling on laptop screens. -->
+  <div class="w-full min-w-0" style="max-width: calc((100dvh - 250px) * 1.45)">
+    <!-- Battlefield stage: everything battle-related overlays this box. -->
+    <div class="relative flex items-stretch gap-2">
       {#if heroUnit && heroUnit.count > 0}
         <button
           type="button"
@@ -372,69 +377,97 @@
           onunithover={u => (hovered = u)}
         />
       </div>
-    </div>
 
-    <div class="relative z-10 mt-2">
-      <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
-    </div>
-
-    <div class="relative z-10 mt-2 flex items-center gap-3">
-      <button
-        type="button"
-        class="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-100
-          hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={!isPlayerTurn}
-        onclick={handleWait}
-      >
-        Wait
-      </button>
-      <button
-        type="button"
-        class="rounded bg-slate-700 px-3 py-1.5 text-sm font-medium text-slate-100
-          hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={!isPlayerTurn}
-        onclick={handleDefend}
-      >
-        Defend
-      </button>
-      <button
-        type="button"
-        class="rounded bg-red-900 px-3 py-1.5 text-sm font-medium text-red-100
-          hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
-        disabled={battle.result !== 'ongoing'}
-        onclick={handleForfeit}
-      >
-        Forfeit
-      </button>
-      <div class="flex items-center gap-1 rounded bg-slate-800 p-0.5" role="group" aria-label="battle speed">
-        {#each Object.keys(AI_SPEEDS) as speed (speed)}
-          <button
-            type="button"
-            class="rounded px-2 py-1 text-xs font-medium capitalize
-              {battleSpeed === speed ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}"
-            onclick={() => (battleSpeed = speed as BattleSpeed)}
-          >
-            {speed}
-          </button>
-        {/each}
+      <!-- Top-center strip: status + the last combat-log lines (LordsWM style). -->
+      <div class="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center">
+        <div class="max-w-2xl rounded-b-lg border border-t-0 border-slate-600/60 bg-slate-900/85 px-5 py-1.5 text-center shadow-lg">
+          <p class="text-sm font-medium text-slate-100">{statusText}</p>
+          {#each logTail as line, i (i)}
+            <p class="font-mono text-[11px] leading-snug text-slate-400">{line}</p>
+          {/each}
+        </div>
       </div>
-      {#if isHeroTurn}
-        {#each Object.entries(SPELL_META) as [id, meta] (id)}
-          {@const spellId = id as SpellId}
-          <button
-            type="button"
-            class="rounded px-3 py-1.5 text-sm font-medium text-slate-100
-              disabled:cursor-not-allowed disabled:opacity-40
-              {pendingSpell === spellId ? 'bg-violet-600 ring-2 ring-violet-300' : 'bg-violet-900 hover:bg-violet-700'}"
-            disabled={(battle.hero.mana ?? 0) < SPELLS[spellId].cost}
-            onclick={() => (pendingSpell = pendingSpell === spellId ? null : spellId)}
-          >
-            {meta.glyph} {meta.label} ({SPELLS[spellId].cost})
-          </button>
-        {/each}
-      {/if}
-      <p class="text-sm text-slate-300">{statusText}</p>
-    </div>
+
+      <!-- Top-right action buttons (over the empty foreshortened corner). -->
+      <div class="absolute right-1 top-1 z-20 flex flex-col items-end gap-1.5">
+        <button
+          type="button"
+          class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-500
+            bg-slate-800/90 text-xl shadow hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Wait"
+          title="Wait — act again in half a cycle"
+          disabled={!isPlayerTurn}
+          onclick={handleWait}
+        >
+          ⏳
+        </button>
+        <button
+          type="button"
+          class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-500
+            bg-slate-800/90 text-xl shadow hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Defend"
+          title="Defend — +30% defense until your next turn"
+          disabled={!isPlayerTurn}
+          onclick={handleDefend}
+        >
+          🛡️
+        </button>
+        <button
+          type="button"
+          class="flex h-11 w-11 items-center justify-center rounded-full border text-xl shadow
+            disabled:cursor-not-allowed disabled:opacity-40
+            {spellbookOpen ? 'border-violet-300 bg-violet-700' : 'border-violet-500/70 bg-violet-950/90 hover:bg-violet-800'}"
+          aria-label="Spellbook"
+          title="Spellbook — cast on the hero's turn"
+          disabled={!isHeroTurn}
+          onclick={() => (spellbookOpen = !spellbookOpen)}
+        >
+          📖
+        </button>
+        {#if spellbookOpen && isHeroTurn}
+          <div class="flex flex-col items-end gap-1">
+            {#each Object.entries(SPELL_META) as [id, meta] (id)}
+              {@const spellId = id as SpellId}
+              <button
+                type="button"
+                class="rounded-full px-3 py-1.5 text-sm font-medium text-slate-100 shadow
+                  disabled:cursor-not-allowed disabled:opacity-40
+                  {pendingSpell === spellId ? 'bg-violet-600 ring-2 ring-violet-300' : 'bg-violet-900/95 hover:bg-violet-700'}"
+                disabled={(battle.hero.mana ?? 0) < SPELLS[spellId].cost}
+                onclick={() => {
+                  pendingSpell = pendingSpell === spellId ? null : spellId;
+                  spellbookOpen = false;
+                }}
+              >
+                {meta.glyph} {meta.label} ({SPELLS[spellId].cost})
+              </button>
+            {/each}
+          </div>
+        {/if}
+        <button
+          type="button"
+          class="flex h-8 w-8 items-center justify-center rounded-full border border-red-800
+            bg-red-950/90 text-sm shadow hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Forfeit"
+          title="Forfeit the battle"
+          disabled={battle.result !== 'ongoing'}
+          onclick={handleForfeit}
+        >
+          🏳️
+        </button>
+        <div class="flex items-center gap-0.5 rounded-full bg-slate-800/90 p-0.5" role="group" aria-label="battle speed">
+          {#each Object.keys(AI_SPEEDS) as speed (speed)}
+            <button
+              type="button"
+              class="rounded-full px-2 py-0.5 text-[10px] font-medium capitalize
+                {battleSpeed === speed ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}"
+              onclick={() => (battleSpeed = speed as BattleSpeed)}
+            >
+              {speed}
+            </button>
+          {/each}
+        </div>
+      </div>
 
     {#if battle.result !== 'ongoing'}
       <div
@@ -465,10 +498,16 @@
         </div>
       </div>
     {/if}
-  </div>
+    </div>
 
-  <div class="flex w-full shrink-0 flex-col gap-4 lg:w-56">
-    <UnitInfo unit={infoUnit} />
-    <BattleLog lines={logLines} />
+    <!-- Bottom row: bare turns bar (LordsWM) + compact unit info. -->
+    <div class="relative z-10 mt-1.5 flex items-start gap-3">
+      <div class="min-w-0 flex-1">
+        <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
+      </div>
+      <div class="w-56 shrink-0">
+        <UnitInfo unit={infoUnit} />
+      </div>
+    </div>
   </div>
 </div>

@@ -27,7 +27,7 @@ installed in a scratch dir (`npm i playwright-core`).
 
 Useful hooks in the battle UI:
 
-- Status line: first `p.text-sm.text-slate-300` — starts with "Your …" on the
+- Status line: first `p.text-sm.font-medium.text-slate-100` — starts with "Your …" on the
   player's turn, "Enemy … are acting…" during AI turns, "Victory!"/"Defeat" at end.
 - Reachable cells: `button.bg-slate-500\/50` — the darker "range blob"
   (click to move; cursor stays the default arrow).
@@ -41,7 +41,12 @@ Useful hooks in the battle UI:
   melee. A damage forecast (`.preview`, 💀 kills / 💥 damage) floats by the
   hovered target.
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
-- `Wait` and `New battle` are role=button by name.
+- Actions are circular icon buttons at the top-right of the battlefield:
+  `Wait` ⏳, `Defend` 🛡️, `Spellbook` 📖 (hero turn only; opens the spell
+  pills), `Forfeit` 🏳️, plus the speed pills — all role=button by
+  aria-label. The status line + last two log lines sit in a translucent
+  top-center strip (`p.text-sm.font-medium.text-slate-100` is the status
+  now); the full BattleLog panel is gone.
 - Unit info panel: the sidebar `dl` — hover any unit's cell to populate it
   (count, HP, attack, defense, damage, speed, initiative, range, shots).
 - ATB turn bar: horizontal strip under the board; entries are

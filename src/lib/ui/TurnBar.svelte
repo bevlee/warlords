@@ -20,10 +20,10 @@
   );
 </script>
 
-<!-- LordsWM-style turns bar: framed portraits, side-coloured, count in the corner. -->
-<div class="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5">
-  <span class="mr-1 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
-    Round {state.round}
+<!-- LordsWM-style turns bar: bare strip of framed portraits, count in the corner. -->
+<div class="flex items-center gap-1.5">
+  <span class="mr-1 shrink-0 text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-slate-400">
+    Round<br />{state.round}
   </span>
   <div class="flex min-w-0 items-center gap-1 overflow-x-auto">
     {#each entries as unit, i (`${unit.id}-${i}`)}
