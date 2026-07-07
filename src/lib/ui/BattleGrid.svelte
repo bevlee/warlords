@@ -179,13 +179,13 @@
             {/if}
             <div class="token-standing" class:hover-glow={occupant.id === hoveredId}>
               <UnitToken unit={occupant} />
-              {#if attackable && (hoveredId === occupant.id || aim?.targetId === occupant.id) && previews.has(occupant.id)}
-                {@const p = previews.get(occupant.id)!}
-                <div class="preview" aria-hidden="true">
-                  💀 {p.killsMin}–{p.killsMax}<br />💥 {p.min}–{p.max}
-                </div>
-              {/if}
             </div>
+            {#if attackable && (hoveredId === occupant.id || aim?.targetId === occupant.id) && previews.has(occupant.id)}
+              {@const p = previews.get(occupant.id)!}
+              <div class="preview" aria-hidden="true">
+                💀 {p.killsMin}–{p.killsMax}<br />💥 {p.min}–{p.max}
+              </div>
+            {/if}
           {:else if cell.blocked}
             <span class="token-shadow" aria-hidden="true"></span>
             <div class="token-standing rock-wrap" aria-hidden="true">
@@ -282,12 +282,18 @@
     justify-content: center;
   }
 
-  /* Damage/kill forecast beside the aimed target (LordsWM tooltip). */
+  /* Damage/kill forecast beside the aimed target (LordsWM tooltip).
+     Sibling of .token-standing, not a child: the standee's hover filter
+     flattens its 3D subtree, which would cancel this lift exactly when the
+     preview is shown. In the board's preserve-3d context paint order is
+     depth, not z-index, so translateZ (≈1.5 cell rows, board-relative via
+     cqw) floats it in front of every neighbouring standee. */
   .preview {
     position: absolute;
     left: 50%;
     bottom: -8%;
-    transform: translateX(-50%);
+    transform: rotateX(calc(-1 * var(--tilt))) translateX(-50%) translateZ(13cqw);
+    transform-origin: 50% 100%;
     white-space: nowrap;
     background: rgb(15 23 42 / 0.85);
     border: 1px solid rgb(148 163 184 / 0.4);
