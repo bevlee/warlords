@@ -1,1 +1,7 @@
 @import 'tailwindcss';
+
+/* If a page scrollbar ever appears, reserve its gutter up front so the
+   width-driven battle board never reflows when content height fluctuates. */
+html {
+  scrollbar-gutter: stable;
+}

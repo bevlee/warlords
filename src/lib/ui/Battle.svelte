@@ -341,13 +341,17 @@
 <div class="flex justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
        turns bar) fits without scrolling on laptop screens. -->
-  <div class="w-full min-w-0" style="max-width: calc((100dvh - 300px) * 1.45 + 220px)">
-    <!-- Combat indicator: status + last log lines, above the battlefield. -->
+  <div class="w-full min-w-0" style="max-width: calc((100dvh - 350px) * 1.45 + 220px)">
+    <!-- Combat indicator: status + last log lines, above the battlefield.
+         Fixed height: content changes must never reflow the board below. -->
     <div class="mb-1 flex justify-center">
-      <div class="min-h-12 max-w-2xl rounded-lg border border-slate-600/60 bg-slate-900/85 px-5 py-1.5 text-center shadow-lg">
+      <div
+        class="flex h-16 max-w-2xl flex-col justify-center overflow-hidden rounded-lg border
+          border-slate-600/60 bg-slate-900/85 px-5 text-center shadow-lg"
+      >
         <p class="text-sm font-medium text-slate-100">{statusText}</p>
         {#each logTail as line, i (i)}
-          <p class="font-mono text-[11px] leading-snug text-slate-400">{line}</p>
+          <p class="truncate font-mono text-[11px] leading-snug text-slate-400">{line}</p>
         {/each}
       </div>
     </div>

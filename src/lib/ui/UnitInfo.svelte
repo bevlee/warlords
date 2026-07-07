@@ -39,7 +39,10 @@
   });
 </script>
 
-<div class="rounded-lg border border-slate-700 bg-slate-800 p-2">
+<!-- Fixed height: hovering different units must never change this panel's
+     footprint (a growing panel can toggle the page scrollbar and reflow the
+     whole width-driven board). -->
+<div class="h-48 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 p-2">
   {#if unit}
     <div class="mb-1 flex items-center gap-2">
       <Sprite name={unit.definition.name} class="h-9 w-8" />
