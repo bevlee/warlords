@@ -524,14 +524,11 @@
     {/if}
     </div>
 
-    <!-- Bottom row: bare turns bar (LordsWM) + compact unit info. -->
-    <div class="relative z-10 mt-1.5 flex items-start gap-3">
-      <div class="min-w-0 flex-1">
-        <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
-      </div>
-      <div class="w-56 shrink-0">
-        <UnitInfo unit={infoUnit} hero={battle.hero} />
-      </div>
+    <!-- Bottom: bare turns bar (LordsWM), then a full-width unit info strip
+         below it so the info panel gets maximum lengthwise space. -->
+    <div class="relative z-10 mt-1.5 flex flex-col gap-2">
+      <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
+      <UnitInfo unit={infoUnit} hero={battle.hero} />
     </div>
   </div>
 </div>
