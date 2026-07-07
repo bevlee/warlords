@@ -53,6 +53,21 @@ export function getSorceryMultiplier(hero: Hero): number {
   return 1 + 0.05 * getSkillLevel(hero, 'sorcery');
 }
 
+/** Hero's max/starting mana: base regen curve plus Intelligence (wizard). */
+export function maxMana(hero: Hero): number {
+  return 5 + 3 * hero.level + 2 * getSkillLevel(hero, 'intelligence');
+}
+
+/** Mana regenerated at the start of each new round from Mysticism (wizard). */
+export function getMysticismRegen(hero: Hero): number {
+  return getSkillLevel(hero, 'mysticism');
+}
+
+/** Knight Tactics: starting column shift toward the enemy, in cells. */
+export function getTacticsShift(hero: Hero): number {
+  return getSkillLevel(hero, 'tactics');
+}
+
 /** Unlock/level faction skills as the hero levels up. Called whenever hero.level changes. */
 export function updateFactionSkills(hero: Hero): Hero {
   const defs = FACTION_SKILL_DEFS[hero.class];

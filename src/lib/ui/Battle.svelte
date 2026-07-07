@@ -35,7 +35,10 @@
 
   let { playerArmy, enemyArmy, hero, onexit, onresult }: Props = $props();
 
-  const AI_DELAY_MS = 450;
+  const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
+  type BattleSpeed = keyof typeof AI_SPEEDS;
+  let battleSpeed: BattleSpeed = $state('normal');
+  const AI_DELAY_MS = $derived(AI_SPEEDS[battleSpeed]);
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
@@ -228,6 +231,12 @@
     battle = applyAction(battle, { type: 'defend' });
   }
 
+  function handleForfeit() {
+    if (battle.result !== 'ongoing') return;
+    pendingSpell = null;
+    battle = { ...battle, result: 'enemy_wins', log: [...battle.log, { type: 'battle_end', data: { result: 'enemy_wins', forfeit: true } }] };
+  }
+
   function restart() {
     pendingSpell = null;
     resultAnnounced = false;
@@ -362,6 +371,27 @@
       >
         Defend
       </button>
+      <button
+        type="button"
+        class="rounded bg-red-900 px-3 py-1.5 text-sm font-medium text-red-100
+          hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={battle.result !== 'ongoing'}
+        onclick={handleForfeit}
+      >
+        Forfeit
+      </button>
+      <div class="flex items-center gap-1 rounded bg-slate-800 p-0.5" role="group" aria-label="battle speed">
+        {#each Object.keys(AI_SPEEDS) as speed (speed)}
+          <button
+            type="button"
+            class="rounded px-2 py-1 text-xs font-medium capitalize
+              {battleSpeed === speed ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}"
+            onclick={() => (battleSpeed = speed as BattleSpeed)}
+          >
+            {speed}
+          </button>
+        {/each}
+      </div>
       {#if isHeroTurn}
         {#each Object.entries(SPELL_META) as [id, meta] (id)}
           {@const spellId = id as SpellId}

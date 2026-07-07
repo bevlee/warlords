@@ -35,7 +35,7 @@ export const WIZARD_UNITS: UnitDef[] = [
   {
     name: 'Titan', tier: 7, speed: 7, initiative: 11, hp: 300,
     attack: 30, defense: 24, minDamage: 50, maxDamage: 65,
-    shots: 6, range: 99, isLarge: true, abilities: ['no_retaliation'],
+    shots: 3, range: 99, isLarge: true, abilities: ['no_retaliation'],
   },
 ];
 

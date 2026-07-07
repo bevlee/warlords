@@ -115,10 +115,20 @@ export function applyDamage(defender: UnitStack, damage: number): DamageResult {
   };
 }
 
-export function canRetaliate(defender: UnitStack): boolean {
-  return !defender.hasRetaliated
+/**
+ * Whether `defender` can retaliate against `attacker`'s hit.
+ * Two independent abilities gate this: the defender's own `no_retaliation`
+ * (it never retaliates, regardless of who hit it) and the attacker's
+ * `no_retaliation` (nothing it hits can retaliate — e.g. Monk/Naga/Titan).
+ * Griffin's `unlimited_retaliation` bypasses the once-per-turn limit.
+ */
+export function canRetaliate(defender: UnitStack, attacker?: UnitStack): boolean {
+  const unlimited = defender.definition.abilities.includes('unlimited_retaliation');
+  const attackerBlocks = attacker?.definition.abilities.includes('no_retaliation') ?? false;
+  return (unlimited || !defender.hasRetaliated)
     && defender.count > 0
-    && !defender.definition.abilities.includes('no_retaliation');
+    && !defender.definition.abilities.includes('no_retaliation')
+    && !attackerBlocks;
 }
 
 /** Returns 'boost' (extra turn), 'freeze' (skip turn), or null */

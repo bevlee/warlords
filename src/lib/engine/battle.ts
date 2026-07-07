@@ -4,7 +4,15 @@ import { createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
 import { mulberry32 } from './rng';
-import { applyOffenseBonus, applyArmorerBonus, getMoraleBonus } from './factionSkills';
+import {
+  applyOffenseBonus,
+  applyArmorerBonus,
+  getMoraleBonus,
+  getSorceryMultiplier,
+  getMysticismRegen,
+  getTacticsShift,
+  maxMana,
+} from './factionSkills';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
  *  reduces damage a player stack takes. Both are hero-wide, so they're applied
@@ -30,8 +38,8 @@ export function lightningDamage(level: number): number {
   return 12 + 8 * level;
 }
 
-function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number): UnitStack {
-  const col = side === 'player' ? 1 : GRID_W - 2;
+function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, colShift = 0): UnitStack {
+  const col = side === 'player' ? 1 + colShift : GRID_W - 2;
   const row = 1 + index * Math.floor((GRID_H - 2) / 6);
   return {
     id: uuidv4(),
@@ -58,8 +66,9 @@ export function initBattle(
   let grid = createGrid(GRID_W, GRID_H);
 
   const moraleBonus = getMoraleBonus(hero);
+  const tacticsShift = getTacticsShift(hero);
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
-    const stack = slotToStack(slot, 'player', i);
+    const stack = slotToStack(slot, 'player', i, tacticsShift);
     return moraleBonus > 0 ? { ...stack, morale: stack.morale + moraleBonus } : stack;
   });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
@@ -108,7 +117,7 @@ export function initBattle(
   const state: BattleState = {
     grid,
     units: allUnits,
-    hero: { ...hero, mana: hero.mana ?? 5 + 3 * hero.level },
+    hero: { ...hero, mana: hero.mana ?? maxMana(hero) },
     round: 1,
     battleTime: 0,
     currentUnitId: null,
@@ -116,7 +125,17 @@ export function initBattle(
     result: 'ongoing',
     seed,
   };
-  return advanceTurn(state);
+  return advance(state);
+}
+
+/** advanceTurn, plus Wizard Mysticism's mana regen whenever a new round starts. */
+function advance(state: BattleState): BattleState {
+  const next = advanceTurn(state);
+  if (next.round > state.round) {
+    const regen = getMysticismRegen(next.hero);
+    if (regen > 0) return { ...next, hero: { ...next.hero, mana: (next.hero.mana ?? 0) + regen } };
+  }
+  return next;
 }
 
 export function checkBattleEnd(state: BattleState): 'player_wins' | 'enemy_wins' | null {
@@ -165,7 +184,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   const moraleResult = checkMorale(actor, rng);
   if (moraleResult === 'freeze') {
     s.log = [...s.log, { type: 'morale_freeze', data: { unitId: actorId } }];
-    return advanceTurn(reenter(s, 0));
+    return advance(reenter(s, 0));
   }
 
   if (action.type === 'cast') {
@@ -174,7 +193,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     const target = s.units[targetIdx];
 
     if (action.spell === 'lightning') {
-      const damage = lightningDamage(s.hero.level);
+      const damage = Math.round(lightningDamage(s.hero.level) * getSorceryMultiplier(s.hero));
       const { killed, remaining } = applyDamage(target, damage);
       s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? remaining : u)) };
       s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id, damage, killed } }];
@@ -208,7 +227,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   } else if (action.type === 'attack') {
     const targetId = action.targetId;
     const targetIdx = s.units.findIndex(u => u.id === targetId);
-    if (targetIdx < 0) return advanceTurn(reenter(s, 0));
+    if (targetIdx < 0) return advance(reenter(s, 0));
     const target = s.units[targetIdx];
 
     // Combined move+attack: relocate the actor before resolving the melee.
@@ -235,10 +254,13 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     // Check end before retaliation
     const endResult = checkBattleEnd(s);
-    if (endResult) return { ...s, result: endResult };
+    if (endResult) {
+      s.log = [...s.log, { type: 'battle_end', data: { result: endResult } }];
+      return { ...s, result: endResult };
+    }
 
     // Retaliation (only on regular attack, not on ranged)
-    if (action.type === 'attack' && canRetaliate(remaining)) {
+    if (action.type === 'attack' && canRetaliate(remaining, attacker)) {
       const retDamage = withHeroBonus(s.hero, remaining, attacker, calculateDamage(remaining, attacker, 0, rng));
       const { killed: retKilled, remaining: retActor } = applyDamage(attacker, retDamage);
       const updatedUnits = s.units.map(u => {
@@ -257,10 +279,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   } else if (action.type === 'shoot') {
     const targetId = (action as { type: 'shoot'; targetId: string }).targetId;
     const targetIdx = s.units.findIndex(u => u.id === targetId);
-    if (targetIdx < 0) return advanceTurn(reenter(s, 0));
+    if (targetIdx < 0) return advance(reenter(s, 0));
     const target = s.units[targetIdx];
 
-    if (actor.shotsLeft <= 0) return advanceTurn(reenter(s, 0));
+    if (actor.shotsLeft <= 0) return advance(reenter(s, 0));
 
     const damage = withHeroBonus(s.hero, actor, target, calculateDamage(actor, target, s.hero.attack, rng));
     const { killed, remaining } = applyDamage(target, damage);
@@ -285,7 +307,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   }
 
   const endResult = checkBattleEnd(s);
-  if (endResult) return { ...s, result: endResult };
+  if (endResult) {
+    s.log = [...s.log, { type: 'battle_end', data: { result: endResult } }];
+    return { ...s, result: endResult };
+  }
 
-  return advanceTurn(reenter(s, action.type === 'wait' ? 0.5 : 0));
+  return advance(reenter(s, action.type === 'wait' ? 0.5 : 0));
 }

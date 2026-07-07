@@ -2,6 +2,7 @@
   import { FACTION_UNITS, FACTION_INFO } from '$lib/engine/factions';
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
   import { xpToReach } from '$lib/engine/progression';
+  import { maxMana } from '$lib/engine/factionSkills';
   import Sprite from './Sprite.svelte';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
@@ -64,7 +65,7 @@
       <div>
         <p class="text-sm font-semibold text-amber-200">
           Level {hero.level} {FACTION_INFO[hero.class].name}
-          <span class="ml-2 font-mono text-xs text-slate-300">⚔{hero.attack} 🛡{hero.defense} 💧{5 + 3 * hero.level}</span>
+          <span class="ml-2 font-mono text-xs text-slate-300">⚔{hero.attack} 🛡{hero.defense} 💧{maxMana(hero)}</span>
         </p>
         <div class="mt-1 flex items-center gap-2">
           <div class="h-1.5 w-40 overflow-hidden rounded bg-black/50">

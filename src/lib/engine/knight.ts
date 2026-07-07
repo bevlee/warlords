@@ -33,7 +33,7 @@ export const KNIGHT_UNITS: UnitDef[] = [
     shots: 0, range: 0, isLarge: true, abilities: ['jousting'],
   },
   {
-    name: 'Champion', tier: 7, speed: 9, initiative: 12, hp: 130,
+    name: 'Champion', tier: 7, speed: 7, initiative: 12, hp: 130,
     attack: 20, defense: 20, minDamage: 20, maxDamage: 25,
     shots: 0, range: 0, isLarge: true, abilities: ['jousting'],
   },

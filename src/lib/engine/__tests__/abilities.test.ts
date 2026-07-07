@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { modifiedDamage, calculateDamage } from '../combat';
-import { CAVALIER } from '../knight';
-import { GORGON } from '../wizard';
+import { modifiedDamage, calculateDamage, canRetaliate } from '../combat';
+import { CAVALIER, GRIFFIN } from '../knight';
+import { GORGON, NAGA } from '../wizard';
 import { GOBLIN } from '../barbarian';
 import type { UnitStack } from '../types';
 
@@ -91,5 +91,37 @@ describe('Death Stare (Gorgon)', () => {
     const defender = makeStack({ definition: GOBLIN, side: 'enemy', count: 10 });
     const damage = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.01]));
     expect(damage).toBeLessThan(GOBLIN.hp); // no death-stare bonus tacked on
+  });
+});
+
+describe('Unlimited Retaliation (Griffin)', () => {
+  it('can retaliate again even after already retaliating this turn', () => {
+    const griffin = makeStack({ definition: GRIFFIN, hasRetaliated: true });
+    expect(canRetaliate(griffin)).toBe(true);
+  });
+
+  it('a normal unit cannot retaliate twice', () => {
+    const goblin = makeStack({ definition: GOBLIN, hasRetaliated: true });
+    expect(canRetaliate(goblin)).toBe(false);
+  });
+});
+
+describe('No Enemy Retaliation (Monk/Naga/Titan) blocks the defender, not just itself', () => {
+  it('the defender cannot retaliate when the attacker has no_retaliation', () => {
+    const attacker = makeStack({ definition: NAGA });
+    const defender = makeStack({ definition: GOBLIN, side: 'enemy', hasRetaliated: false });
+    expect(canRetaliate(defender, attacker)).toBe(false);
+  });
+
+  it('the defender can still retaliate against an attacker without the ability', () => {
+    const attacker = makeStack({ definition: GOBLIN });
+    const defender = makeStack({ definition: GOBLIN, side: 'enemy', hasRetaliated: false });
+    expect(canRetaliate(defender, attacker)).toBe(true);
+  });
+
+  it('a defender with its own no_retaliation still cannot retaliate, attacker ability aside', () => {
+    const attacker = makeStack({ definition: GOBLIN });
+    const defender = makeStack({ definition: NAGA, side: 'enemy', hasRetaliated: false });
+    expect(canRetaliate(defender, attacker)).toBe(false);
   });
 });

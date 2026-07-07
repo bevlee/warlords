@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { initBattle, applyAction } from '../battle';
+import { initBattle, applyAction, lightningDamage } from '../battle';
 import { GOBLIN } from '../barbarian';
 import { CAVALIER } from '../knight';
-import { updateFactionSkills } from '../factionSkills';
+import { updateFactionSkills, maxMana } from '../factionSkills';
 import type { Hero } from '../types';
 
 function baseHero(overrides: Partial<Hero> = {}): Hero {
@@ -91,5 +91,54 @@ describe('faction skills wiring into battle', () => {
     const next = applyAction(acting, { type: 'attack', targetId: enemy.id, moveTo });
     const moved = next.units.find(u => u.id === cavalier.id)!;
     expect(moved.lastMovedFrom).toEqual(from);
+  });
+
+  it('Tactics shifts the Knight player army toward the enemy by the skill level', () => {
+    const hero = baseHero({ class: 'knight', level: 1 }); // tactics lvl 1 unlocks at level 1
+    const withoutTactics = baseHero({ class: 'wizard', level: 1 });
+
+    const shifted = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 9);
+    const plain = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], withoutTactics, 9);
+
+    const shiftedCol = shifted.units.find(u => u.side === 'player' && !u.isHero)!.pos.col;
+    const plainCol = plain.units.find(u => u.side === 'player' && !u.isHero)!.pos.col;
+    expect(shiftedCol).toBe(plainCol + 1);
+  });
+
+  it('Intelligence adds to the hero\'s starting/max mana', () => {
+    const hero = baseHero({ class: 'wizard', level: 2 }); // intelligence lvl 1 unlocks at level 2
+    expect(maxMana(hero)).toBe(5 + 3 * 2 + 2);
+
+    const state = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 1);
+    expect(state.hero.mana).toBe(maxMana(hero));
+  });
+
+  it('Sorcery scales Lightning damage', () => {
+    const hero = baseHero({ class: 'wizard', level: 1 }); // sorcery lvl 1 unlocks at level 1
+    let state = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 20 }], hero, 4);
+    for (let i = 0; i < 20 && !state.units.find(u => u.id === state.currentUnitId)?.isHero; i++) {
+      state = applyAction(state, { type: 'wait' });
+    }
+    const enemy = state.units.find(u => u.side === 'enemy' && u.count > 0)!;
+
+    const next = applyAction(state, { type: 'cast', spell: 'lightning', targetId: enemy.id });
+    const castEvent = next.log.find(e => e.type === 'cast')!;
+    expect(castEvent.data.damage).toBe(Math.round(lightningDamage(hero.level) * 1.05));
+  });
+
+  it('Mysticism regenerates mana at the start of each new round', () => {
+    const hero = baseHero({ class: 'wizard', level: 4 }); // mysticism lvl 1 unlocks at level 4
+    let state = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 1);
+    const startMana = state.hero.mana;
+    const startRound = state.round;
+
+    let iterations = 0;
+    while (state.round === startRound && iterations < 50) {
+      state = applyAction(state, { type: 'wait' });
+      iterations++;
+    }
+
+    expect(state.round).toBeGreaterThan(startRound);
+    expect(state.hero.mana).toBe((startMana ?? 0) + 1);
   });
 });
