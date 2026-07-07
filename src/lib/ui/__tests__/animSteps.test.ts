@@ -1,6 +1,42 @@
 import { describe, it, expect } from 'vitest';
-import { stepsFromLogEntry } from '../animSteps';
-import type { BattleEvent } from '$lib/engine/types';
+import { stepsFromLogEntry, applyLogEntry } from '../animSteps';
+import { createGrid, placeUnits } from '$lib/engine/grid';
+import { GOBLIN } from '$lib/engine/barbarian';
+import type { BattleEvent, BattleState, UnitDef, UnitStack, Pos } from '$lib/engine/types';
+
+function makeStack(def: UnitDef, pos: Pos, side: 'player' | 'enemy', overrides: Partial<UnitStack> = {}): UnitStack {
+  return {
+    id: `${side}-${def.name}-${pos.col}-${pos.row}`,
+    definition: def,
+    count: 5,
+    hp: def.hp,
+    pos,
+    side,
+    hasRetaliated: false,
+    shotsLeft: def.shots,
+    morale: 0,
+    luck: 0,
+    atb: 0,
+    isDefending: false,
+    ...overrides,
+  };
+}
+
+function makeState(units: UnitStack[]): BattleState {
+  let grid = createGrid(12, 10);
+  grid = placeUnits(grid, units);
+  return {
+    grid,
+    units,
+    hero: { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] },
+    round: 1,
+    battleTime: 0,
+    currentUnitId: units[0]?.id ?? null,
+    log: [],
+    result: 'ongoing',
+    seed: 1,
+  };
+}
 
 describe('stepsFromLogEntry: damage', () => {
   it('maps an attack entry to a single damage step on the target', () => {
@@ -96,5 +132,54 @@ describe('stepsFromLogEntry: death and status', () => {
     ];
 
     for (const entry of noop) expect(stepsFromLogEntry(entry)).toEqual([]);
+  });
+});
+
+describe('applyLogEntry', () => {
+  it('reduces the target stack toward 0 count by damage, one creature at a time', () => {
+    const target = makeStack(GOBLIN, { col: 5, row: 5 }, 'enemy', { count: 5, hp: GOBLIN.hp });
+    const state = makeState([target]);
+    const entry: BattleEvent = {
+      type: 'attack',
+      data: { attackerId: 'x', targetId: target.id, damage: GOBLIN.hp + 1, killed: 1 },
+    };
+
+    const next = applyLogEntry(state, entry);
+
+    const patched = next.units.find(u => u.id === target.id)!;
+    expect(patched.count).toBe(4);
+  });
+
+  it('zeroes the stack on a death entry', () => {
+    const target = makeStack(GOBLIN, { col: 5, row: 5 }, 'enemy', { count: 1 });
+    const state = makeState([target]);
+    const entry: BattleEvent = { type: 'death', data: { unitId: target.id } };
+
+    const next = applyLogEntry(state, entry);
+
+    expect(next.units.find(u => u.id === target.id)!.count).toBe(0);
+  });
+
+  it('applies an attack buff on a bloodlust cast', () => {
+    const target = makeStack(GOBLIN, { col: 5, row: 5 }, 'player');
+    const state = makeState([target]);
+    const entry: BattleEvent = {
+      type: 'cast',
+      data: { spell: 'bloodlust', casterId: 'h1', targetId: target.id },
+    };
+
+    const next = applyLogEntry(state, entry);
+
+    expect(next.units.find(u => u.id === target.id)!.attackBuff).toBe(4);
+  });
+
+  it('is a no-op for entry types it does not need to patch', () => {
+    const target = makeStack(GOBLIN, { col: 5, row: 5 }, 'player');
+    const state = makeState([target]);
+    const entry: BattleEvent = { type: 'defend', data: { unitId: target.id } };
+
+    const next = applyLogEntry(state, entry);
+
+    expect(next.units).toEqual(state.units);
   });
 });
