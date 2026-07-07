@@ -14,8 +14,8 @@
     return [
       ['Count', `${unit.count}`],
       ['HP', `${unit.hp} / ${d.hp}`],
-      ['Attack', `${d.attack}`],
-      ['Defense', `${d.defense}`],
+      ['Attack', unit.attackBuff ? `${d.attack + unit.attackBuff} ✨` : `${d.attack}`],
+      ['Defense', unit.defenseBuff ? `${d.defense + unit.defenseBuff} ✨` : `${d.defense}`],
       ['Damage', `${d.minDamage}–${d.maxDamage}`],
       ['Speed', `${d.speed}`],
       ['Initiative', `${d.initiative}`],

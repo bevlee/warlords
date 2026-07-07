@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { ArmySlot, BattleAction, BattleState, Hero, UnitStack } from './types';
+import type { ArmySlot, BattleAction, BattleState, Hero, SpellId, UnitStack } from './types';
 import { createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
@@ -7,6 +7,17 @@ import { mulberry32 } from './rng';
 
 const GRID_W = 12;
 const GRID_H = 10;
+
+export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
+  lightning: { cost: 3, friendly: false },
+  bloodlust: { cost: 2, friendly: true },
+  stoneskin: { cost: 2, friendly: true },
+};
+
+/** Lightning is true damage: flat, level-scaled, ignores attack/defense. */
+export function lightningDamage(level: number): number {
+  return 12 + 8 * level;
+}
 
 function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number): UnitStack {
   const col = side === 'player' ? 1 : GRID_W - 2;
@@ -82,7 +93,7 @@ export function initBattle(
   const state: BattleState = {
     grid,
     units: allUnits,
-    hero,
+    hero: { ...hero, mana: hero.mana ?? 5 + 3 * hero.level },
     round: 1,
     battleTime: 0,
     currentUnitId: null,
@@ -112,6 +123,23 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   if (actorIdx < 0) return s;
   const actor = s.units[actorIdx];
 
+  // Invalid casts are rejected outright: turn is kept, nothing changes.
+  if (action.type === 'cast') {
+    const spell = SPELLS[action.spell];
+    const target = s.units.find(u => u.id === action.targetId);
+    if (
+      !actor.isHero ||
+      !spell ||
+      (s.hero.mana ?? 0) < spell.cost ||
+      !target ||
+      target.count === 0 ||
+      target.isHero ||
+      (spell.friendly ? target.side !== actor.side : target.side === actor.side)
+    ) {
+      return state;
+    }
+  }
+
   // A finished turn re-enters the scale at 0; wait re-enters at 0.5 (half cycle).
   const reenter = (st: BattleState, atb: number): BattleState => ({
     ...st,
@@ -125,7 +153,32 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     return advanceTurn(reenter(s, 0));
   }
 
-  if (action.type === 'defend') {
+  if (action.type === 'cast') {
+    const spell = SPELLS[action.spell];
+    const targetIdx = s.units.findIndex(u => u.id === action.targetId);
+    const target = s.units[targetIdx];
+
+    if (action.spell === 'lightning') {
+      const damage = lightningDamage(s.hero.level);
+      const { killed, remaining } = applyDamage(target, damage);
+      s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? remaining : u)) };
+      s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id, damage, killed } }];
+      if (remaining.count === 0) {
+        s.log = [...s.log, { type: 'death', data: { unitId: target.id } }];
+        s = { ...s, grid: setOccupant(s.grid, remaining.pos, null) };
+      }
+    } else {
+      const buffed =
+        action.spell === 'bloodlust'
+          ? { ...target, attackBuff: (target.attackBuff ?? 0) + 4 }
+          : { ...target, defenseBuff: (target.defenseBuff ?? 0) + 4 };
+      s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? buffed : u)) };
+      s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id } }];
+    }
+
+    s = { ...s, hero: { ...s.hero, mana: (s.hero.mana ?? 0) - spell.cost } };
+
+  } else if (action.type === 'defend') {
     const newUnits = s.units.map((u, i) => (i === actorIdx ? { ...u, isDefending: true } : u));
     s = { ...s, units: newUnits };
     s.log = [...s.log, { type: 'defend', data: { unitId: actorId } }];

@@ -51,8 +51,10 @@ Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
 retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;
 poll status ~every 300 ms, a full battle finishes in ~1–2 min), restart.
 
-- Hero: flank portrait `button[aria-label^="Hero"]` left of the board; on
-  "Your hero's turn" every enemy is a target — click one to strike.
+- Hero: flank portrait `button[aria-label^="Hero"]` left of the board (mana
+  in `span.text-sky-300`); on "Your hero's turn" every enemy is a target —
+  click one to strike, or use the violet spell buttons (Lightning/Bloodlust/
+  Stoneskin by role=button name) then click a ringed stack to cast.
 
 Gotchas: capture `pageerror`/console errors; a stray dev-only 404 (Chrome
 devtools probe) is environment noise, not a bug.

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { initBattle, applyAction } from '$lib/engine/battle';
+  import { initBattle, applyAction, SPELLS } from '$lib/engine/battle';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
@@ -15,6 +15,7 @@
     BattleState,
     Hero,
     Pos,
+    SpellId,
     UnitStack,
   } from '$lib/engine/types';
   import BattleGrid from './BattleGrid.svelte';
@@ -72,6 +73,35 @@
 
   const targetIds = $derived(new Set(actionIcons.keys()));
 
+  const isHeroTurn = $derived(isPlayerTurn && !!activeUnit?.isHero);
+
+  const SPELL_META: Record<SpellId, { glyph: string; label: string }> = {
+    lightning: { glyph: '⚡', label: 'Lightning' },
+    bloodlust: { glyph: '💪', label: 'Bloodlust' },
+    stoneskin: { glyph: '🗿', label: 'Stoneskin' },
+  };
+
+  // Spell targeting: pick a spell on the hero's turn, then click a stack.
+  let pendingSpell: SpellId | null = $state(null);
+  const spellTargetIds = $derived.by(() => {
+    if (!pendingSpell || !isHeroTurn) return null;
+    const friendly = SPELLS[pendingSpell].friendly;
+    return new Set(
+      battle.units
+        .filter(u => u.count > 0 && !u.isHero && (friendly ? u.side === 'player' : u.side === 'enemy'))
+        .map(u => u.id)
+    );
+  });
+
+  // What the grid highlights: spell targeting overrides attack targeting.
+  const gridTargetIds = $derived(spellTargetIds ?? targetIds);
+  const gridActionIcons = $derived.by(() => {
+    if (!spellTargetIds) return actionIcons;
+    const icons = new Map<string, 'melee' | 'shoot' | 'spell'>();
+    for (const id of spellTargetIds) icons.set(id, 'spell');
+    return icons;
+  });
+
   // Two-step melee: click an enemy, then choose which tile to attack from.
   let meleeTarget: UnitStack | null = $state(null);
   const pendingTarget = $derived(
@@ -96,6 +126,7 @@
   $effect(() => {
     void battle.currentUnitId;
     meleeTarget = null;
+    pendingSpell = null;
   });
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
@@ -119,8 +150,19 @@
     hovered = null;
   }
 
+  function castAt(unit: UnitStack) {
+    if (!pendingSpell) return;
+    battle = applyAction(battle, { type: 'cast', spell: pendingSpell, targetId: unit.id });
+    pendingSpell = null;
+    hovered = null;
+  }
+
   function handleCellClick(pos: Pos) {
     if (!isPlayerTurn) return;
+    if (pendingSpell) {
+      pendingSpell = null; // clicking empty ground cancels the cast
+      return;
+    }
     if (pendingTarget) {
       if (attackFromKeys.has(`${pos.col},${pos.row}`)) attackFrom(pendingTarget.id, pos);
       else meleeTarget = null; // clicking elsewhere cancels targeting
@@ -132,6 +174,12 @@
 
   function handleUnitClick(unit: UnitStack, shift = false) {
     if (!isPlayerTurn || !activeUnit) return;
+
+    if (pendingSpell) {
+      if (spellTargetIds?.has(unit.id)) castAt(unit);
+      else pendingSpell = null;
+      return;
+    }
 
     if (unit.side === 'player') {
       // Clicking your own active stack while targeting = attack in place.
@@ -171,12 +219,14 @@
   function handleWait() {
     if (!isPlayerTurn) return;
     meleeTarget = null;
+    pendingSpell = null;
     battle = applyAction(battle, { type: 'wait' });
   }
 
   function handleDefend() {
     if (!isPlayerTurn) return;
     meleeTarget = null;
+    pendingSpell = null;
     battle = applyAction(battle, { type: 'defend' });
   }
 
@@ -201,6 +251,10 @@
         return `${unitLabel(d.unitId)} move to (${(d.to as Pos).col}, ${(d.to as Pos).row}).`;
       case 'defend':
         return `${unitLabel(d.unitId)} brace for defense.`;
+      case 'cast':
+        return d.spell === 'lightning'
+          ? `Your hero casts Lightning at ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`
+          : `Your hero casts ${SPELL_META[d.spell as SpellId].label} on ${unitLabel(d.targetId)}.`;
       case 'attack':
         return `${unitLabel(d.attackerId)} strike ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
       case 'retaliate':
@@ -229,8 +283,12 @@
     if (pendingTarget) {
       return `Attacking enemy ${pendingTarget.definition.name}s — click a ⚔️ tile to attack from, or click elsewhere to cancel.`;
     }
+    if (pendingSpell) {
+      const friendly = SPELLS[pendingSpell].friendly;
+      return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
+    }
     if (isPlayerTurn && activeUnit.isHero) {
-      return 'Your hero\'s turn — click any enemy to strike, or Wait.';
+      return 'Your hero\'s turn — click any enemy to strike, or cast a spell.';
     }
     if (isPlayerTurn) {
       const hints = ['green cell to move'];
@@ -262,17 +320,18 @@
           <span class="text-3xl leading-none">👑</span>
           <span class="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Hero</span>
           <span class="font-mono text-[10px] text-slate-300">⚔{hero.attack} 🛡{hero.defense}</span>
+          <span class="font-mono text-[10px] text-sky-300">💧{battle.hero.mana ?? 0}</span>
           <span class="font-mono text-[10px] text-slate-400">Lv {hero.level}</span>
         </button>
       {/if}
       <div class="min-w-0 flex-1">
         <BattleGrid
           state={battle}
-          reachableKeys={pendingTarget ? new Set() : reachableKeys}
-          {targetIds}
+          reachableKeys={pendingTarget || pendingSpell ? new Set() : reachableKeys}
+          targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
           interactive={isPlayerTurn}
-          {actionIcons}
+          actionIcons={gridActionIcons}
           {attackFromKeys}
           pendingTargetId={pendingTarget?.id ?? null}
           hoveredId={hovered?.id ?? null}
@@ -306,6 +365,21 @@
       >
         Defend
       </button>
+      {#if isHeroTurn}
+        {#each Object.entries(SPELL_META) as [id, meta] (id)}
+          {@const spellId = id as SpellId}
+          <button
+            type="button"
+            class="rounded px-3 py-1.5 text-sm font-medium text-slate-100
+              disabled:cursor-not-allowed disabled:opacity-40
+              {pendingSpell === spellId ? 'bg-violet-600 ring-2 ring-violet-300' : 'bg-violet-900 hover:bg-violet-700'}"
+            disabled={(battle.hero.mana ?? 0) < SPELLS[spellId].cost}
+            onclick={() => (pendingSpell = pendingSpell === spellId ? null : spellId)}
+          >
+            {meta.glyph} {meta.label} ({SPELLS[spellId].cost})
+          </button>
+        {/each}
+      {/if}
       <p class="text-sm text-slate-300">{statusText}</p>
     </div>
 

@@ -8,7 +8,7 @@
     targetIds: Set<string>;
     activeId: string | null;
     interactive: boolean;
-    actionIcons: Map<string, 'melee' | 'shoot'>;
+    actionIcons: Map<string, 'melee' | 'shoot' | 'spell'>;
     attackFromKeys: Set<string>;
     pendingTargetId: string | null;
     hoveredId: string | null;
@@ -33,6 +33,29 @@
   }: Props = $props();
 
   const TILT_DEG = 38;
+
+  // LordsWM-style cursors: the pointer itself becomes a sword/bow near targets.
+  function emojiCursor(emoji: string): string {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><text y='22' font-size='20'>${emoji}</text></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 14 14, crosshair`;
+  }
+  const SWORD_CURSOR = emojiCursor('⚔️');
+  const BOW_CURSOR = emojiCursor('🏹');
+  const SPELL_CURSOR = emojiCursor('✨');
+  const ICON_GLYPH = { melee: '⚔️', shoot: '🏹', spell: '✨' } as const;
+
+  function cursorFor(occupantId: string | null, reachable: boolean, attackFrom: boolean): string {
+    if (!interactive) return 'default';
+    if (attackFrom) return SWORD_CURSOR;
+    if (occupantId) {
+      const icon = actionIcons.get(occupantId);
+      if (icon === 'melee') return SWORD_CURSOR;
+      if (icon === 'shoot') return BOW_CURSOR;
+      if (icon === 'spell') return SPELL_CURSOR;
+    }
+    if (reachable) return 'pointer';
+    return '';
+  }
 
   const unitsById = $derived(new Map(state.units.filter(u => u.count > 0).map(u => [u.id, u])));
 
@@ -68,12 +91,12 @@
           type="button"
           class="cell relative aspect-square rounded-sm p-0
             {attackFrom
-              ? 'bg-amber-700/60 hover:bg-amber-500/70 cursor-pointer'
+              ? 'bg-amber-700/60 hover:bg-amber-500/70'
               : reachable
-                ? 'bg-emerald-800/60 hover:bg-emerald-600/70 cursor-pointer'
+                ? 'bg-emerald-800/60 hover:bg-emerald-600/70'
                 : 'bg-slate-900'}
-            {occupant && targetIds.has(occupant.id) ? 'cursor-crosshair' : ''}
             {!interactive ? 'cursor-default' : ''}"
+          style:cursor={cursorFor(cell.occupantId, reachable, attackFrom)}
           aria-label={cell.blocked
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant
@@ -97,7 +120,7 @@
                   class:pinned={occupant.id === pendingTargetId || attackFrom}
                   aria-hidden="true"
                 >
-                  {actionIcons.get(occupant.id) === 'shoot' ? '🏹' : '⚔️'}
+                  {ICON_GLYPH[actionIcons.get(occupant.id) ?? 'melee']}
                 </span>
               {/if}
             </div>

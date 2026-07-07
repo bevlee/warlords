@@ -12,8 +12,11 @@ export function calculateDamage(
   heroAttack: number,
   rng: Rng
 ): number {
-  const atk = attacker.definition.attack + (attacker.side === 'player' ? heroAttack : 0);
-  let def = defender.definition.defense;
+  const atk =
+    attacker.definition.attack +
+    (attacker.attackBuff ?? 0) +
+    (attacker.side === 'player' ? heroAttack : 0);
+  let def = defender.definition.defense + (defender.defenseBuff ?? 0);
 
   // Defensive stance: +30% defense until the stack's own next turn
   if (defender.isDefending) {

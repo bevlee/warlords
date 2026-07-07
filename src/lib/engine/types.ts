@@ -30,6 +30,8 @@ export interface UnitStack {
   atb: number;         // position on the initiative scale; acts at 1
   isDefending: boolean; // defensive stance until the start of its own next turn
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
+  attackBuff?: number;  // battle-long spell bonus to attack
+  defenseBuff?: number; // battle-long spell bonus to defense
 }
 
 export interface Cell {
@@ -52,7 +54,10 @@ export interface Hero {
   attack: number;
   defense: number;
   statPoints: number;
+  mana?: number;       // set by initBattle (5 + 3·level) unless provided
 }
+
+export type SpellId = 'lightning' | 'bloodlust' | 'stoneskin';
 
 export interface ArmySlot {
   unit: UnitDef;
@@ -60,7 +65,7 @@ export interface ArmySlot {
 }
 
 export type BattleEventType =
-  | 'attack' | 'retaliate' | 'shoot' | 'move' | 'defend'
+  | 'attack' | 'retaliate' | 'shoot' | 'move' | 'defend' | 'cast'
   | 'death' | 'morale_boost' | 'morale_freeze'
   | 'round_start' | 'battle_end';
 
@@ -86,4 +91,5 @@ export type BattleAction =
   | { type: 'attack'; targetId: string; moveTo?: Pos }
   | { type: 'shoot'; targetId: string }
   | { type: 'defend' }
+  | { type: 'cast'; spell: SpellId; targetId: string }
   | { type: 'wait' };

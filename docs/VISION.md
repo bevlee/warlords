@@ -43,10 +43,16 @@ melee) · **Defend** (+30% defense until own next turn, 🛡️ badge) ·
 (flank portrait, own ATB turn, whole-board no-retaliation strike,
 untargetable, army death = defeat).
 
+Also done: **sword/bow/sparkle cursors** on targets (SVG data-URI cursors) ·
+**hero spells** (mana = 5 + 3·level; Lightning true damage, Bloodlust /
+Stoneskin battle-long buffs; spell bar on the hero's turn).
+
 ### Gaps, roughly in priority order
 
-1. **Cursor treatment** — LordsWM changes the mouse cursor itself (sword/bow)
-   near targets; we use hover icons above the standee.
-2. **Hero spells** — the hero only strikes; LordsWM heroes also cast.
-3. **Long term** — unit art replacing emoji standees, factions beyond
-   Barbarian, faction skills in the damage formula, PvP/economy layers.
+All LordsWM combat mechanics are in. What remains is content and meta-game:
+
+1. **Army setup screen** — rosters are hardcoded in `+page.svelte`; a
+   pre-battle screen (recruiting, per LordsWM) is the next structural piece.
+2. **Long term** — unit art replacing emoji standees, factions beyond
+   Barbarian, faction skills in the damage formula, hero XP/levelling between
+   battles, PvP/economy layers.
