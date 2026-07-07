@@ -6,11 +6,12 @@ import type { Rng } from './rng';
  * effectiveAttack = attacker.definition.attack + attacker bonuses + hero.attack
  * effectiveDefense = defender.definition.defense (hero.defense doesn't apply to enemies)
  */
-export function calculateDamage(
+/** Stack damage for a given per-creature roll, through the attack/defense modifier. */
+export function modifiedDamage(
   attacker: UnitStack,
   defender: UnitStack,
   heroAttack: number,
-  rng: Rng
+  dmgPerCreature: number
 ): number {
   const atk =
     attacker.definition.attack +
@@ -28,9 +29,6 @@ export function calculateDamage(
     def = Math.floor(def * 0.6);
   }
 
-  // Base damage per creature
-  let dmgPerCreature = attacker.definition.minDamage +
-    Math.floor(rng() * (attacker.definition.maxDamage - attacker.definition.minDamage + 1));
   let totalDamage = dmgPerCreature * attacker.count;
 
   // Attack/defense modifier
@@ -41,6 +39,19 @@ export function calculateDamage(
     const penalty = Math.min(def - atk, 20);
     totalDamage /= 1 + 0.05 * penalty;
   }
+  return totalDamage;
+}
+
+export function calculateDamage(
+  attacker: UnitStack,
+  defender: UnitStack,
+  heroAttack: number,
+  rng: Rng
+): number {
+  // Base damage per creature
+  const dmgPerCreature = attacker.definition.minDamage +
+    Math.floor(rng() * (attacker.definition.maxDamage - attacker.definition.minDamage + 1));
+  let totalDamage = modifiedDamage(attacker, defender, heroAttack, dmgPerCreature);
 
   // Luck: 12.5% * luck chance to double
   if (attacker.luck > 0 && rng() < 0.125 * attacker.luck) {

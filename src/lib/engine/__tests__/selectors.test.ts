@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
-import { getReachableCells, getMeleeTargets, getAttackOrigins, canShoot } from '../selectors';
+import { getReachableCells, getMeleeTargets, getAttackOrigins, canShoot, damagePreview } from '../selectors';
 import { GOBLIN, ORC, THUNDERBIRD, WOLF_RIDER } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
 
@@ -163,6 +163,31 @@ describe('getAttackOrigins', () => {
     const state = makeState([goblin, enemy]);
 
     expect(getAttackOrigins(state, goblin, enemy)).toHaveLength(0);
+  });
+});
+
+describe('damagePreview', () => {
+  it('reports the min/max roll through the attack/defense modifier, with kill ranges', () => {
+    // 5 wolf riders (atk 5, dmg 2–5) vs goblins (def 1, hp 5): atk−def = 4 → ×1.2
+    const riders = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
+    const goblins = makeStack(GOBLIN, { col: 2, row: 1 }, 'enemy', { count: 10 });
+
+    const p = damagePreview(riders, goblins, 0);
+
+    expect(p.min).toBe(12); // 2×5×1.2
+    expect(p.max).toBe(30); // 5×5×1.2
+    expect(p.killsMin).toBe(2); // 12 dmg vs 5 hp
+    expect(p.killsMax).toBe(6); // 30 dmg vs 5 hp
+  });
+
+  it('caps kills at the stack size and applies buffs', () => {
+    const riders = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player', { attackBuff: 4 }); // atk 9 vs def 1 → ×1.4
+    const goblins = makeStack(GOBLIN, { col: 2, row: 1 }, 'enemy', { count: 3 });
+
+    const p = damagePreview(riders, goblins, 0);
+
+    expect(p.min).toBe(14); // 2×5×1.4
+    expect(p.killsMax).toBe(3); // only 3 goblins to kill
   });
 });
 

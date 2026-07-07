@@ -2,7 +2,7 @@
   import { BARBARIAN_UNITS } from '$lib/engine/barbarian';
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
   import { xpToReach } from '$lib/engine/progression';
-  import { glyphFor } from './glyphs';
+  import Sprite from './Sprite.svelte';
   import type { ArmySlot, Hero } from '$lib/engine/types';
 
   interface Props {
@@ -54,7 +54,7 @@
     aria-label="Hero — level {hero.level}, {hero.xp} XP"
   >
     <div class="flex items-center gap-3">
-      <span class="text-3xl">👑</span>
+      <Sprite name="Hero" class="h-12 w-10" />
       <div>
         <p class="text-sm font-semibold text-amber-200">
           Level {hero.level} Barbarian
@@ -106,7 +106,7 @@
         class="flex items-center gap-3 border-b border-slate-700/60 bg-slate-800 px-4 py-2 last:border-b-0
           {n > 0 ? 'bg-slate-700/60' : ''}"
       >
-        <span class="w-8 text-2xl">{glyphFor(unit.name)}</span>
+        <Sprite name={unit.name} class="h-11 w-9 shrink-0" />
         <div class="w-32">
           <p class="text-sm font-semibold text-slate-100">{unit.name}</p>
           <p class="font-mono text-[10px] text-amber-300">🪙 {UNIT_COSTS[unit.name]} each</p>

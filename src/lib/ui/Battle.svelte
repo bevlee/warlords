@@ -8,6 +8,7 @@
     canShoot,
     canShootTarget,
     isShootingBlocked,
+    damagePreview,
   } from '$lib/engine/selectors';
   import type {
     ArmySlot,
@@ -22,6 +23,7 @@
   import TurnBar from './TurnBar.svelte';
   import BattleLog from './BattleLog.svelte';
   import UnitInfo from './UnitInfo.svelte';
+  import Sprite from './Sprite.svelte';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -104,17 +106,29 @@
     return icons;
   });
 
-  // Two-step melee: click an enemy, then choose which tile to attack from.
-  let meleeTarget: UnitStack | null = $state(null);
-  const pendingTarget = $derived(
-    meleeTarget && isPlayerTurn
-      ? (battle.units.find(u => u.id === meleeTarget!.id && u.count > 0) ?? null)
-      : null
-  );
-  const attackOrigins = $derived(
-    pendingTarget && activeUnit ? getAttackOrigins(battle, activeUnit, pendingTarget) : []
-  );
-  const attackFromKeys = $derived(new Set(attackOrigins.map(p => `${p.col},${p.row}`)));
+  // Aim-by-cursor melee (LordsWM): every attack origin per target, so the grid
+  // can pick the landing tile from the cursor angle.
+  const originsByTarget = $derived.by(() => {
+    const map = new Map<string, Pos[]>();
+    if (!isPlayerTurn || !activeUnit) return map;
+    for (const u of battle.units) {
+      if (u.side !== 'enemy' || u.count === 0 || u.isHero) continue;
+      if (!meleeApproaches.has(u.id)) continue;
+      map.set(u.id, getAttackOrigins(battle, activeUnit, u));
+    }
+    return map;
+  });
+
+  // Damage forecast for the aiming tooltip.
+  const previews = $derived.by(() => {
+    const map = new Map<string, ReturnType<typeof damagePreview>>();
+    if (!isPlayerTurn || !activeUnit) return map;
+    for (const id of actionIcons.keys()) {
+      const target = battle.units.find(u => u.id === id);
+      if (target) map.set(id, damagePreview(activeUnit, target, hero.attack));
+    }
+    return map;
+  });
 
   let hovered: UnitStack | null = $state(null);
   const infoUnit = $derived.by(() => {
@@ -122,12 +136,9 @@
     return fresh ?? activeUnit;
   });
 
-  // Targeting is per-turn state: whoever acts next starts without a selection.
-  // Without this, a stale selection turns clicks on that enemy into no-ops
-  // for actors that can't melee it (empty attack origins short-circuit).
+  // Spell selection is per-turn state: whoever acts next starts clean.
   $effect(() => {
     void battle.currentUnitId;
-    meleeTarget = null;
     pendingSpell = null;
   });
 
@@ -157,7 +168,6 @@
       battle,
       inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin }
     );
-    meleeTarget = null;
     hovered = null;
   }
 
@@ -174,16 +184,17 @@
       pendingSpell = null; // clicking empty ground cancels the cast
       return;
     }
-    if (pendingTarget) {
-      if (attackFromKeys.has(`${pos.col},${pos.row}`)) attackFrom(pendingTarget.id, pos);
-      else meleeTarget = null; // clicking elsewhere cancels targeting
-      return;
-    }
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
     battle = applyAction(battle, { type: 'move', to: pos });
   }
 
-  function handleUnitClick(unit: UnitStack, shift = false) {
+  // The grid resolved an aimed melee: move to the chosen tile and strike.
+  function handleMeleeAim(targetId: string, origin: Pos) {
+    if (!isPlayerTurn || !activeUnit) return;
+    attackFrom(targetId, origin);
+  }
+
+  function handleUnitClick(unit: UnitStack, _shift = false) {
     if (!isPlayerTurn || !activeUnit) return;
 
     if (pendingSpell) {
@@ -192,57 +203,32 @@
       return;
     }
 
-    if (unit.side === 'player') {
-      // Clicking your own active stack while targeting = attack in place.
-      if (pendingTarget && unit.id === activeUnit.id && attackFromKeys.has(`${unit.pos.col},${unit.pos.row}`)) {
-        attackFrom(pendingTarget.id, unit.pos);
-      }
-      return;
-    }
-
-    // Second click on the selected enemy = quick attack from the nearest tile.
-    if (pendingTarget?.id === unit.id) {
-      if (attackOrigins.length > 0) {
-        attackFrom(unit.id, attackOrigins[0]);
-        return;
-      }
-      meleeTarget = null; // unreachable selection: drop it and fall through
-    }
-
-    // Shift forces melee targeting even when a shot is available (LordsWM parity).
-    if (shift && meleeApproaches.has(unit.id)) {
-      meleeTarget = unit;
-      return;
-    }
+    if (unit.side === 'player') return;
 
     const action = actionIcons.get(unit.id);
     if (action === 'shoot') {
       battle = applyAction(battle, { type: 'shoot', targetId: unit.id });
-      meleeTarget = null;
       hovered = null;
     } else if (action === 'melee') {
-      meleeTarget = unit; // enter targeting: choose the tile to attack from
-    } else {
-      meleeTarget = null;
+      // Fallback for non-mouse activation (keyboard): nearest origin.
+      const origins = originsByTarget.get(unit.id);
+      if (origins?.length) attackFrom(unit.id, origins[0]);
     }
   }
 
   function handleWait() {
     if (!isPlayerTurn) return;
-    meleeTarget = null;
     pendingSpell = null;
     battle = applyAction(battle, { type: 'wait' });
   }
 
   function handleDefend() {
     if (!isPlayerTurn) return;
-    meleeTarget = null;
     pendingSpell = null;
     battle = applyAction(battle, { type: 'defend' });
   }
 
   function restart() {
-    meleeTarget = null;
     pendingSpell = null;
     resultAnnounced = false;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
@@ -293,9 +279,6 @@
     if (battle.result === 'player_wins') return 'Victory!';
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
-    if (pendingTarget) {
-      return `Attacking enemy ${pendingTarget.definition.name}s — click a ⚔️ tile to attack from, or click elsewhere to cancel.`;
-    }
     if (pendingSpell) {
       const friendly = SPELLS[pendingSpell].friendly;
       return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
@@ -304,8 +287,8 @@
       return 'Your hero\'s turn — click any enemy to strike, or cast a spell.';
     }
     if (isPlayerTurn) {
-      const hints = ['green cell to move'];
-      if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack');
+      const hints = ['highlighted cell to move'];
+      if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack (aim picks your tile)');
       if (canShoot(activeUnit) && !shootingBlocked) {
         hints.push(`🏹 enemy to shoot (${activeUnit.shotsLeft} left)`);
       }
@@ -330,7 +313,7 @@
           onmouseenter={() => (hovered = heroUnit)}
           onmouseleave={() => (hovered = null)}
         >
-          <span class="text-3xl leading-none">👑</span>
+          <Sprite name="Hero" class="h-12 w-10" />
           <span class="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Hero</span>
           <span class="font-mono text-[10px] text-slate-300">⚔{hero.attack} 🛡{hero.defense}</span>
           <span class="font-mono text-[10px] text-sky-300">💧{battle.hero.mana ?? 0}</span>
@@ -340,16 +323,17 @@
       <div class="min-w-0 flex-1">
         <BattleGrid
           state={battle}
-          reachableKeys={pendingTarget || pendingSpell ? new Set() : reachableKeys}
+          reachableKeys={pendingSpell ? new Set() : reachableKeys}
           targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
           interactive={isPlayerTurn}
           actionIcons={gridActionIcons}
-          {attackFromKeys}
-          pendingTargetId={pendingTarget?.id ?? null}
+          originsByTarget={pendingSpell ? new Map() : originsByTarget}
+          {previews}
           hoveredId={hovered?.id ?? null}
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
+          onmeleeaim={handleMeleeAim}
           onunithover={u => (hovered = u)}
         />
       </div>

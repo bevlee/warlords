@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { UnitStack } from '$lib/engine/types';
-  import { glyphFor } from './glyphs';
+  import Sprite from './Sprite.svelte';
 
   interface Props {
     unit: UnitStack | null;
@@ -28,7 +28,7 @@
 <div class="rounded-lg border border-slate-700 bg-slate-800 p-2">
   {#if unit}
     <div class="mb-1 flex items-center gap-2">
-      <span class="text-xl">{glyphFor(unit.definition.name)}</span>
+      <Sprite name={unit.definition.name} class="h-9 w-8" />
       <span class="text-sm font-semibold {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
         {unit.definition.name}
       </span>

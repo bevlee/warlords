@@ -1,5 +1,6 @@
 import type { BattleState, Grid, Pos, UnitStack } from './types';
 import { getNeighbours, chebyshevDistance } from './grid';
+import { modifiedDamage, applyDamage } from './combat';
 
 /**
  * Empty cells the unit can move to this turn: BFS from its position,
@@ -46,6 +47,31 @@ export function canShoot(unit: UnitStack): boolean {
 /** Whether the unit can shoot this specific target: shots left and within range. */
 export function canShootTarget(unit: UnitStack, target: UnitStack): boolean {
   return canShoot(unit) && chebyshevDistance(unit.pos, target.pos) <= unit.definition.range;
+}
+
+export interface DamagePreview {
+  min: number;
+  max: number;
+  killsMin: number;
+  killsMax: number;
+}
+
+/** Expected damage/kill ranges for the aiming tooltip (luck excluded). */
+export function damagePreview(
+  attacker: UnitStack,
+  defender: UnitStack,
+  heroAttack: number
+): DamagePreview {
+  const roll = (per: number) =>
+    Math.max(1, Math.round(modifiedDamage(attacker, defender, heroAttack, per)));
+  const min = roll(attacker.definition.minDamage);
+  const max = roll(attacker.definition.maxDamage);
+  return {
+    min,
+    max,
+    killsMin: applyDamage(defender, min).killed,
+    killsMax: applyDamage(defender, max).killed,
+  };
 }
 
 /** LordsWM rule: a living enemy directly adjacent disables shooting. */

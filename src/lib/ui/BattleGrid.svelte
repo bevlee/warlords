@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { BattleState, Pos, UnitStack } from '$lib/engine/types';
+  import type { DamagePreview } from '$lib/engine/selectors';
   import UnitToken from './UnitToken.svelte';
+  import Sprite from './Sprite.svelte';
 
   interface Props {
     state: BattleState;
@@ -9,30 +11,34 @@
     activeId: string | null;
     interactive: boolean;
     actionIcons: Map<string, 'melee' | 'shoot' | 'spell'>;
-    attackFromKeys: Set<string>;
-    pendingTargetId: string | null;
+    originsByTarget: Map<string, Pos[]>;
+    previews: Map<string, DamagePreview>;
     hoveredId: string | null;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
+    onmeleeaim: (targetId: string, origin: Pos) => void;
     onunithover: (unit: UnitStack | null) => void;
   }
 
   let {
-    state,
+    state: battleState,
     reachableKeys,
     targetIds,
     activeId,
     interactive,
     actionIcons,
-    attackFromKeys,
-    pendingTargetId,
+    originsByTarget,
+    previews,
     hoveredId,
     oncellclick,
     onunitclick,
+    onmeleeaim,
     onunithover,
   }: Props = $props();
 
   const TILT_DEG = 38;
+
+  const unitsById = $derived(new Map(battleState.units.filter(u => u.count > 0).map(u => [u.id, u])));
 
   // LordsWM-style cursors: the pointer itself becomes a sword/bow near targets.
   function emojiCursor(emoji: string): string {
@@ -42,97 +48,148 @@
   const SWORD_CURSOR = emojiCursor('⚔️');
   const BOW_CURSOR = emojiCursor('🏹');
   const SPELL_CURSOR = emojiCursor('✨');
-  const ICON_GLYPH = { melee: '⚔️', shoot: '🏹', spell: '✨' } as const;
 
-  function cursorFor(occupantId: string | null, reachable: boolean, attackFrom: boolean): string {
-    if (!interactive) return 'default';
-    if (attackFrom) return SWORD_CURSOR;
-    if (occupantId) {
-      const icon = actionIcons.get(occupantId);
-      if (icon === 'melee') return SWORD_CURSOR;
-      if (icon === 'shoot') return BOW_CURSOR;
-      if (icon === 'spell') return SPELL_CURSOR;
-    }
-    if (reachable) return 'pointer';
-    return '';
+  // Shift forces melee aiming for shooters (LordsWM parity).
+  let shiftHeld = $state(false);
+  function onKey(e: KeyboardEvent) {
+    shiftHeld = e.shiftKey;
   }
 
-  const unitsById = $derived(new Map(state.units.filter(u => u.count > 0).map(u => [u.id, u])));
+  // Aim: hovering an attackable enemy picks the landing tile from the cursor's
+  // position within the enemy tile — the valid origin whose direction from the
+  // enemy best matches the cursor offset.
+  let aim = $state<{ targetId: string; origin: Pos } | null>(null);
+
+  function meleeAimable(id: string): boolean {
+    if (!originsByTarget.has(id)) return false;
+    const icon = actionIcons.get(id);
+    return icon === 'melee' || (icon === 'shoot' && shiftHeld);
+  }
+
+  function updateAim(e: MouseEvent, unit: UnitStack) {
+    if (!interactive || !meleeAimable(unit.id)) {
+      if (aim?.targetId === unit.id) aim = null;
+      return;
+    }
+    const origins = originsByTarget.get(unit.id)!;
+    if (origins.length === 0) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    const len = Math.hypot(dx, dy) || 1;
+    let best = origins[0];
+    let bestDot = -Infinity;
+    for (const o of origins) {
+      const oc = o.col - unit.pos.col;
+      const or = o.row - unit.pos.row;
+      const olen = Math.hypot(oc, or) || 1;
+      const dot = (dx / len) * (oc / olen) + (dy / len) * (or / olen);
+      if (dot > bestDot) {
+        bestDot = dot;
+        best = o;
+      }
+    }
+    aim = { targetId: unit.id, origin: best };
+  }
+
+  const aimKey = $derived(aim ? `${aim.origin.col},${aim.origin.row}` : null);
+  const aimTarget = $derived(aim ? (unitsById.get(aim.targetId) ?? null) : null);
+
+  function arrowAngle(): number {
+    if (!aim || !aimTarget) return 0;
+    return (Math.atan2(aimTarget.pos.row - aim.origin.row, aimTarget.pos.col - aim.origin.col) * 180) / Math.PI;
+  }
 
   function cellKey(col: number, row: number): string {
     return `${col},${row}`;
   }
 
+  function cursorFor(occupantId: string | null, attackable: boolean): string {
+    if (!interactive) return 'default';
+    if (occupantId && attackable) {
+      if (meleeAimable(occupantId)) return SWORD_CURSOR;
+      const icon = actionIcons.get(occupantId);
+      if (icon === 'shoot') return BOW_CURSOR;
+      if (icon === 'spell') return SPELL_CURSOR;
+      return SWORD_CURSOR;
+    }
+    return '';
+  }
+
   function handleClick(col: number, row: number, shift: boolean) {
     if (!interactive) return;
-    const cell = state.grid.cells[row][col];
+    const cell = battleState.grid.cells[row][col];
     if (cell.blocked) return;
     const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined;
     if (occupant) {
-      onunitclick(occupant, shift);
+      if (aim && aim.targetId === occupant.id && meleeAimable(occupant.id)) {
+        onmeleeaim(occupant.id, aim.origin);
+      } else {
+        onunitclick(occupant, shift);
+      }
     } else {
       oncellclick({ col, row });
     }
   }
 </script>
 
+<svelte:window onkeydown={onKey} onkeyup={onKey} />
+
 <!-- Perspective viewport: tilts the board like a tabletop. -->
 <div class="board-viewport">
   <div
-    class="board grid gap-0.5 rounded-lg border border-slate-700 bg-slate-800 p-1"
-    style="grid-template-columns: repeat({state.grid.width}, minmax(0, 1fr)); --tilt: {TILT_DEG}deg;"
+    class="board grid rounded-md border border-indigo-300/20 bg-slate-800/60 p-0.5"
+    style="grid-template-columns: repeat({battleState.grid.width}, minmax(0, 1fr)); --tilt: {TILT_DEG}deg;"
   >
-    {#each state.grid.cells as row (row[0].row)}
+    {#each battleState.grid.cells as row (row[0].row)}
       {#each row as cell (cellKey(cell.col, cell.row))}
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
         {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row))}
-        {@const attackFrom = attackFromKeys.has(cellKey(cell.col, cell.row))}
+        {@const attackable = !!occupant && targetIds.has(occupant.id)}
+        {@const isAimOrigin = aimKey === cellKey(cell.col, cell.row)}
         <button
           type="button"
-          class="cell relative aspect-square rounded-sm p-0
-            {attackFrom
-              ? 'bg-amber-700/60 hover:bg-amber-500/70'
-              : reachable
-                ? 'bg-emerald-800/60 hover:bg-emerald-600/70'
-                : 'bg-slate-900'}
+          class="cell relative aspect-square border border-indigo-300/15
+            {reachable ? 'bg-slate-500/50 hover:bg-slate-400/50' : 'bg-slate-900/70'}
+            {attackable ? 'attackable' : ''}
+            {isAimOrigin ? 'aim-origin' : ''}
             {!interactive ? 'cursor-default' : ''}"
-          style:cursor={cursorFor(cell.occupantId, reachable, attackFrom)}
+          style:cursor={cursorFor(cell.occupantId, attackable)}
           aria-label={cell.blocked
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant
-              ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`
-              : `cell ${cell.col},${cell.row}${attackFrom ? ' — attack from here' : ''}`}
+              ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}`
+              : `cell ${cell.col},${cell.row}`}
           onclick={e => handleClick(cell.col, cell.row, e.shiftKey)}
           onmouseenter={() => onunithover(occupant ?? null)}
-          onmouseleave={() => onunithover(null)}
+          onmousemove={occupant ? e => updateAim(e, occupant) : undefined}
+          onmouseleave={() => {
+            onunithover(null);
+            if (aim && occupant && aim.targetId === occupant.id) aim = null;
+          }}
         >
           {#if occupant}
             <span class="token-shadow" aria-hidden="true"></span>
+            {#if occupant.id === activeId}
+              <span class="active-arc" aria-hidden="true"></span>
+            {/if}
             <div class="token-standing" class:hover-glow={occupant.id === hoveredId}>
-              <UnitToken
-                unit={occupant}
-                isActive={occupant.id === activeId}
-                isTarget={targetIds.has(occupant.id)}
-              />
-              {#if interactive && (actionIcons.has(occupant.id) || attackFrom)}
-                <span
-                  class="action-icon"
-                  class:pinned={occupant.id === pendingTargetId || attackFrom}
-                  aria-hidden="true"
-                >
-                  {ICON_GLYPH[actionIcons.get(occupant.id) ?? 'melee']}
-                </span>
+              <UnitToken unit={occupant} />
+              {#if attackable && (hoveredId === occupant.id || aim?.targetId === occupant.id) && previews.has(occupant.id)}
+                {@const p = previews.get(occupant.id)!}
+                <div class="preview" aria-hidden="true">
+                  💀 {p.killsMin}–{p.killsMax}<br />💥 {p.min}–{p.max}
+                </div>
               {/if}
-            </div>
-          {:else if attackFrom}
-            <div class="token-standing origin-wrap" aria-hidden="true">
-              <span class="origin-icon">⚔️</span>
             </div>
           {:else if cell.blocked}
             <span class="token-shadow" aria-hidden="true"></span>
-            <div class="token-standing origin-wrap rock" aria-hidden="true">
-              <span class="rock-icon">🪨</span>
+            <div class="token-standing rock-wrap" aria-hidden="true">
+              <Sprite name="Rock" class="h-3/4 w-auto" />
             </div>
+          {/if}
+          {#if isAimOrigin}
+            <span class="aim-arrow" style="transform: rotate({arrowAngle()}deg)" aria-hidden="true">➤</span>
           {/if}
         </button>
       {/each}
@@ -160,76 +217,71 @@
     transform-style: preserve-3d;
   }
 
+  /* Hovering an attackable enemy edges its tile red (LordsWM). */
+  .cell.attackable:hover,
+  .cell.aim-origin {
+    box-shadow: inset 0 0 0 2px rgb(239 68 68 / 0.9);
+  }
+
+  .cell.aim-origin {
+    background-color: rgb(239 68 68 / 0.18);
+  }
+
+  .aim-arrow {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: #f97316;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+    pointer-events: none;
+  }
+
+  /* Turn-bar hover sync: pick the stack out on the battlefield. */
+  .hover-glow {
+    filter: brightness(1.35) drop-shadow(0 0 5px rgb(255 255 255 / 0.45));
+  }
+
   /* Token rises out of the board plane, like a cardboard standee.
      pointer-events stays ON: the standee is a child of its cell button, so
-     clicks anywhere on the visible token (including the part leaning over
-     the cell behind) bubble to the right cell. With pointer-events: none,
-     real-input hit testing through the 3D transform intermittently routed
-     clicks to a neighbouring cell — a silent no-op. */
+     clicks anywhere on the visible token bubble to the right cell. With
+     pointer-events: none, real-input hit testing through the 3D transform
+     intermittently routed clicks to a neighbouring cell — a silent no-op. */
   .token-standing {
     position: absolute;
-    left: 7%;
-    right: 7%;
-    height: 110%;
+    left: 4%;
+    right: 4%;
+    height: 118%;
     top: auto;
     bottom: 0;
     transform: rotateX(calc(-1 * var(--tilt)));
     transform-origin: 50% 100%;
   }
 
-  /* Origin ⚔️ markers and rocks stay clickable on purpose: their clicks
-     bubble to their own cell button (attack-from / blocked no-op). A
-     pointer-events:none element inside the 3D subtree makes real-input
-     hit-testing unreliable in Chromium. */
-
-  /* Turn-bar hover sync: pick the stack out on the battlefield. */
-  .hover-glow {
-    filter: brightness(1.4) drop-shadow(0 0 6px rgb(255 255 255 / 0.5));
-  }
-
-  /* Sword/bow appears above the standee while hovering an attackable enemy.
-     Decorative: must never intercept clicks (even at opacity 0 it would
-     swallow clicks meant for the cell behind the standee). */
-  .action-icon {
-    position: absolute;
-    top: -30%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 1.25rem;
-    line-height: 1;
-    opacity: 0;
-    transition: opacity 0.1s;
-    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
-    pointer-events: none;
-  }
-
-  .cell:hover .action-icon,
-  .action-icon.pinned {
-    opacity: 1;
-  }
-
-  /* Standing sword marking a tile you can attack from. */
-  .origin-wrap {
+  .rock-wrap {
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding-bottom: 10%;
   }
 
-  .origin-icon {
-    font-size: 1.1rem;
-    line-height: 1;
-    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.8));
-  }
-
-  .cell:hover .origin-icon {
-    font-size: 1.35rem;
-  }
-
-  .rock-icon {
-    font-size: 1.6rem;
-    line-height: 1;
-    filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.7));
+  /* Damage/kill forecast beside the aimed target (LordsWM tooltip). */
+  .preview {
+    position: absolute;
+    left: 50%;
+    bottom: -8%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    background: rgb(15 23 42 / 0.85);
+    border: 1px solid rgb(148 163 184 / 0.4);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 10px;
+    line-height: 1.25;
+    color: #f1f5f9;
+    font-family: ui-monospace, monospace;
+    pointer-events: none;
   }
 
   .token-shadow {
@@ -240,5 +292,19 @@
     height: 26%;
     border-radius: 50%;
     background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.55), transparent 70%);
+  }
+
+  /* Yellow arc under the acting stack (LordsWM's swirl). */
+  .active-arc {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    bottom: 3%;
+    height: 34%;
+    border: 3px solid #facc15;
+    border-top-color: transparent;
+    border-radius: 50%;
+    filter: drop-shadow(0 0 3px rgb(250 204 21 / 0.7));
+    pointer-events: none;
   }
 </style>
