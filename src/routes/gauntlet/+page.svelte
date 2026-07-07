@@ -1,0 +1,227 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import Battle from '$lib/ui/Battle.svelte';
+  import Sprite from '$lib/ui/Sprite.svelte';
+  import { FACTION_INFO, FACTION_UNITS } from '$lib/engine/factions';
+  import { armyCost } from '$lib/engine/recruit';
+  import {
+    newRun,
+    recordBattle,
+    applyPick,
+    generateGauntletEnemy,
+    survivorsFrom,
+    encounterBudget,
+    actOf,
+    BOSS_NODES,
+    RUN_LENGTH,
+    type RunState,
+    type UnitCard,
+    type GauntletEncounter,
+  } from '$lib/gauntlet/run';
+  import { loadRun, saveRun, clearRun } from '$lib/storage';
+  import type { FactionClass, UnitStack } from '$lib/engine/types';
+
+  const ACT_NAMES: Record<1 | 2 | 3, string> = {
+    1: 'Act I — The Borderlands',
+    2: 'Act II — The Deep Wilds',
+    3: 'Act III — The Black Citadel',
+  };
+
+  let run: RunState | null = $state(null);
+  let inBattle = $state(false);
+  let encounter: GauntletEncounter | null = $state(null);
+  let battleKey = $state(0);
+  let loaded = $state(false);
+
+  onMount(async () => {
+    run = await loadRun<RunState>();
+    loaded = true;
+  });
+
+  function begin(faction: FactionClass) {
+    run = newRun(faction);
+    void saveRun(run);
+  }
+
+  function fight() {
+    if (!run) return;
+    encounter = generateGauntletEnemy(run);
+    battleKey += 1;
+    inBattle = true;
+  }
+
+  function handleResult(result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[]) {
+    if (!run) return;
+    run = recordBattle(run, result === 'player_wins', survivorsFrom(finalUnits));
+    void saveRun(run);
+  }
+
+  function pick(card: UnitCard) {
+    if (!run) return;
+    run = applyPick(run, card);
+    void saveRun(run);
+  }
+
+  async function abandon() {
+    run = null;
+    inBattle = false;
+    await clearRun();
+  }
+
+  const unitFor = (name: string) =>
+    run ? FACTION_UNITS[run.faction].find(u => u.name === name)! : null;
+</script>
+
+<main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
+  <div class="mb-4 flex items-center gap-4">
+    <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
+    <a href="/" class="text-sm text-slate-400 hover:text-slate-200">← main game</a>
+  </div>
+
+  {#if !loaded}
+    <p class="text-slate-400">Loading…</p>
+  {:else if !run}
+    <!-- Run setup: pick a faction -->
+    <div class="mx-auto max-w-3xl">
+      <p class="mb-4 text-slate-300">
+        Fight 10 escalating battles. Losses persist — draft reinforcements after each victory.
+        Choose your faction:
+      </p>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {#each Object.entries(FACTION_INFO) as [id, info] (id)}
+          {@const t7 = FACTION_UNITS[id as FactionClass].find(u => u.tier === 7)!}
+          <button
+            type="button"
+            class="flex flex-col items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 p-4
+              text-center hover:border-amber-400 hover:bg-slate-700"
+            onclick={() => begin(id as FactionClass)}
+          >
+            <Sprite name={t7.name} class="h-16 w-14" />
+            <span class="font-semibold text-amber-200">{info.name}</span>
+            <span class="text-xs text-slate-400">{info.description}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+  {:else if inBattle}
+    {#key battleKey}
+      <Battle
+        playerArmy={run.army}
+        enemyArmy={encounter?.army ?? []}
+        hero={run.hero}
+        allowRestart={false}
+        exitLabel="Continue"
+        onexit={() => (inBattle = false)}
+        onresult={handleResult}
+      />
+    {/key}
+  {:else if run.status === 'draft'}
+    <!-- Draft: pick 1 of 3 -->
+    <div class="mx-auto max-w-2xl">
+      <h2 class="mb-1 text-lg font-semibold text-amber-200">Victory! Choose your reinforcements</h2>
+      <p class="mb-4 text-sm text-slate-400">Battle {run.encounterIndex - 1} won — {RUN_LENGTH - run.encounterIndex + 1} to go.</p>
+      <div class="grid grid-cols-3 gap-3">
+        {#each run.pendingDraft ?? [] as card (card.unitName)}
+          {@const unit = unitFor(card.unitName)}
+          <button
+            type="button"
+            class="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-600 bg-slate-800 p-4
+              hover:border-amber-400 hover:bg-slate-700"
+            onclick={() => pick(card)}
+          >
+            <Sprite name={card.unitName} class="h-16 w-14" />
+            <span class="font-bold text-slate-100">{card.count} × {card.unitName}</span>
+            {#if unit}
+              <span class="font-mono text-[10px] text-slate-400">
+                HP {unit.hp} · Atk {unit.attack} · Def {unit.defense} · Spd {unit.speed}
+              </span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+      <div class="mt-4 rounded border border-slate-700 bg-slate-800 p-2 text-sm text-slate-300">
+        Your army: {run.army.map(s => `${s.count}× ${s.unit.name}`).join(' · ')}
+      </div>
+    </div>
+  {:else if run.status === 'won' || run.status === 'lost'}
+    <!-- Run summary -->
+    <div class="mx-auto max-w-md rounded-lg border border-slate-700 bg-slate-800 p-6 text-center">
+      <p class="mb-2 text-4xl font-bold {run.status === 'won' ? 'text-amber-300' : 'text-red-400'}">
+        {run.status === 'won' ? '🏆 Gauntlet conquered!' : 'Run over'}
+      </p>
+      <p class="mb-1 text-slate-300">
+        {FACTION_INFO[run.faction].name} · {run.battlesWon} / {RUN_LENGTH} battles won
+      </p>
+      <p class="mb-4 text-sm text-slate-400">Hero reached level {run.hero.level}</p>
+      <button
+        type="button"
+        class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500"
+        onclick={abandon}
+      >
+        New run
+      </button>
+    </div>
+  {:else}
+    <!-- Run map -->
+    <div class="mx-auto flex max-w-3xl gap-6">
+      <div class="flex-1">
+        {#each [3, 2, 1] as act (act)}
+          <p class="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            {ACT_NAMES[act as 1 | 2 | 3]}
+          </p>
+          {#each Array.from({ length: RUN_LENGTH }, (_, i) => RUN_LENGTH - i).filter(n => actOf(n) === act) as n (n)}
+            {@const current = n === run.encounterIndex}
+            <div
+              class="mb-1 flex items-center gap-3 rounded border px-3 py-1.5
+                {current ? 'border-amber-400 bg-slate-700' : n < run.encounterIndex ? 'border-emerald-700 bg-emerald-950/40' : 'border-slate-700 bg-slate-800/60'}"
+              aria-label="node {n}{current ? ' — current' : n < run.encounterIndex ? ' — cleared' : ''}"
+            >
+              <span class="w-6 text-center font-mono text-sm {BOSS_NODES.has(n) ? 'text-red-400' : 'text-slate-400'}">
+                {BOSS_NODES.has(n) ? '💀' : n}
+              </span>
+              {#if current}
+                {@const enc = generateGauntletEnemy(run)}
+                <span class="flex-1 text-sm text-slate-200">
+                  {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(n)}
+                  {#if enc.isBoss}<span class="ml-1 font-semibold text-red-400">BOSS</span>{/if}
+                </span>
+                <button
+                  type="button"
+                  class="rounded bg-amber-600 px-4 py-1 text-sm font-semibold text-white hover:bg-amber-500"
+                  onclick={fight}
+                >
+                  Fight ⚔️
+                </button>
+              {:else}
+                <span class="flex-1 text-sm text-slate-500">{n < run.encounterIndex ? 'cleared' : '???'}</span>
+              {/if}
+            </div>
+          {/each}
+        {/each}
+      </div>
+
+      <div class="w-56 shrink-0">
+        <div class="rounded-lg border border-slate-700 bg-slate-800 p-3">
+          <p class="mb-1 text-sm font-semibold text-amber-200">
+            {FACTION_INFO[run.faction].name} — level {run.hero.level}
+          </p>
+          <p class="mb-2 font-mono text-xs text-slate-400">⚔{run.hero.attack} 🛡{run.hero.defense}</p>
+          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Army ({armyCost(run.army)} power)</p>
+          {#each run.army as slot (slot.unit.name)}
+            <div class="flex items-center gap-2 py-0.5">
+              <Sprite name={slot.unit.name} class="h-7 w-6" />
+              <span class="text-xs text-slate-200">{slot.count} × {slot.unit.name}</span>
+            </div>
+          {/each}
+        </div>
+        <button
+          type="button"
+          class="mt-3 w-full rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+          onclick={abandon}
+        >
+          Abandon run
+        </button>
+      </div>
+    </div>
+  {/if}
+</main>

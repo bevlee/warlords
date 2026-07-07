@@ -1,0 +1,184 @@
+import type { ArmySlot, FactionClass, Hero, UnitStack } from '../engine/types';
+import { FACTION_UNITS, FACTION_INFO } from '../engine/factions';
+import { UNIT_COSTS } from '../engine/recruit';
+import { updateFactionSkills } from '../engine/factionSkills';
+import { mulberry32, type Rng } from '../engine/rng';
+
+export const RUN_LENGTH = 10;
+export const BOSS_NODES = new Set([3, 7, 10]);
+const MAX_STACKS = 6;
+
+export interface UnitCard {
+  unitName: string;
+  count: number;
+}
+
+export interface RunState {
+  version: 1;
+  seed: number;
+  faction: FactionClass;
+  encounterIndex: number; // next battle, 1..10
+  hero: Hero;
+  army: ArmySlot[];
+  pendingDraft: UnitCard[] | null;
+  status: 'map' | 'draft' | 'won' | 'lost';
+  battlesWon: number;
+  startedAt: number;
+}
+
+export function actOf(n: number): 1 | 2 | 3 {
+  return n <= 3 ? 1 : n <= 7 ? 2 : 3;
+}
+
+/** Power budget: 90 × 1.32^(n−1), bosses (3/7/10) pay a 10% premium. */
+export function encounterBudget(n: number): number {
+  const base = 90 * 1.32 ** (n - 1);
+  return Math.round(BOSS_NODES.has(n) ? base * 1.1 : base);
+}
+
+export function newRun(faction: FactionClass, seed = Date.now()): RunState {
+  const roster = FACTION_UNITS[faction];
+  const t1 = roster.find(u => u.tier === 1)!;
+  const t2 = roster.find(u => u.tier === 2)!;
+  const army: ArmySlot[] = [
+    { unit: t1, count: Math.max(1, Math.round(55 / UNIT_COSTS[t1.name])) },
+    { unit: t2, count: Math.max(1, Math.round(35 / UNIT_COSTS[t2.name])) },
+  ];
+  const hero: Hero = updateFactionSkills({
+    class: faction,
+    level: 1,
+    xp: 0,
+    attack: 2,
+    defense: 1,
+    statPoints: 0,
+    factionSkills: [],
+  });
+  return {
+    version: 1,
+    seed,
+    faction,
+    encounterIndex: 1,
+    hero,
+    army,
+    pendingDraft: null,
+    status: 'map',
+    battlesWon: 0,
+    startedAt: Date.now(),
+  };
+}
+
+const FACTIONS = Object.keys(FACTION_INFO) as FactionClass[];
+
+function buildArmy(roster: typeof FACTION_UNITS.barbarian, budget: number, rng: Rng): ArmySlot[] {
+  const slots: ArmySlot[] = [];
+  let remaining = budget;
+  const picks = 3 + Math.floor(rng() * 3);
+  for (let i = 0; i < picks; i++) {
+    const affordable = roster.filter(u => UNIT_COSTS[u.name] <= remaining);
+    if (affordable.length === 0) break;
+    const unit = affordable[Math.floor(rng() * affordable.length)];
+    const cost = UNIT_COSTS[unit.name];
+    const share = remaining * (i === picks - 1 ? 0.95 : 0.3 + rng() * 0.4);
+    const count = Math.max(1, Math.min(Math.floor(remaining / cost), Math.round(share / cost)));
+    const existing = slots.find(s => s.unit.name === unit.name);
+    if (existing) existing.count += count;
+    else slots.push({ unit, count });
+    remaining -= count * cost;
+  }
+  // Top up with the roster's cheapest unit.
+  const cheapest = [...roster].sort((a, b) => UNIT_COSTS[a.name] - UNIT_COSTS[b.name])[0];
+  const cheapCost = UNIT_COSTS[cheapest.name];
+  if (remaining >= cheapCost && (slots.length < MAX_STACKS || slots.some(s => s.unit.name === cheapest.name))) {
+    const count = Math.floor(remaining / cheapCost);
+    const existing = slots.find(s => s.unit.name === cheapest.name);
+    if (existing) existing.count += count;
+    else slots.push({ unit: cheapest, count });
+  }
+  return slots;
+}
+
+export interface GauntletEncounter {
+  faction: FactionClass;
+  budget: number;
+  army: ArmySlot[];
+  isBoss: boolean;
+}
+
+/** Deterministic enemy for the run's current node. */
+export function generateGauntletEnemy(run: RunState): GauntletEncounter {
+  const n = run.encounterIndex;
+  const rng = mulberry32(run.seed * 31 + n * 977);
+  const faction = FACTIONS[Math.floor(rng() * FACTIONS.length)];
+  const act = actOf(n);
+  const maxTier = act === 1 ? 3 : act === 2 ? 5 : 7;
+  const roster = FACTION_UNITS[faction].filter(u => u.tier <= maxTier);
+  const budget = encounterBudget(n);
+  return { faction, budget, army: buildArmy(roster, budget, rng), isBoss: BOSS_NODES.has(n) };
+}
+
+const ACT_CARD_POWER: Record<1 | 2 | 3, number> = { 1: 60, 2: 110, 3: 170 };
+const ACT_TIERS: Record<1 | 2 | 3, [number, number]> = { 1: [1, 3], 2: [2, 5], 3: [4, 7] };
+
+/** Three distinct own-faction unit cards, tier-gated by act. */
+export function draftOptions(run: RunState): UnitCard[] {
+  const act = actOf(run.encounterIndex);
+  const [lo, hi] = ACT_TIERS[act];
+  const power = ACT_CARD_POWER[act];
+  const atCap = run.army.length >= MAX_STACKS;
+  const ownNames = new Set(run.army.map(s => s.unit.name));
+
+  let pool = FACTION_UNITS[run.faction].filter(u => u.tier >= lo && u.tier <= hi);
+  if (atCap) {
+    const owned = pool.filter(u => ownNames.has(u.name));
+    if (owned.length >= 1) pool = owned;
+  }
+
+  const rng = mulberry32(run.seed * 17 + run.encounterIndex * 449 + run.battlesWon);
+  const cards: UnitCard[] = [];
+  const used = new Set<string>();
+  for (let guard = 0; cards.length < Math.min(3, pool.length) && guard < 50; guard++) {
+    const unit = pool[Math.floor(rng() * pool.length)];
+    if (used.has(unit.name)) continue;
+    used.add(unit.name);
+    cards.push({ unitName: unit.name, count: Math.max(1, Math.round(power / UNIT_COSTS[unit.name])) });
+  }
+  return cards;
+}
+
+export function applyPick(run: RunState, card: UnitCard): RunState {
+  const unit = FACTION_UNITS[run.faction].find(u => u.name === card.unitName)!;
+  const existing = run.army.find(s => s.unit.name === card.unitName);
+  const army = existing
+    ? run.army.map(s => (s.unit.name === card.unitName ? { ...s, count: s.count + card.count } : s))
+    : [...run.army, { unit, count: card.count }];
+  return { ...run, army, pendingDraft: null, status: 'map' };
+}
+
+/** Living player stacks (minus the hero) from a finished battle. */
+export function survivorsFrom(units: UnitStack[]): ArmySlot[] {
+  return units
+    .filter(u => u.side === 'player' && !u.isHero && u.count > 0)
+    .map(u => ({ unit: u.definition, count: u.count }));
+}
+
+export function recordBattle(run: RunState, won: boolean, survivors: ArmySlot[]): RunState {
+  if (!won) return { ...run, status: 'lost' };
+
+  const hero = updateFactionSkills({
+    ...run.hero,
+    level: run.hero.level + 1,
+    attack: run.hero.attack + 1,
+    defense: run.hero.defense + 1,
+  });
+  const next: RunState = {
+    ...run,
+    hero,
+    army: survivors,
+    battlesWon: run.battlesWon + 1,
+    encounterIndex: run.encounterIndex + 1,
+    pendingDraft: null,
+    status: 'map',
+  };
+  if (run.encounterIndex >= RUN_LENGTH) return { ...next, status: 'won' };
+  return { ...next, status: 'draft', pendingDraft: draftOptions(next) };
+}

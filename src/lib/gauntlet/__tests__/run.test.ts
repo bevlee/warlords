@@ -1,0 +1,132 @@
+import { describe, it, expect } from 'vitest';
+import {
+  newRun,
+  encounterBudget,
+  actOf,
+  generateGauntletEnemy,
+  draftOptions,
+  applyPick,
+  recordBattle,
+  survivorsFrom,
+} from '../run';
+import { armyCost, UNIT_COSTS } from '../../engine/recruit';
+import { FACTION_UNITS } from '../../engine/factions';
+import type { UnitStack } from '../../engine/types';
+
+describe('gauntlet run', () => {
+  it('newRun starts a level-1 faction hero with a ~90-power T1/T2 army', () => {
+    const run = newRun('barbarian', 42);
+
+    expect(run.status).toBe('map');
+    expect(run.encounterIndex).toBe(1);
+    expect(run.hero.level).toBe(1);
+    expect(run.hero.class).toBe('barbarian');
+    for (const slot of run.army) expect(slot.unit.tier).toBeLessThanOrEqual(2);
+    const power = armyCost(run.army);
+    expect(power).toBeGreaterThanOrEqual(70);
+    expect(power).toBeLessThanOrEqual(110);
+  });
+
+  it('encounter budgets follow the design curve with a boss premium on 3/7/10', () => {
+    // The design table's exact numbers drift from its own formula by rounding;
+    // hold the curve to within 2% of the published values.
+    expect(encounterBudget(1)).toBe(90);
+    expect(encounterBudget(2)).toBe(119);
+    for (const [n, v] of [[3, 172], [7, 518], [10, 1195]] as const) {
+      expect(Math.abs(encounterBudget(n) - v) / v).toBeLessThanOrEqual(0.02);
+    }
+  });
+
+  it('acts split 1–3 / 4–7 / 8–10', () => {
+    expect(actOf(1)).toBe(1);
+    expect(actOf(3)).toBe(1);
+    expect(actOf(4)).toBe(2);
+    expect(actOf(7)).toBe(2);
+    expect(actOf(8)).toBe(3);
+  });
+
+  it('enemy armies are deterministic per seed and spend most of the budget', () => {
+    const run = newRun('barbarian', 7);
+    const a = generateGauntletEnemy(run);
+    const b = generateGauntletEnemy(run);
+
+    expect(a.army.map(s => `${s.unit.name}x${s.count}`)).toEqual(
+      b.army.map(s => `${s.unit.name}x${s.count}`)
+    );
+    const cost = armyCost(a.army);
+    expect(cost).toBeLessThanOrEqual(encounterBudget(1));
+    expect(cost).toBeGreaterThanOrEqual(encounterBudget(1) * 0.6);
+    expect(a.army.length).toBeGreaterThan(0);
+  });
+
+  it('draftOptions offers 3 distinct own-faction unit cards, tier-gated by act', () => {
+    const run = { ...newRun('knight', 5), encounterIndex: 2 }; // act I
+    const cards = draftOptions(run);
+
+    expect(cards).toHaveLength(3);
+    const names = cards.map(c => c.unitName);
+    expect(new Set(names).size).toBe(3);
+    for (const c of cards) {
+      const unit = FACTION_UNITS.knight.find(u => u.name === c.unitName)!;
+      expect(unit).toBeTruthy();
+      expect(unit.tier).toBeLessThanOrEqual(3); // act I: T1–T3
+      expect(c.count).toBe(Math.max(1, Math.round(60 / UNIT_COSTS[c.unitName])));
+    }
+  });
+
+  it('applyPick stacks duplicate unit types', () => {
+    let run = newRun('barbarian', 3);
+    const existing = run.army[0];
+    run = { ...run, pendingDraft: [{ unitName: existing.unit.name, count: 10 }], status: 'draft' };
+
+    const next = applyPick(run, run.pendingDraft![0]);
+
+    expect(next.status).toBe('map');
+    expect(next.pendingDraft).toBeNull();
+    const stack = next.army.find(s => s.unit.name === existing.unit.name)!;
+    expect(stack.count).toBe(existing.count + 10);
+  });
+
+  it('recordBattle: win levels the hero, keeps survivors, and queues a draft', () => {
+    const run = newRun('barbarian', 9);
+    const survivors = [{ unit: run.army[0].unit, count: 2 }];
+
+    const next = recordBattle(run, true, survivors);
+
+    expect(next.battlesWon).toBe(1);
+    expect(next.hero.level).toBe(2);
+    expect(next.encounterIndex).toBe(2);
+    expect(next.army).toEqual(survivors); // losses persist
+    expect(next.status).toBe('draft');
+    expect(next.pendingDraft).toHaveLength(3);
+  });
+
+  it('recordBattle: winning encounter 10 ends the run; losing ends it anywhere', () => {
+    const run = { ...newRun('barbarian', 9), encounterIndex: 10 };
+    expect(recordBattle(run, true, run.army).status).toBe('won');
+    expect(recordBattle(newRun('barbarian', 9), false, []).status).toBe('lost');
+  });
+
+  it('survivorsFrom keeps living player stacks, drops the hero and the dead', () => {
+    const run = newRun('barbarian', 4);
+    const mk = (name: string, count: number, side: 'player' | 'enemy', isHero = false) =>
+      ({
+        definition: FACTION_UNITS.barbarian.find(u => u.name === name) ?? { name },
+        count,
+        side,
+        isHero,
+      }) as unknown as UnitStack;
+
+    const units = [
+      mk('Goblin', 7, 'player'),
+      mk('Orc', 0, 'player'),
+      mk('Hero', 1, 'player', true),
+      mk('Imp', 5, 'enemy'),
+    ];
+
+    const survivors = survivorsFrom(units);
+    expect(survivors).toHaveLength(1);
+    expect(survivors[0].unit.name).toBe('Goblin');
+    expect(survivors[0].count).toBe(7);
+  });
+});

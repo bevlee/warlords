@@ -29,8 +29,17 @@ Useful hooks in the battle UI:
 
 - Status line: first `p.text-sm.text-slate-300` — starts with "Your …" on the
   player's turn, "Enemy … are acting…" during AI turns, "Victory!"/"Defeat" at end.
-- Reachable cells: `button.bg-emerald-800\/60` (click to move).
-- Attackable enemies: `div.grid button:has(div.ring-red-500)` (click to attack/shoot).
+- Reachable cells: `button.bg-slate-500\/50` — the darker "range blob"
+  (click to move; cursor stays the default arrow).
+- Enemy stacks: `div.grid button:has(span.bg-red-700)` (red count plate);
+  player stacks have `span.bg-sky-700`. There are no target rings anymore.
+- **Melee is aim-by-cursor**: hovering an attackable enemy shows a sword
+  cursor and a red-edged landing tile picked from the cursor's position
+  (`.cell.aim-origin` + `.aim-arrow`); clicking executes move+attack in one
+  go. A Playwright `click` works because it mouse-moves first (aim resolves
+  before the press). Shooters are single-click (bow cursor); Shift forces
+  melee. A damage forecast (`.preview`, 💀 kills / 💥 damage) floats by the
+  hovered target.
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
 - `Wait` and `New battle` are role=button by name.
 - Unit info panel: the sidebar `dl` — hover any unit's cell to populate it
@@ -40,12 +49,6 @@ Useful hooks in the battle UI:
   first. Fast units repeat. Hovering an entry glows the matching field token
   (`div.token-standing.hover-glow`). Waiting re-enters at half a cycle —
   the waiter drops down the bar, it doesn't just go to the back.
-- Hover an attackable enemy to reveal `.action-icon` (⚔️ melee/move+attack,
-  🏹 shoot) on its cell.
-- Melee is two-step: click the enemy → amber origin tiles appear with aria
-  labels ending in "attack from here" (`button[aria-label$="attack from here"]`);
-  click one to move+attack, click the enemy again to quick-attack, click
-  elsewhere to cancel. Shift+click forces melee targeting for shooters.
 - Shooters with an adjacent living enemy can't shoot (status says
   "Shooting blocked — enemy adjacent!"; their targets show ⚔️ not 🏹).
 - `Defend` button next to Wait: logs "brace for defense", shows a 🛡️ badge
@@ -60,7 +63,7 @@ poll status ~every 300 ms, a full battle finishes in ~1–2 min), restart.
 - Hero: flank portrait `button[aria-label^="Hero"]` left of the board (mana
   in `span.text-sky-300`); on "Your hero's turn" every enemy is a target —
   click one to strike, or use the violet spell buttons (Lightning/Bloodlust/
-  Stoneskin by role=button name) then click a ringed stack to cast.
+  Stoneskin by role=button name) then click a highlighted stack to cast.
 
 Gotchas: capture `pageerror`/console errors; a stray dev-only 404 (Chrome
 devtools probe) is environment noise, not a bug.
@@ -82,3 +85,12 @@ Never reintroduce `pointer-events: none` on elements inside the 3D-transformed
 board subtree — Chromium's real-input hit-testing goes inconsistent with
 `elementFromPoint` and clicks land on the wrong cell (that was the cause of a
 whole class of "click does nothing" stalls).
+
+## Gauntlet mode (`/gauntlet`)
+
+Roguelite run: faction select (6 cards) → 10-node map (`Fight ⚔️` on the
+current node, bosses at 3/7/10) → battle (Continue on the overlay) → draft
+(3 unit cards, click one) → map. Run persists in IndexedDB key `gauntletRun`
+(kv store) — but note each Playwright launch is a fresh profile, so
+persistence checks must reload within one browser session. To test late-run
+states, inject a crafted RunState into idb via page.evaluate and reload.

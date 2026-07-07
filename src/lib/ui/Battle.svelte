@@ -30,10 +30,20 @@
     enemyArmy: ArmySlot[];
     hero: Hero;
     onexit?: () => void;
-    onresult?: (result: 'player_wins' | 'enemy_wins') => void;
+    onresult?: (result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[]) => void;
+    allowRestart?: boolean;
+    exitLabel?: string;
   }
 
-  let { playerArmy, enemyArmy, hero, onexit, onresult }: Props = $props();
+  let {
+    playerArmy,
+    enemyArmy,
+    hero,
+    onexit,
+    onresult,
+    allowRestart = true,
+    exitLabel = 'Change army',
+  }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
   type BattleSpeed = keyof typeof AI_SPEEDS;
@@ -150,7 +160,7 @@
   $effect(() => {
     if (battle.result !== 'ongoing' && !resultAnnounced) {
       resultAnnounced = true;
-      onresult?.(battle.result);
+      onresult?.(battle.result, $state.snapshot(battle).units as UnitStack[]);
     }
   });
 
@@ -432,20 +442,22 @@
           {battle.result === 'player_wins' ? 'Victory!' : 'Defeat'}
         </p>
         <div class="flex gap-3">
-          <button
-            type="button"
-            class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
-            onclick={restart}
-          >
-            New battle
-          </button>
+          {#if allowRestart}
+            <button
+              type="button"
+              class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
+              onclick={restart}
+            >
+              New battle
+            </button>
+          {/if}
           {#if onexit}
             <button
               type="button"
-              class="rounded bg-slate-600 px-4 py-2 font-semibold text-white hover:bg-slate-500"
+              class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
               onclick={onexit}
             >
-              Change army
+              {exitLabel}
             </button>
           {/if}
         </div>
