@@ -19,6 +19,7 @@
     type GauntletEncounter,
   } from '$lib/gauntlet/run';
   import { loadRun, saveRun, clearRun } from '$lib/storage';
+  import { TIER_STYLE } from '$lib/ui/tierStyle';
   import type { FactionClass, UnitStack } from '$lib/engine/types';
 
   const ACT_NAMES: Record<1 | 2 | 3, string> = {
@@ -123,15 +124,19 @@
       <div class="grid grid-cols-3 gap-3">
         {#each run.pendingDraft ?? [] as card (card.unitName)}
           {@const unit = unitFor(card.unitName)}
+          {@const ts = unit ? TIER_STYLE[unit.tier] : TIER_STYLE[1]}
           <button
             type="button"
-            class="flex flex-col items-center gap-2 rounded-lg border-2 border-slate-600 bg-slate-800 p-4
-              hover:border-amber-400 hover:bg-slate-700"
+            class="flex flex-col items-center gap-2 rounded-lg border-2 bg-slate-800 p-4
+              hover:bg-slate-700 hover:brightness-110 {ts.border} {ts.glow}"
             onclick={() => pick(card)}
           >
             <Sprite name={card.unitName} class="h-16 w-14" />
-            <span class="font-bold text-slate-100">{card.count} × {card.unitName}</span>
+            <span class="font-bold {ts.text}">{card.count} × {card.unitName}</span>
             {#if unit}
+              <span class="text-[10px] font-semibold uppercase tracking-wider {ts.text}">
+                Tier {unit.tier} · {ts.label}
+              </span>
               <span class="font-mono text-[10px] text-slate-400">
                 HP {unit.hp} · Atk {unit.attack} · Def {unit.defense} · Spd {unit.speed}
               </span>
@@ -208,9 +213,10 @@
           <p class="mb-2 font-mono text-xs text-slate-400">⚔{run.hero.attack} 🛡{run.hero.defense}</p>
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Army ({armyCost(run.army)} power)</p>
           {#each run.army as slot (slot.unit.name)}
+            {@const ts = TIER_STYLE[slot.unit.tier]}
             <div class="flex items-center gap-2 py-0.5">
-              <Sprite name={slot.unit.name} class="h-7 w-6" />
-              <span class="text-xs text-slate-200">{slot.count} × {slot.unit.name}</span>
+              <span class="rounded ring-1 {ts.ring}"><Sprite name={slot.unit.name} class="h-7 w-6" /></span>
+              <span class="text-xs {ts.text}">{slot.count} × {slot.unit.name}</span>
             </div>
           {/each}
         </div>
