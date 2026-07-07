@@ -188,7 +188,11 @@
             {#if occupant.id === activeId}
               <span class="active-arc" aria-hidden="true"></span>
             {/if}
-            <div class="token-standing" class:hover-glow={occupant.id === hoveredId}>
+            <div
+              class="token-standing"
+              class:hover-glow={occupant.id === hoveredId}
+              class:dying={dyingIds.has(occupant.id)}
+            >
               <UnitToken unit={occupant} />
             </div>
             {#if attackable && (hoveredId === occupant.id || aim?.targetId === occupant.id) && previews.has(occupant.id)}
@@ -295,6 +299,14 @@
     bottom: 0;
     transform: rotateX(calc(-1 * var(--tilt)));
     transform-origin: 50% 100%;
+  }
+
+  /* Dying stack: fades and sinks into the board rather than vanishing
+     instantly, timed to finish as the death step's reveal delay elapses. */
+  .token-standing.dying {
+    transition: opacity 0.5s ease-in, transform 0.5s ease-in;
+    opacity: 0;
+    transform: rotateX(calc(-1 * var(--tilt))) translateY(15%);
   }
 
   .rock-wrap {
