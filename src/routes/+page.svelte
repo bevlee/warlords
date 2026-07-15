@@ -26,10 +26,11 @@
 
   let hero: Hero = $state({ ...DEFAULT_HERO });
   let lastBattle: { xp: number; levels: number } | null = $state(null);
-  let screen: 'setup' | 'campaign' | 'battle' = $state('setup');
+  let screen: 'setup' | 'campaign' | 'battle' | 'result' = $state('setup');
   let campaign: CampaignState | null = $state(null);
   let activeEncounter: Encounter | null = $state(null);
   let lastReward: { xp: number; gold: number } | null = $state(null);
+  let lastOutcome: 'player_wins' | 'enemy_wins' | null = $state(null);
   let playerArmy: ArmySlot[] = $state([]);
   let enemyArmy: ArmySlot[] = $state([]);
   let battleKey = $state(0);
@@ -67,10 +68,12 @@
     battleKey += 1;
     lastBattle = null;
     lastReward = null;
+    lastOutcome = null;
     screen = 'battle';
   }
 
   function handleResult(result: 'player_wins' | 'enemy_wins') {
+    lastOutcome = result;
     if (result === 'player_wins') {
       const gained = activeEncounter ? activeEncounter.xpReward : armyCost(enemyArmy);
       const { hero: next, levels } = applyXp(hero, gained);
@@ -89,9 +92,29 @@
     }
   }
 
+  // Leaving a battle lands on the result screen, which owns the choice of where
+  // to go next. Forfeiting mid-battle has no outcome to show, so it skips ahead.
   function exitBattle() {
-    screen = activeEncounter ? 'campaign' : 'setup';
+    if (lastOutcome) {
+      screen = 'result';
+      return;
+    }
     activeEncounter = null;
+    screen = 'setup';
+  }
+
+  // Both result exits clear activeEncounter: it marks "a fight is in flight", and
+  // by here the encounter is resolved (advanceCampaign already ran in handleResult).
+  function resultToSetup() {
+    activeEncounter = null;
+    lastOutcome = null;
+    screen = 'setup';
+  }
+
+  function resultToCampaign() {
+    activeEncounter = null;
+    lastOutcome = null;
+    screen = 'campaign';
   }
 
   function handleClass(cls: FactionClass) {
@@ -109,6 +132,7 @@
     hero = { ...DEFAULT_HERO };
     lastBattle = null;
     lastReward = null;
+    lastOutcome = null;
     campaign = null;
     activeEncounter = null;
     screen = 'setup';
@@ -131,11 +155,40 @@
     <ArmySetup {hero} {budget} {lastBattle} onstart={startBattle} onreset={handleReset} onclass={handleClass} />
   {:else if screen === 'campaign' && campaign}
     <CampaignMap {hero} {campaign} onselect={selectEncounter} onback={backToSetup} />
-    {#if lastReward}
-      <p class="mx-auto mt-3 max-w-4xl text-center text-sm text-emerald-300">
-        Victory! +{lastReward.gold} gold, +{lastReward.xp} XP
+  {:else if screen === 'result'}
+    <div class="mx-auto mt-10 max-w-md rounded-lg border border-slate-700 bg-slate-800/60 p-6 text-center">
+      <p class="text-3xl font-bold {lastOutcome === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
+        {lastOutcome === 'player_wins' ? 'Victory!' : 'Defeat'}
       </p>
-    {/if}
+      {#if lastReward}
+        <p class="mt-3 text-sm text-emerald-300">+{lastReward.gold} gold, +{lastReward.xp} XP</p>
+      {:else if lastBattle && lastBattle.xp > 0}
+        <p class="mt-3 text-sm text-emerald-300">+{lastBattle.xp} XP</p>
+      {/if}
+      {#if lastBattle && lastBattle.levels > 0}
+        <p class="mt-1 text-sm font-semibold text-amber-300">
+          Level up! Now level {hero.level}
+        </p>
+      {/if}
+      <div class="mt-6 flex justify-center gap-3">
+        <button
+          type="button"
+          class="rounded bg-slate-600 px-4 py-2 font-semibold text-white hover:bg-slate-500"
+          onclick={resultToSetup}
+        >
+          Change army
+        </button>
+        {#if campaign}
+          <button
+            type="button"
+            class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
+            onclick={resultToCampaign}
+          >
+            Continue
+          </button>
+        {/if}
+      </div>
+    </div>
   {:else}
     {#key battleKey}
       <Battle
@@ -144,6 +197,8 @@
         {hero}
         onexit={exitBattle}
         onresult={handleResult}
+        allowRestart={!activeEncounter}
+        exitLabel="Continue"
       />
     {/key}
   {/if}
