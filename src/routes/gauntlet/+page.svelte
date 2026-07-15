@@ -76,7 +76,7 @@
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
   <div class="mb-4 flex items-center gap-4">
     <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
-    <a href="/" class="text-sm text-slate-400 hover:text-slate-200">← main game</a>
+    <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
   </div>
 
   {#if !loaded}
@@ -211,6 +211,13 @@
             {FACTION_INFO[run.faction].name} — level {run.hero.level}
           </p>
           <p class="mb-2 font-mono text-xs text-slate-400">⚔{run.hero.attack} 🛡{run.hero.defense}</p>
+          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Skills</p>
+{#each run.hero.factionSkills as skill (skill.id)}
+  <div class="flex items-center gap-2 py-0.5" title={skill.description}>
+    <span class="text-xs text-slate-200">{skill.name}</span>
+    <span class="font-mono text-[10px] text-amber-300">{skill.level}</span>
+  </div>
+{/each}
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Army ({armyCost(run.army)} power)</p>
           {#each run.army as slot (slot.unit.name)}
             {@const ts = TIER_STYLE[slot.unit.tier]}

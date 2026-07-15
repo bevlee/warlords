@@ -149,7 +149,7 @@
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
   <div class="mb-4 flex items-center gap-4">
     <h1 class="text-2xl font-bold">Warlords</h1>
-    <a href="/gauntlet" class="text-sm text-amber-400 hover:text-amber-300">🏰 Gauntlet mode →</a>
+    <a href="/gauntlet" class="text-lg text-amber-400 hover:text-amber-300">🏰 Gauntlet mode →</a>
   </div>
   {#if screen === 'setup'}
     <ArmySetup {hero} {budget} {lastBattle} onstart={startBattle} onreset={handleReset} onclass={handleClass} />

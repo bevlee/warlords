@@ -204,10 +204,24 @@
       : getReachableCells(battle.grid, fresh);
     return new Set(cells.map(p => `${p.col},${p.row}`));
   });
+  // Right-click pins a unit into the info panel. A pin is an explicit request,
+  // so it outranks hover — without it the panel snaps back to the active unit
+  // the moment the cursor leaves the standee, putting its ability tooltips out
+  // of reach. Pin drops automatically once the stack is dead.
+  let selectedId: string | null = $state(null);
+  const selectedUnit = $derived(
+    selectedId ? (battle.units.find(u => u.id === selectedId && u.count > 0) ?? null) : null
+  );
   const infoUnit = $derived.by(() => {
+    if (selectedUnit) return selectedUnit;
     const fresh = hovered ? battle.units.find(u => u.id === hovered!.id && u.count > 0) : undefined;
     return fresh ?? activeUnit;
   });
+
+  function inspect(unit: UnitStack | null) {
+    // Right-clicking the pinned unit again, or empty ground, unpins.
+    selectedId = !unit || unit.id === selectedId ? null : unit.id;
+  }
 
   // Spellbook panel and the settings popover.
   let spellbookOpen = $state(false);
@@ -408,7 +422,16 @@
     }
     return `Enemy ${activeUnit.definition.name}s are acting…`;
   });
+  // Escape backs out of the most recent thing first: a spell being aimed, then
+  // a pinned unit.
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key !== 'Escape') return;
+    if (pendingSpell) pendingSpell = null;
+    else if (selectedId) selectedId = null;
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="flex justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
@@ -440,6 +463,10 @@
           aria-label="Hero — level {hero.level}"
           onmouseenter={() => (hovered = heroUnit)}
           onmouseleave={() => (hovered = null)}
+          oncontextmenu={e => {
+            e.preventDefault();
+            inspect(heroUnit);
+          }}
         >
           <span class="hero-shadow" aria-hidden="true"></span>
           {#if heroUnit.id === battle.currentUnitId}
@@ -467,6 +494,7 @@
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
           onunithover={u => (hovered = u)}
+          onunitinspect={inspect}
         />
       </div>
 
@@ -605,8 +633,13 @@
       <div class="min-w-0 flex-[7]">
         <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
       </div>
-      <div class="h-40 min-w-0 flex-[3]">
-        <UnitInfo unit={infoUnit} hero={battle.hero} />
+      <div class="relative h-40 min-w-0 flex-[3]">
+        <UnitInfo
+          unit={infoUnit}
+          hero={battle.hero}
+          pinned={!!selectedUnit}
+          onunpin={() => (selectedId = null)}
+        />
       </div>
     </div>
   </div>

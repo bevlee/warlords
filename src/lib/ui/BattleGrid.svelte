@@ -24,6 +24,7 @@
     onunitclick: (unit: UnitStack, shift: boolean) => void;
     onmeleeaim: (targetId: string, origin: Pos) => void;
     onunithover: (unit: UnitStack | null) => void;
+    onunitinspect: (unit: UnitStack | null) => void;
   }
 
   let {
@@ -44,6 +45,7 @@
     onunitclick,
     onmeleeaim,
     onunithover,
+    onunitinspect,
   }: Props = $props();
 
   const TILT_DEG = 38;
@@ -229,6 +231,10 @@
               ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}`
               : `cell ${cell.col},${cell.row}`}
           onclick={e => handleClick(cell.col, cell.row, e.shiftKey)}
+          oncontextmenu={e => {
+            e.preventDefault(); // suppress the browser menu: right-click inspects
+            onunitinspect(occupant ?? null);
+          }}
           onmouseenter={() => onunithover(occupant ?? null)}
           onmousemove={occupant ? e => updateAim(e, occupant) : undefined}
           onmouseleave={() => {
