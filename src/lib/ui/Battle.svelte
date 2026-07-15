@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { initBattle, applyAction, SPELLS } from '$lib/engine/battle';
+  import { initBattle, applyAction, spellPreview, SPELLS } from '$lib/engine/battle';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
+    getRangeCells,
     getMeleeApproaches,
     getAttackOrigins,
     canShoot,
@@ -168,18 +169,41 @@
     return map;
   });
 
-  // Damage forecast for the aiming tooltip.
+  // Damage forecast for the aiming tooltip; far shots preview at half damage.
+  // While aiming a spell, forecast the spell itself (buffs show no numbers).
   const previews = $derived.by(() => {
     const map = new Map<string, ReturnType<typeof damagePreview>>();
     if (!isPlayerTurn || !activeUnit) return map;
+    if (pendingSpell) {
+      for (const id of spellTargetIds ?? []) {
+        const target = battle.units.find(u => u.id === id);
+        const p = target && spellPreview(battle.hero, pendingSpell, target);
+        if (p) map.set(id, p);
+      }
+      return map;
+    }
     for (const id of actionIcons.keys()) {
       const target = battle.units.find(u => u.id === id);
-      if (target) map.set(id, damagePreview(activeUnit, target, hero.attack));
+      if (target) map.set(id, damagePreview(activeUnit, target, hero.attack, actionIcons.get(id) === 'shoot'));
     }
     return map;
   });
 
   let hovered: UnitStack | null = $state(null);
+
+  // Hovering a stack previews its range: enemies always show movement reach
+  // (the threat: where they can get to), own shooters show their full-damage
+  // shooting range. The hero strikes board-wide — nothing to show.
+  const hoverRangeKeys = $derived.by(() => {
+    const fresh = hovered && !hovered.isHero
+      ? battle.units.find(u => u.id === hovered!.id && u.count > 0)
+      : undefined;
+    if (!fresh) return new Set<string>();
+    const cells = fresh.side === 'player' && fresh.definition.range > 0
+      ? getRangeCells(battle.grid, fresh)
+      : getReachableCells(battle.grid, fresh);
+    return new Set(cells.map(p => `${p.col},${p.row}`));
+  });
   const infoUnit = $derived.by(() => {
     const fresh = hovered ? battle.units.find(u => u.id === hovered!.id && u.count > 0) : undefined;
     return fresh ?? activeUnit;
@@ -331,7 +355,7 @@
       case 'retaliate':
         return `${unitLabel(d.attackerId)} retaliate against ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
       case 'shoot':
-        return `${unitLabel(d.attackerId)} shoot ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
+        return `${unitLabel(d.attackerId)} shoot ${unitLabel(d.targetId)} for ${d.damage} damage${d.farShot ? ' (long shot — half damage)' : ''}, killing ${d.killed}.`;
       case 'death':
         return `${unitLabel(d.unitId)} are wiped out!`;
       case 'morale_boost':
@@ -428,6 +452,7 @@
         <BattleGrid
           state={battle}
           reachableKeys={pendingSpell ? new Set() : reachableKeys}
+          rangeKeys={hoverRangeKeys}
           targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
           interactive={isPlayerTurn && !animating}
@@ -437,6 +462,7 @@
           hoveredId={hovered?.id ?? null}
           {activeSteps}
           {dyingIds}
+          stepMs={STEP_DELAY_MS}
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
@@ -573,11 +599,15 @@
     {/if}
     </div>
 
-    <!-- Bottom: bare turns bar (LordsWM), then a full-width unit info strip
-         below it so the info panel gets maximum lengthwise space. -->
-    <div class="relative z-10 mt-1.5 flex flex-col gap-2">
-      <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
-      <UnitInfo unit={infoUnit} hero={battle.hero} />
+    <!-- Bottom: turns bar on the left (70%), unit info on the right (30%) —
+         tall enough for the info panel to fit stats plus ability badges. -->
+    <div class="relative z-10 mt-1.5 flex items-stretch gap-3">
+      <div class="min-w-0 flex-[7]">
+        <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
+      </div>
+      <div class="h-40 min-w-0 flex-[3]">
+        <UnitInfo unit={infoUnit} hero={battle.hero} />
+      </div>
     </div>
   </div>
 </div>

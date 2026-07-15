@@ -33,7 +33,9 @@ and play like LordsWM's. This doc is the durable checklist; dated docs in
 
 Have already: grid with lit move squares · stack tokens with counts and HP ·
 matching damage formula · retaliation · morale/luck · flyers passing over
-occupants · shooter range · player-chosen attack-from tile with ⚔️/🏹
+occupants · shooter range (any target on the board; half damage beyond
+range, with a hover overlay: enemies show movement reach, own shooters
+their full-damage range) · player-chosen attack-from tile with ⚔️/🏹
 indicators · owner colours · combat log · 2.5D perspective board ·
 **ATB initiative bar** (continuous scale, repeat turns, wait = half-cycle,
 0–10% start deviation, bottom strip with two-way hover sync) ·

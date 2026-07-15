@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
-import { getReachableCells, getMeleeTargets, getAttackOrigins, canShoot, damagePreview } from '../selectors';
+import { getReachableCells, getMeleeTargets, getAttackOrigins, canShoot, damagePreview, getRangeCells } from '../selectors';
 import { GOBLIN, ORC, THUNDERBIRD, WOLF_RIDER } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
 
@@ -188,6 +188,55 @@ describe('damagePreview', () => {
 
     expect(p.min).toBe(14); // 2×5×1.4
     expect(p.killsMax).toBe(3); // only 3 goblins to kill
+  });
+
+  it('halves ranged damage beyond the shooter\'s range', () => {
+    // 5 orcs (atk 7, dmg 4–8) vs goblins (def 1): atk−def = 6 → ×1.3
+    const orcs = makeStack(ORC, { col: 0, row: 0 }, 'player'); // range 7
+    const nearGoblins = makeStack(GOBLIN, { col: 7, row: 0 }, 'enemy', { count: 99 });
+    const farGoblins = makeStack(GOBLIN, { col: 11, row: 0 }, 'enemy', { count: 99 });
+
+    const near = damagePreview(orcs, nearGoblins, 0, true);
+    const far = damagePreview(orcs, farGoblins, 0, true);
+
+    expect(far.min).toBe(Math.max(1, Math.round(near.min / 2)));
+    expect(far.max).toBe(Math.max(1, Math.round(near.max / 2)));
+  });
+
+  it('applies no range penalty to melee previews', () => {
+    const riders = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player'); // range 0
+    const goblins = makeStack(GOBLIN, { col: 9, row: 1 }, 'enemy', { count: 10 });
+
+    const p = damagePreview(riders, goblins, 0);
+    expect(p.min).toBe(12); // same as adjacent: 2×5×1.2
+  });
+});
+
+describe('getRangeCells', () => {
+  it('returns every other cell within Chebyshev range of a shooter, including occupied ones', () => {
+    const orc = makeStack(ORC, { col: 5, row: 5 }, 'player'); // range 7
+    const bystander = makeStack(GOBLIN, { col: 6, row: 5 }, 'enemy');
+    const state = makeState([orc, bystander]);
+
+    const cells = getRangeCells(state.grid, orc);
+
+    expect(has(cells, 5, 5)).toBe(false); // own cell excluded
+    expect(has(cells, 6, 5)).toBe(true); // occupied cells shown
+    expect(has(cells, 11, 9)).toBe(true); // dist 6,4 → 6 ≤ 7
+    expect(has(cells, 5, 0)).toBe(true); // dist 5
+    // farthest corner (0,0)→dist 5; whole 12×10 board is within 7 of (5,5)
+    // except nothing — so use a corner shooter instead for the boundary:
+    const cornerOrc = makeStack(ORC, { col: 0, row: 0 }, 'player');
+    const cornerCells = getRangeCells(state.grid, cornerOrc);
+    expect(has(cornerCells, 7, 0)).toBe(true); // dist 7 = range
+    expect(has(cornerCells, 8, 0)).toBe(false); // dist 8 > range
+  });
+
+  it('is empty for melee units', () => {
+    const goblin = makeStack(GOBLIN, { col: 5, row: 5 }, 'player'); // range 0
+    const state = makeState([goblin]);
+
+    expect(getRangeCells(state.grid, goblin)).toHaveLength(0);
   });
 });
 

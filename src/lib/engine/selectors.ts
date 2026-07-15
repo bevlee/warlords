@@ -49,9 +49,31 @@ export function canShoot(unit: UnitStack): boolean {
   return unit.definition.shots > 0 && unit.shotsLeft > 0;
 }
 
-/** Whether the unit can shoot this specific target: shots left and within range. */
+/**
+ * Whether the unit can shoot this specific target: shots left and a real stack.
+ * Range never blocks a shot (LordsWM) — beyond range it just deals half damage.
+ */
 export function canShootTarget(unit: UnitStack, target: UnitStack): boolean {
-  return canShoot(unit) && chebyshevDistance(unit.pos, target.pos) <= unit.definition.range;
+  return canShoot(unit) && !target.isHero;
+}
+
+/** LordsWM far-shot rule: past `range` cells a shot deals half damage. */
+export function isBeyondRange(unit: UnitStack, target: UnitStack): boolean {
+  return chebyshevDistance(unit.pos, target.pos) > unit.definition.range;
+}
+
+/** Cells within a shooter's full-damage range, own cell excluded; empty for melee units. */
+export function getRangeCells(grid: Grid, unit: UnitStack): Pos[] {
+  const range = unit.definition.range;
+  if (range <= 0) return [];
+  const cells: Pos[] = [];
+  for (const row of grid.cells) {
+    for (const cell of row) {
+      if (cell.col === unit.pos.col && cell.row === unit.pos.row) continue;
+      if (chebyshevDistance(unit.pos, cell) <= range) cells.push({ col: cell.col, row: cell.row });
+    }
+  }
+  return cells;
 }
 
 export interface DamagePreview {
@@ -65,10 +87,15 @@ export interface DamagePreview {
 export function damagePreview(
   attacker: UnitStack,
   defender: UnitStack,
-  heroAttack: number
+  heroAttack: number,
+  ranged = false
 ): DamagePreview {
-  const roll = (per: number) =>
-    Math.max(1, Math.round(modifiedDamage(attacker, defender, heroAttack, per)));
+  // Mirror the engine's rounding: full damage first, then the far-shot halving.
+  const penalized = ranged && isBeyondRange(attacker, defender);
+  const roll = (per: number) => {
+    const base = Math.max(1, Math.round(modifiedDamage(attacker, defender, heroAttack, per)));
+    return penalized ? Math.max(1, Math.round(base / 2)) : base;
+  };
   const min = roll(attacker.definition.minDamage);
   const max = roll(attacker.definition.maxDamage);
   return {

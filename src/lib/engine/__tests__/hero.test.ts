@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { initBattle, applyAction, checkBattleEnd } from '../battle';
+import { initBattle, applyAction, checkBattleEnd, spellPreview } from '../battle';
 import { aiTakeTurn } from '../ai';
 import { predictTurnOrder } from '../turnOrder';
 import { getMeleeApproaches } from '../selectors';
@@ -20,6 +20,38 @@ function newBattle(seed = 7): BattleState {
 function heroStack(state: BattleState) {
   return state.units.find(u => u.isHero)!;
 }
+
+describe('spellPreview', () => {
+  it('forecasts Lightning as flat true damage with exact kills, ignoring hero attack', () => {
+    const state = newBattle();
+    const goblins = state.units.find(u => !u.isHero && u.side === 'player')!; // 10 goblins, hp 5
+
+    // hero level 2 → 12 + 8×2 = 28 true damage; attack 4 must not matter
+    const p = spellPreview(hero, 'lightning', goblins);
+    expect(p).toEqual({ min: 28, max: 28, killsMin: 5, killsMax: 5 });
+  });
+
+  it('scales Lightning with the Sorcery skill', () => {
+    const sorcerer: Hero = {
+      ...hero,
+      class: 'wizard',
+      factionSkills: [{ id: 'sorcery', name: 'Sorcery', description: '', level: 2 }],
+    };
+    const state = newBattle();
+    const goblins = state.units.find(u => !u.isHero && u.side === 'player')!;
+
+    const p = spellPreview(sorcerer, 'lightning', goblins);
+    expect(p!.min).toBe(31); // round(28 × 1.10)
+  });
+
+  it('is null for friendly buff spells', () => {
+    const state = newBattle();
+    const goblins = state.units.find(u => !u.isHero && u.side === 'player')!;
+
+    expect(spellPreview(hero, 'bloodlust', goblins)).toBeNull();
+    expect(spellPreview(hero, 'stoneskin', goblins)).toBeNull();
+  });
+});
 
 describe('hero as a battlefield actor', () => {
   it('joins the battle as an off-grid, ATB-scheduled player stack', () => {

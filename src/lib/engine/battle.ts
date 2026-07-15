@@ -3,7 +3,7 @@ import type { ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, U
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
-import { isShootingBlocked } from './selectors';
+import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors';
 import { mulberry32, type Rng } from './rng';
 import {
   applyOffenseBonus,
@@ -132,6 +132,14 @@ export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
 /** Lightning is true damage: flat, level-scaled, ignores attack/defense. */
 export function lightningDamage(level: number): number {
   return 12 + 8 * level;
+}
+
+/** Forecast for the spell-aiming tooltip: Lightning's exact true damage; null for buffs. */
+export function spellPreview(hero: Hero, spell: SpellId, target: UnitStack): DamagePreview | null {
+  if (SPELLS[spell].friendly) return null;
+  const damage = Math.round(lightningDamage(hero.level) * getSorceryMultiplier(hero));
+  const { killed } = applyDamage(target, damage);
+  return { min: damage, max: damage, killsMin: killed, killsMax: killed };
 }
 
 function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, colShift = 0): UnitStack {
@@ -367,7 +375,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     const updatedActor = { ...actor, pos: action.to, lastMovedFrom: actor.pos };
     const newUnits = s.units.map((u, i) => i === actorIdx ? updatedActor : u);
     s = { ...s, grid: newGrid, units: newUnits };
-    s.log = [...s.log, { type: 'move', data: { unitId: actorId, to: action.to } }];
+    s.log = [...s.log, { type: 'move', data: { unitId: actorId, from: updatedActor.lastMovedFrom, to: action.to } }];
 
   } else if (action.type === 'attack') {
     const targetId = action.targetId;
@@ -384,7 +392,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       attacker = { ...actor, pos: action.moveTo, lastMovedFrom: actor.pos };
       const movedUnits = s.units.map((u, i) => (i === actorIdx ? attacker : u));
       s = { ...s, grid: newGrid, units: movedUnits };
-      s.log = [...s.log, { type: 'move', data: { unitId: actorId, to: action.moveTo } }];
+      s.log = [...s.log, { type: 'move', data: { unitId: actorId, from: attacker.lastMovedFrom, to: action.moveTo } }];
     }
 
     const damage = withHeroBonus(s.hero, attacker, target, calculateDamage(attacker, target, s.hero.attack, rng));
@@ -442,14 +450,17 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     // Grand Elf double_shot fires twice, consuming 2 shots.
     const shotCount = actor.definition.abilities.includes('double_shot') ? 2 : 1;
+    // LordsWM far-shot rule: beyond the shooter's range the shot deals half damage.
+    const farShot = isBeyondRange(actor, target);
     let currentTarget = target;
     let firstShotDamage = 0;
     for (let shot = 0; shot < shotCount && currentTarget.count > 0; shot++) {
-      const shotDamage = withHeroBonus(s.hero, actor, currentTarget, calculateDamage(actor, currentTarget, s.hero.attack, rng), true);
+      const fullDamage = withHeroBonus(s.hero, actor, currentTarget, calculateDamage(actor, currentTarget, s.hero.attack, rng), true);
+      const shotDamage = farShot ? Math.max(1, Math.round(fullDamage / 2)) : fullDamage;
       if (shot === 0) firstShotDamage = shotDamage;
       const { killed, remaining } = applyDamage(currentTarget, shotDamage);
       currentTarget = remaining;
-      s.log = [...s.log, { type: 'shoot', data: { attackerId: actorId, targetId, damage: shotDamage, killed } }];
+      s.log = [...s.log, { type: 'shoot', data: { attackerId: actorId, targetId, damage: shotDamage, killed, ...(farShot ? { farShot: true } : {}) } }];
     }
 
     const shootingActor = { ...actor, shotsLeft: Math.max(0, actor.shotsLeft - shotCount) };

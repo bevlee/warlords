@@ -77,6 +77,20 @@ poll status ~every 300 ms, a full battle finishes in ~1–2 min), restart.
 Gotchas: capture `pageerror`/console errors; a stray dev-only 404 (Chrome
 devtools probe) is environment noise, not a bug.
 
+**Polling loops that also click**: action buttons (Wait/Defend) disable
+during every animation beat, and a Playwright `click` with the default
+timeout blocks ~30 s on a disabled button — a poll-and-click loop then
+spends the whole battle stalled inside click auto-wait and misses every
+transient (`.sliding`/`.striking` standees, `.fx-text`). Always click with
+`{ timeout: ~250 }` + `.catch(() => {})` inside sampling loops.
+
+**Combat animations** (beat = STEP_DELAY_MS: 700/450/200 by speed): during
+a move beat the moving standee has `.token-standing.sliding`; during an
+attack/retaliate beat the attacker has `.token-standing.striking` (lunge
+toward the target, `--strike-x/--strike-y` vars). Damage/buff/status text
+floats in `.fx-text` elements. Set combat speed to `slow` and sample every
+~90 ms to catch these.
+
 **Clicking the tilted board**: standees are clickable and lean over the cell
 behind them, so never click cells/targets at their bounding-box center —
 Playwright either times out ("subtree intercepts pointer events") or, worse

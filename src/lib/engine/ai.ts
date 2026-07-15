@@ -14,7 +14,7 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
     chebyshevDistance(unit.pos, e.pos) < chebyshevDistance(unit.pos, closest.pos) ? e : closest
   );
 
-  // Ranged: shoot if the target is within range and no enemy is in our face
+  // Ranged: shoot unless an enemy is in our face — beyond range still beats walking (half damage)
   if (canShootTarget(unit, target) && !isShootingBlocked(state, unit)) {
     return { type: 'shoot', targetId: target.id };
   }

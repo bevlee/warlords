@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits, getCell, chebyshevDistance } from '../grid';
 import { applyAction } from '../battle';
 import { aiTakeTurn } from '../ai';
-import { canShootTarget, getMeleeApproaches, isShootingBlocked } from '../selectors';
+import { canShootTarget, isBeyondRange, getMeleeApproaches, isShootingBlocked } from '../selectors';
 import { GOBLIN, ORC, WOLF_RIDER } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
 
@@ -45,6 +45,29 @@ function makeState(units: UnitStack[]): BattleState {
   };
 }
 
+describe('move logging', () => {
+  it('records from and to on a plain move', () => {
+    const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
+    const state = makeState([rider]);
+
+    const next = applyAction(state, { type: 'move', to: { col: 4, row: 2 } });
+
+    const entry = next.log.find(e => e.type === 'move')!;
+    expect(entry.data).toMatchObject({ unitId: rider.id, from: { col: 1, row: 1 }, to: { col: 4, row: 2 } });
+  });
+
+  it('records from and to on the move of a move+attack', () => {
+    const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
+    const goblins = makeStack(GOBLIN, { col: 6, row: 1 }, 'enemy', { count: 30 });
+    const state = makeState([rider, goblins]);
+
+    const next = applyAction(state, { type: 'attack', targetId: goblins.id, moveTo: { col: 5, row: 1 } });
+
+    const entry = next.log.find(e => e.type === 'move')!;
+    expect(entry.data).toMatchObject({ unitId: rider.id, from: { col: 1, row: 1 }, to: { col: 5, row: 1 } });
+  });
+});
+
 describe('attack with moveTo (move+attack)', () => {
   it('relocates the actor, then resolves the melee with retaliation', () => {
     const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
@@ -66,7 +89,7 @@ describe('attack with moveTo (move+attack)', () => {
 });
 
 describe('canShootTarget', () => {
-  it('requires shots left and the target within range', () => {
+  it('requires shots left; range does not gate the shot (LordsWM: any target on the board)', () => {
     const orc = makeStack(ORC, { col: 0, row: 0 }, 'player'); // range 7
     const inRange = makeStack(GOBLIN, { col: 7, row: 0 }, 'enemy');
     const outOfRange = makeStack(GOBLIN, { col: 8, row: 0 }, 'enemy');
@@ -74,9 +97,27 @@ describe('canShootTarget', () => {
     const goblin = makeStack(GOBLIN, { col: 0, row: 2 }, 'player'); // melee only
 
     expect(canShootTarget(orc, inRange)).toBe(true);
-    expect(canShootTarget(orc, outOfRange)).toBe(false);
+    expect(canShootTarget(orc, outOfRange)).toBe(true);
     expect(canShootTarget(spentOrc, inRange)).toBe(false);
     expect(canShootTarget(goblin, inRange)).toBe(false);
+  });
+
+  it('never targets heroes', () => {
+    const orc = makeStack(ORC, { col: 0, row: 0 }, 'player');
+    const hero = makeStack(GOBLIN, { col: 5, row: 0 }, 'enemy', { isHero: true });
+
+    expect(canShootTarget(orc, hero)).toBe(false);
+  });
+});
+
+describe('isBeyondRange', () => {
+  it('is true only past the shooter\'s full-damage range', () => {
+    const orc = makeStack(ORC, { col: 0, row: 0 }, 'player'); // range 7
+    const atRange = makeStack(GOBLIN, { col: 7, row: 0 }, 'enemy');
+    const pastRange = makeStack(GOBLIN, { col: 8, row: 0 }, 'enemy');
+
+    expect(isBeyondRange(orc, atRange)).toBe(false);
+    expect(isBeyondRange(orc, pastRange)).toBe(true);
   });
 });
 
@@ -141,6 +182,22 @@ describe('applyAction shoot', () => {
     expect(unhurtTarget.count).toBe(target.count);
     expect(next.log.some(e => e.type === 'shoot')).toBe(false);
   });
+
+  it('halves the damage when the target is beyond the shooter\'s range', () => {
+    const shotDamage = (targetCol: number): number => {
+      const orc = makeStack(ORC, { col: 0, row: 0 }, 'player', { count: 20 }); // range 7
+      const target = makeStack(GOBLIN, { col: targetCol, row: 0 }, 'enemy', { count: 99 });
+      const next = applyAction(makeState([orc, target]), { type: 'shoot', targetId: target.id });
+      const entry = next.log.find(e => e.type === 'shoot');
+      expect(entry).toBeTruthy();
+      return (entry!.data as { damage: number }).damage;
+    };
+
+    // Same seed and log length → identical damage roll; only the distance differs.
+    const nearDamage = shotDamage(7); // dist 7 = range
+    const farDamage = shotDamage(11); // dist 11 > range
+    expect(farDamage).toBe(Math.max(1, Math.round(nearDamage / 2)));
+  });
 });
 
 describe('AI with range and move+attack', () => {
@@ -153,9 +210,18 @@ describe('AI with range and move+attack', () => {
     expect(action).toEqual({ type: 'attack', targetId: adjacent.id });
   });
 
-  it('does not shoot beyond range; walks toward the target instead', () => {
+  it('shoots beyond range (at half damage) rather than walking', () => {
     const orc = makeStack(ORC, { col: 1, row: 1 }, 'enemy'); // range 7, speed 4
     const target = makeStack(GOBLIN, { col: 10, row: 1 }, 'player'); // dist 9
+    const state = makeState([orc, target]);
+
+    const action = aiTakeTurn(state, orc.id);
+    expect(action).toEqual({ type: 'shoot', targetId: target.id });
+  });
+
+  it('walks toward the target once its shots are spent', () => {
+    const orc = makeStack(ORC, { col: 1, row: 1 }, 'enemy', { shotsLeft: 0 });
+    const target = makeStack(GOBLIN, { col: 10, row: 1 }, 'player');
     const state = makeState([orc, target]);
 
     const action = aiTakeTurn(state, orc.id);

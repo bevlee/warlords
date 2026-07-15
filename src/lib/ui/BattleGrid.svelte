@@ -9,6 +9,7 @@
   interface Props {
     state: BattleState;
     reachableKeys: Set<string>;
+    rangeKeys: Set<string>;
     targetIds: Set<string>;
     activeId: string | null;
     interactive: boolean;
@@ -18,6 +19,7 @@
     hoveredId: string | null;
     activeSteps: { unitId: string; step: AnimStep }[];
     dyingIds: Set<string>;
+    stepMs: number;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
     onmeleeaim: (targetId: string, origin: Pos) => void;
@@ -27,6 +29,7 @@
   let {
     state: battleState,
     reachableKeys,
+    rangeKeys,
     targetIds,
     activeId,
     interactive,
@@ -36,6 +39,7 @@
     hoveredId,
     activeSteps,
     dyingIds,
+    stepMs,
     oncellclick,
     onunitclick,
     onmeleeaim,
@@ -43,6 +47,42 @@
   }: Props = $props();
 
   const TILT_DEG = 38;
+
+  // The board is tilted back by TILT_DEG, so one board-row of movement covers only
+  // cos(TILT_DEG) of the screen pixels one board-column does. Aim math compares screen
+  // offsets against board-space cell deltas — divide dy through to undo the
+  // foreshortening, or vertical origins are ~30% harder to select than horizontal ones.
+  const ROW_SQUASH = Math.cos((TILT_DEG * Math.PI) / 180);
+
+  // One cell of travel in percent of the standee's own box (92% × 118% of a cell).
+  const CELL_X = 100 / 0.92;
+  const CELL_Y = 100 / 1.18;
+
+  // Per-standee animation for the current beat. This is the seam for richer
+  // combat animation later: add a step kind in animSteps.ts, then map it here
+  // to a class plus CSS vars (and keyframes below). All animations run in the
+  // board plane — translate before the rotateX that stands the token up.
+  const standeeAnim = $derived.by(() => {
+    const map = new Map<string, { cls: string; style: string }>();
+    const ms = `--anim-ms: ${Math.round(stepMs * 0.9)}ms;`;
+    for (const { unitId, step } of activeSteps) {
+      if (step.kind === 'move') {
+        // Slide: start translated back at the source cell, settle in place.
+        const dx = (step.from.col - step.to.col) * CELL_X;
+        const dy = (step.from.row - step.to.row) * CELL_Y;
+        map.set(unitId, { cls: 'sliding', style: `--slide-x: ${dx}%; --slide-y: ${dy}%; ${ms}` });
+      } else if (step.kind === 'strike') {
+        // Melee lunge: bump ~45% of a cell toward the target and spring back.
+        const attacker = unitsById.get(unitId);
+        const target = unitsById.get(step.targetId);
+        if (!attacker || !target) continue;
+        const dx = Math.max(-1, Math.min(1, target.pos.col - attacker.pos.col)) * 0.45 * CELL_X;
+        const dy = Math.max(-1, Math.min(1, target.pos.row - attacker.pos.row)) * 0.45 * CELL_Y;
+        map.set(unitId, { cls: 'striking', style: `--strike-x: ${dx}%; --strike-y: ${dy}%; ${ms}` });
+      }
+    }
+    return map;
+  });
 
   // A dying stack's count already reads 0 (patched by applyLogEntry ahead of
   // the engine's real state) but must keep rendering — still occupying its
@@ -86,8 +126,12 @@
     if (origins.length === 0) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const dx = e.clientX - (rect.left + rect.width / 2);
-    const dy = e.clientY - (rect.top + rect.height / 2);
+    const dy = (e.clientY - (rect.top + rect.height / 2)) / ROW_SQUASH;
     const len = Math.hypot(dx, dy) || 1;
+    // Too close to the centre to read a direction — keep the origin we already have
+    // rather than letting sub-pixel jitter reassign it. Entering a tile still picks
+    // one immediately; only re-deciding is suppressed.
+    if (len < rect.width * 0.18 && aim?.targetId === unit.id) return;
     let best = origins[0];
     let bestDot = -Infinity;
     for (const o of origins) {
@@ -105,6 +149,13 @@
 
   const aimKey = $derived(aim ? `${aim.origin.col},${aim.origin.row}` : null);
   const aimTarget = $derived(aim ? (unitsById.get(aim.targetId) ?? null) : null);
+
+  // updateAim only clears on mousemove, so a locked board (animating, AI turn) would
+  // otherwise strand the red origin tile and arrow on an origin that may no longer be
+  // reachable — and clicking it is a silent no-op, since handleMeleeAim re-checks.
+  $effect(() => {
+    if (!interactive) aim = null;
+  });
 
   function arrowAngle(): number {
     if (!aim || !aimTarget) return 0;
@@ -160,12 +211,14 @@
       {#each row as cell (cellKey(cell.col, cell.row))}
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
         {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row))}
+        {@const inHoverRange = rangeKeys.has(cellKey(cell.col, cell.row))}
         {@const attackable = !!occupant && targetIds.has(occupant.id)}
         {@const isAimOrigin = aimKey === cellKey(cell.col, cell.row)}
         <button
           type="button"
           class="cell relative aspect-square border border-indigo-300/15
             {reachable ? 'bg-slate-500/50 hover:bg-slate-400/50' : 'bg-slate-900/70'}
+            {inHoverRange ? 'range-cell' : ''}
             {attackable ? 'attackable' : ''}
             {isAimOrigin ? 'aim-origin' : ''}
             {!interactive ? 'cursor-default' : ''}"
@@ -188,12 +241,14 @@
             {#if occupant.id === activeId}
               <span class="active-arc" aria-hidden="true"></span>
             {/if}
+            {@const anim = standeeAnim.get(occupant.id)}
             <div
-              class="token-standing"
+              class="token-standing {anim?.cls ?? ''}"
               class:hover-glow={occupant.id === hoveredId}
               class:dying={dyingIds.has(occupant.id)}
+              style={anim?.style ?? ''}
             >
-              <UnitToken unit={occupant} />
+              <UnitToken unit={occupant} active={occupant.id === activeId} />
             </div>
             {#if attackable && (hoveredId === occupant.id || aim?.targetId === occupant.id) && previews.has(occupant.id)}
               {@const p = previews.get(occupant.id)!}
@@ -218,6 +273,7 @@
     gridWidth={battleState.grid.width}
     gridHeight={battleState.grid.height}
     steps={activeSteps
+      .filter(({ step }) => step.kind !== 'move' && step.kind !== 'strike')
       .map(({ unitId, step }) => {
         const u = unitsById.get(unitId);
         return u ? { step, pos: u.pos, key: `${unitId}-${step.kind}-${battleState.log.length}` } : null;
@@ -256,6 +312,14 @@
 
   .cell {
     transform-style: preserve-3d;
+  }
+
+  /* Hovered stack's threat range: shooting range for shooters, movement
+     reach for melee. Declared before the red target rules so those win
+     when a cell is both. */
+  .cell.range-cell {
+    box-shadow: inset 0 0 0 1.5px rgb(56 189 248 / 0.4);
+    background-color: rgb(56 189 248 / 0.12);
   }
 
   /* Hovering an attackable enemy edges its tile red (LordsWM). */
@@ -299,6 +363,36 @@
     bottom: 0;
     transform: rotateX(calc(-1 * var(--tilt)));
     transform-origin: 50% 100%;
+  }
+
+  /* Move beat: slide from the source cell into place. The translate runs in
+     the board plane (before the rotateX that stands the token up). */
+  .token-standing.sliding {
+    animation: standee-slide var(--anim-ms, 400ms) ease-in-out;
+  }
+
+  @keyframes standee-slide {
+    from {
+      transform: translate(var(--slide-x), var(--slide-y)) rotateX(calc(-1 * var(--tilt)));
+    }
+    to {
+      transform: rotateX(calc(-1 * var(--tilt)));
+    }
+  }
+
+  /* Attack beat: the attacker lunges into the target and springs back. */
+  .token-standing.striking {
+    animation: standee-strike var(--anim-ms, 400ms) ease-in-out;
+  }
+
+  @keyframes standee-strike {
+    0%,
+    100% {
+      transform: rotateX(calc(-1 * var(--tilt)));
+    }
+    40% {
+      transform: translate(var(--strike-x), var(--strike-y)) rotateX(calc(-1 * var(--tilt)));
+    }
   }
 
   /* Dying stack: fades and sinks into the board rather than vanishing
@@ -381,6 +475,11 @@
 
   @media (prefers-reduced-motion: reduce) {
     .active-arc::after {
+      animation: none;
+    }
+
+    .token-standing.sliding,
+    .token-standing.striking {
       animation: none;
     }
   }

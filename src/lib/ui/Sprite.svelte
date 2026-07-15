@@ -5,10 +5,13 @@
   interface Props {
     name: string;
     pose?: Pose;
+    /** Run the idle loop. Action poses always animate; idle holds frame 0
+        unless this is set (in battle: only the unit whose turn it is). */
+    animate?: boolean;
     class?: string;
   }
 
-  let { name, pose = 'idle', class: cls = '' }: Props = $props();
+  let { name, pose = 'idle', animate = false, class: cls = '' }: Props = $props();
 
   const src = $derived(sheetFor(name));
   const POSE_MS: Record<Pose, number> = { idle: 900, attack: 400, hit: 400, death: 500 };
@@ -20,6 +23,7 @@
   {#key pose}
     <div
       class="sprite {cls}"
+      class:animated={animate || pose !== 'idle'}
       class:play-once={pose === 'death'}
       style="background-image:url('{src}'); --row:{POSE_ROW[pose]}; --dur:{POSE_MS[pose]}ms"
       aria-hidden="true"
@@ -38,6 +42,9 @@
        thirds: cell n sits at n/3 · 100%. */
     background-size: 400% 400%;
     background-position-y: calc(var(--row) / 3 * 100%);
+  }
+
+  .animated {
     animation: sprite-frames var(--dur, 900ms) steps(4, jump-none) infinite;
   }
 

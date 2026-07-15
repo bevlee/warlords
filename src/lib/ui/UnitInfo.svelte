@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { abilityInfo } from './abilities';
   import Sprite from './Sprite.svelte';
 
   interface Props {
@@ -58,21 +59,20 @@
 
 <!-- Fixed height: hovering different units must never change this panel's
      footprint (a growing panel can toggle the page scrollbar and reflow the
-     whole width-driven board). Wide + short: stats lay out lengthwise as a
-     row of icon+value chips instead of a tall label/value grid. -->
-<div class="flex h-16 items-center gap-4 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 px-3">
+     whole width-driven board). Narrow + tall (the 30% right column): stats
+     as a grid of icon+value chips, abilities as badges with hover tooltips. -->
+<div class="flex h-full flex-col gap-1.5 overflow-hidden rounded-lg border border-slate-700 bg-slate-800 px-3 py-2">
   {#if unit}
     <div class="flex shrink-0 items-center gap-2">
       <Sprite name={unit.definition.name} class="h-11 w-10" />
-      <span class="text-sm font-semibold {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
+      <span class="truncate text-sm font-semibold {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
         {unit.isHero ? `Hero — level ${hero?.level ?? '?'}` : unit.definition.name}
       </span>
     </div>
-    <div class="h-9 w-px shrink-0 bg-slate-600" aria-hidden="true"></div>
-    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-0.5">
+    <div class="grid grid-cols-3 gap-x-3 gap-y-1">
       {#each stats as { key, value } (key)}
         <span
-          class="flex items-baseline gap-1 text-sm"
+          class="flex cursor-help items-baseline gap-1 text-sm"
           title={STAT_META[key].title}
         >
           <span aria-hidden="true">{STAT_META[key].icon}</span>
@@ -81,9 +81,18 @@
       {/each}
     </div>
     {#if unit.definition.abilities.length > 0}
-      <p class="ml-auto max-w-xs shrink truncate text-xs text-amber-300/90" title={unit.definition.abilities.join(', ').replaceAll('_', ' ')}>
-        {unit.definition.abilities.join(', ').replaceAll('_', ' ')}
-      </p>
+      <div class="flex flex-wrap content-start items-start gap-1">
+        {#each unit.definition.abilities as ability (ability)}
+          {@const info = abilityInfo(ability)}
+          <span
+            class="cursor-help rounded border border-amber-500/40 bg-amber-950/60 px-1.5 py-0.5
+              text-[11px] font-medium leading-tight text-amber-300"
+            title={info.description}
+          >
+            {info.label}
+          </span>
+        {/each}
+      </div>
     {/if}
   {:else}
     <p class="text-xs text-slate-500">Hover a unit to inspect it.</p>

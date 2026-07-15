@@ -4,16 +4,19 @@
 
   interface Props {
     unit: UnitStack;
+    /** It's this unit's turn — run its idle animation. */
+    active?: boolean;
     small?: boolean;
   }
 
-  let { unit, small = false }: Props = $props();
+  let { unit, active = false, small = false }: Props = $props();
 </script>
 
 <!-- Transparent standee: sprite + count plate, LordsWM-style (no card chrome). -->
 <div class="relative flex h-full w-full items-end justify-center" title="{unit.definition.name} ×{unit.count}">
   <Sprite
     name={unit.definition.name}
+    animate={active}
     class="h-full w-auto {unit.side === 'enemy' ? '-scale-x-100' : ''}"
   />
 
