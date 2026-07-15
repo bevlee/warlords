@@ -195,6 +195,40 @@ describe('initBattle obstacles', () => {
   });
 });
 
+describe('luck events', () => {
+  it('emits the luck entry immediately before the hit it explains', () => {
+    // Nature's Luck-style: every stack has luck, so a run of attacks will fire
+    // some rolls. The ordering is the contract — the UI plays entries as beats,
+    // so a luck entry after its attack would flash the cause after the effect.
+    const hero: Hero = { class: 'ranger', level: 1, xp: 0, attack: 5, defense: 3, statPoints: 0, factionSkills: [] };
+    let state = initBattle([{ unit: WOLF_RIDER, count: 20 }], [{ unit: GOBLIN, count: 50 }], hero, 7);
+    state = { ...state, units: state.units.map(u => ({ ...u, luck: 3 })) };
+
+    let iterations = 0;
+    while (state.result === 'ongoing' && iterations < 400) {
+      const unitId = state.currentUnitId;
+      if (!unitId) break;
+      const unit = state.units.find(u => u.id === unitId)!;
+      const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
+      if (enemies.length === 0) break;
+      state = applyAction(state, { type: 'attack', targetId: enemies[0].id });
+      iterations++;
+    }
+
+    const luckIdxs = state.log.flatMap((e, i) => (e.type === 'luck' ? [i] : []));
+    expect(luckIdxs.length).toBeGreaterThan(0); // luck 3 over a whole battle must fire
+
+    for (const i of luckIdxs) {
+      const next = state.log[i + 1];
+      expect(next, 'a luck entry must be followed by the hit it explains').toBeDefined();
+      expect(['attack', 'retaliate', 'shoot']).toContain(next.type);
+      // and it must describe the same striker
+      expect((next.data as { attackerId: string }).attackerId)
+        .toBe((state.log[i].data as { unitId: string }).unitId);
+    }
+  });
+});
+
 describe('full battle simulation', () => {
   it('eventually ends with a winner', () => {
     const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 10, defense: 5, statPoints: 0, factionSkills: [] };

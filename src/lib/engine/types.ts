@@ -84,7 +84,7 @@ export interface ArmySlot {
 
 export type BattleEventType =
   | 'attack' | 'retaliate' | 'shoot' | 'move' | 'defend' | 'cast'
-  | 'death' | 'morale_boost' | 'morale_freeze' | 'status'
+  | 'death' | 'morale_boost' | 'morale_freeze' | 'luck' | 'status'
   | 'round_start' | 'battle_end';
 
 export interface BattleEvent {

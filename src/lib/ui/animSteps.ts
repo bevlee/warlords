@@ -62,6 +62,22 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       const icon = STATUS_ICON[effect];
       return icon ? [{ unitId, kind: 'status', icon }] : [];
     }
+    // Morale resolves after the stack's turn, so these arrive as their own log
+    // entry and animate on their own beat — no extra sequencing needed.
+    case 'morale_boost': {
+      const { unitId } = entry.data as { unitId: string };
+      return [{ unitId, kind: 'status', icon: '🎺' }];
+    }
+    case 'morale_freeze': {
+      const { unitId } = entry.data as { unitId: string };
+      return [{ unitId, kind: 'status', icon: '❄️' }];
+    }
+    // Luck is rolled before damage lands, and the engine emits it as its own
+    // entry ahead of the attack — the flash reads as the cause of the big hit.
+    case 'luck': {
+      const { unitId, kind } = entry.data as { unitId: string; kind: 'good' | 'bad' };
+      return [{ unitId, kind: 'status', icon: kind === 'good' ? '🍀' : '💢' }];
+    }
     case 'move': {
       const { unitId, from, to } = entry.data as { unitId: string; from?: Pos; to: Pos };
       return from ? [{ unitId, kind: 'move', from, to }] : [];

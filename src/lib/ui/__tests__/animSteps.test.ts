@@ -146,15 +146,28 @@ describe('stepsFromLogEntry: death and status', () => {
     expect(stepsFromLogEntry(entry)).toEqual([]);
   });
 
-  it('maps round_start, defend, morale_freeze, battle_end to no steps', () => {
+  it('maps round_start, defend, battle_end to no steps', () => {
     const noop: BattleEvent[] = [
       { type: 'round_start', data: { round: 2 } },
       { type: 'defend', data: { unitId: 't1' } },
-      { type: 'morale_freeze', data: { unitId: 't1' } },
       { type: 'battle_end', data: { result: 'player_wins' } },
     ];
 
     for (const entry of noop) expect(stepsFromLogEntry(entry)).toEqual([]);
+  });
+
+  it('floats an icon for a morale roll firing either way', () => {
+    expect(stepsFromLogEntry({ type: 'morale_boost', data: { unitId: 't1' } }))
+      .toEqual([{ unitId: 't1', kind: 'status', icon: '🎺' }]);
+    expect(stepsFromLogEntry({ type: 'morale_freeze', data: { unitId: 't1' } }))
+      .toEqual([{ unitId: 't1', kind: 'status', icon: '❄️' }]);
+  });
+
+  it('distinguishes good and bad luck', () => {
+    expect(stepsFromLogEntry({ type: 'luck', data: { unitId: 't1', kind: 'good' } }))
+      .toEqual([{ unitId: 't1', kind: 'status', icon: '🍀' }]);
+    expect(stepsFromLogEntry({ type: 'luck', data: { unitId: 't1', kind: 'bad' } }))
+      .toEqual([{ unitId: 't1', kind: 'status', icon: '💢' }]);
   });
 });
 

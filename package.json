@@ -8,6 +8,8 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"sprites": "node scripts/generate-sheets.mjs",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"

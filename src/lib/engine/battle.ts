@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, UnitStack } from './types';
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
-import { calculateDamage, applyDamage, canRetaliate, checkMorale } from './combat';
+import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat';
 import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors';
 import { mulberry32, type Rng } from './rng';
 import {
@@ -42,6 +42,27 @@ function withHeroBonus(
   }
   if (defender.side === 'player') d = applyArmorerBonus(d, hero);
   return d;
+}
+
+/** A hit plus the luck event that preceded it, if the attacker's luck fired.
+ *  Emitted as its own entry ahead of the attack so the UI plays it as an
+ *  earlier beat — the flash reads as the cause of the damage that follows. */
+function rollHit(
+  hero: Hero,
+  attacker: UnitStack,
+  defender: UnitStack,
+  rng: Rng,
+  heroAttack: number,
+  ranged = false
+): { damage: number; luckEvents: BattleEvent[] } {
+  const sink: LuckSink = { luck: null };
+  const raw = calculateDamage(attacker, defender, heroAttack, rng, sink);
+  return {
+    damage: withHeroBonus(hero, attacker, defender, raw, ranged),
+    luckEvents: sink.luck
+      ? [{ type: 'luck', data: { unitId: attacker.id, kind: sink.luck } }]
+      : [],
+  };
 }
 
 /**
@@ -395,7 +416,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       s.log = [...s.log, { type: 'move', data: { unitId: actorId, from: attacker.lastMovedFrom, to: action.moveTo } }];
     }
 
-    const damage = withHeroBonus(s.hero, attacker, target, calculateDamage(attacker, target, s.hero.attack, rng));
+    const { damage, luckEvents } = rollHit(s.hero, attacker, target, rng, s.hero.attack);
     const { killed, remaining: hitTarget } = applyDamage(target, damage);
     const { striker: attackerAfterHit, victim: remaining, events: hitEvents } =
       applyOnHitEffects(rng, attacker, hitTarget, damage, s.round, s.hero);
@@ -408,7 +429,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
         return u;
       }),
     };
-    s.log = [...s.log, { type: 'attack', data: { attackerId: actorId, targetId, damage, killed } }, ...hitEvents];
+    s.log = [...s.log, ...luckEvents, { type: 'attack', data: { attackerId: actorId, targetId, damage, killed } }, ...hitEvents];
 
     if (remaining.count === 0) {
       s = handleDeath(s, remaining, rng);
@@ -423,7 +444,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     // Retaliation (only on regular attack, not on ranged)
     if (canRetaliate(remaining, attackerAfterHit)) {
-      const retDamage = withHeroBonus(s.hero, remaining, attackerAfterHit, calculateDamage(remaining, attackerAfterHit, 0, rng));
+      const { damage: retDamage, luckEvents: retLuckEvents } = rollHit(s.hero, remaining, attackerAfterHit, rng, 0);
       const { killed: retKilled, remaining: hitAttacker } = applyDamage(attackerAfterHit, retDamage);
       const { striker: retaliatorAfterHit, victim: retActor, events: retEvents } =
         applyOnHitEffects(rng, remaining, hitAttacker, retDamage, s.round, s.hero);
@@ -433,7 +454,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
         return u;
       });
       s = { ...s, units: updatedUnits };
-      s.log = [...s.log, { type: 'retaliate', data: { attackerId: targetId, targetId: actorId, damage: retDamage, killed: retKilled } }, ...retEvents];
+      s.log = [...s.log, ...retLuckEvents, { type: 'retaliate', data: { attackerId: targetId, targetId: actorId, damage: retDamage, killed: retKilled } }, ...retEvents];
       if (retActor.count === 0) {
         s = handleDeath(s, retActor, rng);
       }
@@ -455,12 +476,12 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     let currentTarget = target;
     let firstShotDamage = 0;
     for (let shot = 0; shot < shotCount && currentTarget.count > 0; shot++) {
-      const fullDamage = withHeroBonus(s.hero, actor, currentTarget, calculateDamage(actor, currentTarget, s.hero.attack, rng), true);
+      const { damage: fullDamage, luckEvents } = rollHit(s.hero, actor, currentTarget, rng, s.hero.attack, true);
       const shotDamage = farShot ? Math.max(1, Math.round(fullDamage / 2)) : fullDamage;
       if (shot === 0) firstShotDamage = shotDamage;
       const { killed, remaining } = applyDamage(currentTarget, shotDamage);
       currentTarget = remaining;
-      s.log = [...s.log, { type: 'shoot', data: { attackerId: actorId, targetId, damage: shotDamage, killed, ...(farShot ? { farShot: true } : {}) } }];
+      s.log = [...s.log, ...luckEvents, { type: 'shoot', data: { attackerId: actorId, targetId, damage: shotDamage, killed, ...(farShot ? { farShot: true } : {}) } }];
     }
 
     const shootingActor = { ...actor, shotsLeft: Math.max(0, actor.shotsLeft - shotCount) };

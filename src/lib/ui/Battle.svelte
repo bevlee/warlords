@@ -68,6 +68,16 @@
 
   const STEP_DELAY_MS = $derived({ slow: 700, normal: 450, fast: 200 }[battleSpeed]);
 
+  // A beat's CSS outlives its beat: the floating damage/status text runs 0.9s
+  // and the death fade 0.6s, against a 200–700ms beat. Mid-sequence that's
+  // fine — the next beat's delay gives it room to finish. The last beat has no
+  // next, so clearing straight after it cuts the animation off mid-flight;
+  // retaliations and deaths land last most often, which is why they were the
+  // ones that looked like they had no animation at all. Hold for the longest
+  // CSS before tearing the layer down. Not speed-scaled: the point is to let a
+  // fixed-duration animation finish.
+  const FX_TAIL_MS = 900;
+
   async function revealAction(result: BattleState) {
     const token = ++revealToken;
     animating = true;
@@ -82,6 +92,11 @@
       }
       battle = working;
       await new Promise(r => setTimeout(r, STEP_DELAY_MS));
+      if (token !== revealToken) return;
+    }
+
+    if (activeSteps.length > 0 || dyingIds.size > 0) {
+      await new Promise(r => setTimeout(r, FX_TAIL_MS - STEP_DELAY_MS));
       if (token !== revealToken) return;
     }
 
@@ -376,6 +391,10 @@
         return `High morale! ${unitLabel(d.unitId)} act again.`;
       case 'morale_freeze':
         return `Low morale — ${unitLabel(d.unitId)} freeze and skip their turn.`;
+      case 'luck':
+        return d.kind === 'good'
+          ? `Lucky strike! ${unitLabel(d.unitId)} land a double-damage blow.`
+          : `Bad luck — ${unitLabel(d.unitId)} fumble for half damage.`;
       case 'status': {
         const label = unitLabel(d.unitId);
         switch (d.effect) {
@@ -435,8 +454,9 @@
 
 <div class="flex justify-center">
   <!-- Cap the board width by viewport height so the whole battle (board +
-       turns bar) fits without scrolling on laptop screens. -->
-  <div class="w-full min-w-0" style="max-width: calc((100dvh - 350px) * 1.45 + 220px)">
+       turns bar) fits without scrolling on laptop screens. The subtrahend
+       reserves the non-board chrome: status strip + the h-60 bottom row. -->
+  <div class="w-full min-w-0" style="max-width: calc((100dvh - 430px) * 1.45 + 220px)">
     <!-- Combat indicator: status + last log lines, above the battlefield.
          Fixed height: content changes must never reflow the board below. -->
     <div class="mb-1 flex justify-center">
@@ -633,7 +653,9 @@
       <div class="min-w-0 flex-[7]">
         <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
       </div>
-      <div class="relative h-40 min-w-0 flex-[3]">
+      <!-- h-60 fits the tallest unit (stats + a couple of ability blurbs);
+           anything longer scrolls inside the panel rather than reflowing. -->
+      <div class="h-60 min-w-0 flex-[3]">
         <UnitInfo
           unit={infoUnit}
           hero={battle.hero}

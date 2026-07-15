@@ -125,3 +125,49 @@ describe('No Enemy Retaliation (Monk/Naga/Titan) blocks the defender, not just i
     expect(canRetaliate(defender, attacker)).toBe(false);
   });
 });
+
+describe('luck reporting', () => {
+  // rng order: damage roll, then the luck roll (0.125 * luck to fire).
+  it('reports a good-luck double and doubles the damage', () => {
+    const attacker = makeStack({ luck: 3 });
+    const defender = makeStack({ side: 'enemy' });
+    const sink: { luck: 'good' | 'bad' | null } = { luck: null };
+
+    const lucky = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.01]), sink);
+    const plain = calculateDamage(makeStack({ luck: 0 }), defender, 0, sequenceRng([0, 0.01]));
+
+    expect(sink.luck).toBe('good');
+    // Doubling happens pre-rounding, so this is 2x within a rounding step.
+    expect(lucky).toBeCloseTo(plain * 2, -0.5);
+    expect(lucky).toBeGreaterThan(plain);
+  });
+
+  it('reports a bad-luck halving', () => {
+    const attacker = makeStack({ luck: -3 });
+    const defender = makeStack({ side: 'enemy' });
+    const sink: { luck: 'good' | 'bad' | null } = { luck: null };
+
+    calculateDamage(attacker, defender, 0, sequenceRng([0, 0.01]), sink);
+
+    expect(sink.luck).toBe('bad');
+  });
+
+  it('reports nothing when the roll misses', () => {
+    const attacker = makeStack({ luck: 3 });
+    const defender = makeStack({ side: 'enemy' });
+    const sink: { luck: 'good' | 'bad' | null } = { luck: null };
+
+    calculateDamage(attacker, defender, 0, sequenceRng([0, 0.99]), sink);
+
+    expect(sink.luck).toBeNull();
+  });
+
+  it('leaves the rng sequence untouched for a zero-luck stack', () => {
+    // The sink must not perturb existing seeded expectations: no luck, no roll.
+    const defender = makeStack({ side: 'enemy' });
+    const withSink = calculateDamage(makeStack({ luck: 0 }), defender, 0, sequenceRng([0, 0.01]), { luck: null });
+    const withoutSink = calculateDamage(makeStack({ luck: 0 }), defender, 0, sequenceRng([0, 0.01]));
+
+    expect(withSink).toBe(withoutSink);
+  });
+});

@@ -50,11 +50,19 @@ export function modifiedDamage(
   return totalDamage;
 }
 
+/** Whether a hit's luck roll fired, for callers that want to narrate it.
+ *  Passed in rather than returned so the damage return type — and the rng call
+ *  order every seeded test depends on — stay exactly as they were. */
+export interface LuckSink {
+  luck: 'good' | 'bad' | null;
+}
+
 export function calculateDamage(
   attacker: UnitStack,
   defender: UnitStack,
   heroAttack: number,
-  rng: Rng
+  rng: Rng,
+  luckSink?: LuckSink
 ): number {
   // Base damage per creature
   const dmgPerCreature = attacker.definition.minDamage +
@@ -64,10 +72,12 @@ export function calculateDamage(
   // Luck: 12.5% * luck chance to double
   if (attacker.luck > 0 && rng() < 0.125 * attacker.luck) {
     totalDamage *= 2;
+    if (luckSink) luckSink.luck = 'good';
   }
   // Bad luck: 12.5% * abs(luck) chance to halve
   if (attacker.luck < 0 && rng() < 0.125 * Math.abs(attacker.luck)) {
     totalDamage *= 0.5;
+    if (luckSink) luckSink.luck = 'bad';
   }
 
   // Wizard Gorgon Death Stare: 10% chance to instantly kill the top defending creature.
