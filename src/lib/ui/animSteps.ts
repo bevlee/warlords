@@ -27,7 +27,9 @@ export type AnimStep =
   // Ranged shot: unitId is the shooter (or the off-grid hero); BattleGrid
   // resolves both ids to positions at beat time. Anchored at the target cell,
   // flight starts translated back at the source.
-  | { unitId: string; kind: 'projectile'; targetId: string };
+  | { unitId: string; kind: 'projectile'; targetId: string }
+  // Cast visual at the target cell: lightning bolt flash or buff glow.
+  | { unitId: string; kind: 'spell_fx'; spell: 'lightning' | 'bloodlust' | 'stoneskin' };
 
 /** Translates one battle log entry into the visual steps it should play. */
 export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
@@ -60,11 +62,12 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
         damage?: number;
         spell: 'lightning' | 'bloodlust' | 'stoneskin';
       };
+      const fx: AnimStep = { unitId: targetId, kind: 'spell_fx', spell };
       if (damage !== undefined) {
-        return [{ unitId: targetId, kind: 'damage', value: damage }];
+        return [fx, { unitId: targetId, kind: 'damage', value: damage, delayed: true }];
       }
-      if (spell === 'bloodlust') return [{ unitId: targetId, kind: 'buff', value: 4, label: 'ATK' }];
-      if (spell === 'stoneskin') return [{ unitId: targetId, kind: 'buff', value: 4, label: 'DEF' }];
+      if (spell === 'bloodlust') return [fx, { unitId: targetId, kind: 'buff', value: 4, label: 'ATK', delayed: true }];
+      if (spell === 'stoneskin') return [fx, { unitId: targetId, kind: 'buff', value: 4, label: 'DEF', delayed: true }];
       return [];
     }
     case 'death': {

@@ -90,7 +90,7 @@ describe('stepsFromLogEntry: damage', () => {
     expect(steps).toEqual([{ unitId: 't2', kind: 'damage', value: 3 }]);
   });
 
-  it('maps a lightning cast to a damage step on its target', () => {
+  it('maps a lightning cast to a bolt flash plus delayed damage on its target', () => {
     const entry: BattleEvent = {
       type: 'cast',
       data: { spell: 'lightning', casterId: 'h1', targetId: 't1', damage: 20, killed: 0 },
@@ -98,7 +98,10 @@ describe('stepsFromLogEntry: damage', () => {
 
     const steps = stepsFromLogEntry(entry);
 
-    expect(steps).toEqual([{ unitId: 't1', kind: 'damage', value: 20 }]);
+    expect(steps).toEqual([
+      { unitId: 't1', kind: 'spell_fx', spell: 'lightning' },
+      { unitId: 't1', kind: 'damage', value: 20, delayed: true },
+    ]);
   });
 });
 
@@ -111,7 +114,10 @@ describe('stepsFromLogEntry: buffs', () => {
 
     const steps = stepsFromLogEntry(entry);
 
-    expect(steps).toEqual([{ unitId: 't1', kind: 'buff', value: 4, label: 'ATK' }]);
+    expect(steps).toEqual([
+      { unitId: 't1', kind: 'spell_fx', spell: 'bloodlust' },
+      { unitId: 't1', kind: 'buff', value: 4, label: 'ATK', delayed: true },
+    ]);
   });
 
   it('maps a stoneskin cast to a defense buff step', () => {
@@ -122,7 +128,10 @@ describe('stepsFromLogEntry: buffs', () => {
 
     const steps = stepsFromLogEntry(entry);
 
-    expect(steps).toEqual([{ unitId: 't1', kind: 'buff', value: 4, label: 'DEF' }]);
+    expect(steps).toEqual([
+      { unitId: 't1', kind: 'spell_fx', spell: 'stoneskin' },
+      { unitId: 't1', kind: 'buff', value: 4, label: 'DEF', delayed: true },
+    ]);
   });
 });
 
