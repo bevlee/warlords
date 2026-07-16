@@ -6,8 +6,9 @@ army-wide unit stats: attack, defense, initiative, luck, morale.
 ## Acquisition
 
 - Every 3rd battle won (battlesWon 3, 6, 9, …) the post-battle draft offers
-  the usual 3 unit cards **plus 2 item cards**. The player still picks exactly
-  one thing — a unit card or an item.
+  the usual 3 unit cards **plus 2 item cards**. The player picks **one of
+  each** — a unit card *and* an item, in either order; the draft holds until
+  both are taken. Units-only drafts still resolve on a single pick.
 - Applies to the whole run (nodes 1–10 and endless).
 - Items are unique: each can be owned at most once. Items whose only effect
   targets a stat already at cap (luck/morale cap at +3 total) are excluded
