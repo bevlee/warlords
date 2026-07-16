@@ -3,6 +3,7 @@
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
   import { xpToReach } from '$lib/engine/progression';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { abilityInfo } from './abilities';
   import Sprite from './Sprite.svelte';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
@@ -135,10 +136,23 @@
           <p class="text-sm font-semibold text-slate-100">{unit.name}</p>
           <p class="font-mono text-[10px] text-amber-300">🪙 {UNIT_COSTS[unit.name]} each</p>
         </div>
-        <p class="flex-1 font-mono text-[11px] leading-tight text-slate-400">
-          HP {unit.hp} · Atk {unit.attack} · Def {unit.defense} · Dmg {unit.minDamage}–{unit.maxDamage}<br />
-          Spd {unit.speed} · Init {unit.initiative}{unit.shots > 0 ? ` · 🏹 ${unit.shots} shots, range ${unit.range}` : ''}
-        </p>
+        <div class="flex-1">
+          <p class="font-mono text-[11px] leading-tight text-slate-400">
+            HP {unit.hp} · Atk {unit.attack} · Def {unit.defense} · Dmg {unit.minDamage}–{unit.maxDamage}<br />
+            Spd {unit.speed} · Init {unit.initiative}{unit.shots > 0 ? ` · 🏹 ${unit.shots} shots, range ${unit.range}` : ''}
+          </p>
+          {#if unit.abilities.length > 0}
+            <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+              {#each unit.abilities as ability (ability)}
+                {@const info = abilityInfo(ability)}
+                <span class="text-[11px] leading-tight" title={info.description}>
+                  <span class="font-semibold text-amber-300">{info.label}</span>
+                  <span class="text-slate-400"> — {info.description}</span>
+                </span>
+              {/each}
+            </div>
+          {/if}
+        </div>
         <div class="flex items-center gap-1">
           <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
             disabled={n === 0} onclick={() => remove(unit.name, 5)} aria-label="remove 5 {unit.name}">‹5</button>
