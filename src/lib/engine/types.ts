@@ -30,6 +30,7 @@ export interface UnitStack {
   atb: number;         // position on the initiative scale; acts at 1
   isDefending: boolean; // defensive stance until the start of its own next turn
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
+  isAlly?: boolean;    // summoned ally stack: fights on the player side, AI-controlled
   attackBuff?: number;  // battle-long spell bonus to attack
   defenseBuff?: number; // battle-long spell bonus to defense
   lastMovedFrom?: Pos;  // set when a unit moves this turn; cleared at round start (Knight jousting)

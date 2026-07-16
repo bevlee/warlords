@@ -128,7 +128,7 @@ function applyOnHitEffects(
  */
 function handleDeath(s: BattleState, dead: UnitStack, rng: Rng): BattleState {
   const next: BattleState = { ...s, log: [...s.log, { type: 'death', data: { unitId: dead.id } }] };
-  const gatingChance = dead.side === 'player' ? getGatingChance(next.hero) : 0;
+  const gatingChance = dead.side === 'player' && !dead.isAlly ? getGatingChance(next.hero) : 0;
   if (gatingChance > 0 && DEMON_UNITS.some(u => u.name === dead.definition.name) && rng() < gatingChance) {
     const revived: UnitStack = { ...dead, count: 1, hp: dead.definition.hp };
     return {
@@ -186,7 +186,8 @@ export function initBattle(
   playerArmy: ArmySlot[],
   enemyArmy: ArmySlot[],
   hero: Hero,
-  seed = Date.now()
+  seed = Date.now(),
+  allyArmy: ArmySlot[] = []
 ): BattleState {
   let grid = createGrid(GRID_W, GRID_H);
 
@@ -202,6 +203,13 @@ export function initBattle(
     return stack;
   });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
+  // Summoned ally: player-side but AI-driven, fielded one column behind the
+  // player line. Hero skill bonuses (morale/logistics/luck/gating) deliberately
+  // don't apply — the ally fights under its own banner.
+  const allyUnits: UnitStack[] = allyArmy.map((slot, i) => ({
+    ...slotToStack(slot, 'player', i, -1),
+    isAlly: true,
+  }));
 
   // The hero fights too: off-grid on the flank, ATB-scheduled, untargetable.
   // Whole-board ranged strike via the shoot action (no retaliation). attack: 0
@@ -229,7 +237,7 @@ export function initBattle(
 
   // LordsWM-style start: every stack gets a seeded random 0–10% head start.
   const rng = mulberry32(seed);
-  const allUnits = [...playerUnits, ...enemyUnits, heroStack].map(u => ({ ...u, atb: rng() * 0.1 }));
+  const allUnits = [...playerUnits, ...allyUnits, ...enemyUnits, heroStack].map(u => ({ ...u, atb: rng() * 0.1 }));
 
   grid = placeUnits(grid, allUnits);
 
