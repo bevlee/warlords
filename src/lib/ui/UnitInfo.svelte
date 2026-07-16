@@ -9,9 +9,11 @@
     hero?: Hero | null;
     pinned?: boolean;
     onunpin?: (() => void) | null;
+    /** Render inside another surface (e.g. a draft card): no own border, no pin hint. */
+    embedded?: boolean;
   }
 
-  let { unit, hero = null, pinned = false, onunpin = null }: Props = $props();
+  let { unit, hero = null, pinned = false, onunpin = null, embedded = false }: Props = $props();
 
   // Icon + label + hover explanation per stat, kept in one place so the meaning
   // of each glyph is discoverable via title tooltip as well as its label.
@@ -76,8 +78,8 @@
      panel can toggle the page scrollbar and reflow the width-driven board. A
      unit with many abilities scrolls rather than growing. -->
 <div
-  class="flex h-full flex-col gap-1.5 overflow-y-auto rounded-lg border bg-slate-800 px-3 py-2
-    {pinned ? 'border-amber-500/60' : 'border-slate-700'}"
+  class="flex h-full flex-col gap-1.5 overflow-y-auto rounded-lg bg-slate-800 px-3 py-2
+    {embedded ? '' : `border ${pinned ? 'border-amber-500/60' : 'border-slate-700'}`}"
 >
   {#if unit}
     <div class="flex shrink-0 items-center gap-2">
@@ -96,7 +98,7 @@
         >
           ×
         </button>
-      {:else}
+      {:else if !embedded}
         <span class="shrink-0 text-[10px] uppercase tracking-wide text-slate-600">right-click to pin</span>
       {/if}
     </div>

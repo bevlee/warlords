@@ -22,8 +22,8 @@
   } from '$lib/gauntlet/run';
   import { loadRun, saveRun, clearRun } from '$lib/storage';
   import { TIER_STYLE } from '$lib/ui/tierStyle';
-  import { abilityInfo } from '$lib/ui/abilities';
-  import type { FactionClass, UnitStack } from '$lib/engine/types';
+  import UnitInfo from '$lib/ui/UnitInfo.svelte';
+  import type { FactionClass, UnitDef, UnitStack } from '$lib/engine/types';
 
   const ACT_NAMES: Record<1 | 2 | 3, string> = {
     1: 'Act I — The Borderlands',
@@ -88,6 +88,24 @@
 
   const unitFor = (name: string) =>
     run ? FACTION_UNITS[run.faction].find(u => u.name === name)! : null;
+
+  /** A pristine full-health stack so the battle UnitInfo panel can present a draft card. */
+  function draftStack(unit: UnitDef, count: number): UnitStack {
+    return {
+      id: `draft-${unit.name}`,
+      definition: unit,
+      count,
+      hp: unit.hp,
+      pos: { col: 0, row: 0 },
+      side: 'player',
+      hasRetaliated: false,
+      shotsLeft: unit.shots,
+      morale: 0,
+      luck: 0,
+      atb: 0,
+      isDefending: false,
+    };
+  }
 </script>
 
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
@@ -136,7 +154,7 @@
     {/key}
   {:else if run.status === 'draft'}
     <!-- Draft: pick 1 of 3 -->
-    <div class="mx-auto max-w-2xl">
+    <div class="mx-auto max-w-4xl">
       <h2 class="mb-1 text-lg font-semibold text-amber-200">
         Victory! {run.pendingDraft ? 'Choose your reinforcements' : 'Claim an artifact'}
       </h2>
@@ -151,32 +169,15 @@
           {@const ts = unit ? TIER_STYLE[unit.tier] : TIER_STYLE[1]}
           <button
             type="button"
-            class="flex flex-col items-center gap-2 rounded-lg border-2 bg-slate-800 p-4
-              hover:bg-slate-700 hover:brightness-110 {ts.border} {ts.glow}"
+            class="flex flex-col overflow-hidden rounded-lg border-2 bg-slate-800 text-left
+              hover:brightness-110 {ts.border} {ts.glow}"
             onclick={() => pick(card)}
           >
-            <Sprite name={card.unitName} class="h-16 w-14" />
-            <span class="font-bold {ts.text}">{card.count} × {card.unitName}</span>
+            <span class="w-full py-1 text-center text-[10px] font-semibold uppercase tracking-wider {ts.text}">
+              Tier {unit?.tier ?? '?'} · {ts.label}
+            </span>
             {#if unit}
-              <span class="text-[10px] font-semibold uppercase tracking-wider {ts.text}">
-                Tier {unit.tier} · {ts.label}
-              </span>
-              <span class="font-mono text-[10px] leading-tight text-slate-400">
-                HP {unit.hp} · Atk {unit.attack} · Def {unit.defense}<br />
-                Dmg {unit.minDamage}–{unit.maxDamage} · Spd {unit.speed} · Init {unit.initiative}
-                {#if unit.shots > 0}<br />🏹 {unit.shots} shots, range {unit.range}{/if}
-              </span>
-              {#if unit.abilities.length > 0}
-                <span class="flex flex-col gap-0.5 text-left">
-                  {#each unit.abilities as ability (ability)}
-                    {@const info = abilityInfo(ability)}
-                    <span class="text-[10px] leading-tight" title={info.description}>
-                      <span class="font-semibold text-amber-300">{info.label}</span>
-                      <span class="text-slate-400"> — {info.description}</span>
-                    </span>
-                  {/each}
-                </span>
-              {/if}
+              <UnitInfo unit={draftStack(unit, card.count)} embedded />
             {/if}
           </button>
         {/each}
