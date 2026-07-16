@@ -34,6 +34,16 @@
         >
           <span class="fx-proj-glyph" style="transform: rotate({angle}deg)">{art === 'bolt' ? '✦' : '➤'}</span>
         </span>
+      {:else if step.kind === 'spell_fx'}
+        {#if step.spell === 'lightning'}
+          <!-- Bolt stands up out of the board like a standee and strikes downward. -->
+          <span class="fx-bolt-strike" aria-hidden="true">⚡</span>
+        {:else}
+          <span
+            class="fx-glow {step.spell === 'bloodlust' ? 'fx-glow-attack' : 'fx-glow-defense'}"
+            aria-hidden="true"
+          ></span>
+        {/if}
       {:else if step.kind === 'damage'}
         <span class="fx-text fx-damage" class:fx-delayed={step.delayed}>-{step.value}</span>
       {:else if step.kind === 'buff'}
@@ -50,10 +60,12 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
+    transform-style: preserve-3d;
   }
 
   .fx-cell {
     position: relative;
+    transform-style: preserve-3d;
   }
 
   .fx-text {
@@ -123,6 +135,59 @@
     animation-fill-mode: backwards;
   }
 
+  /* Lightning: stood up out of the board plane (inverse of the board tilt,
+     hinged at the cell's bottom edge — same trick as .token-standing).
+     --tilt inherits from .board's style attribute. Requires preserve-3d all
+     the way down and NO filter/overflow on .fx-layer or .fx-cell (either
+     flattens the 3D subtree — see the .preview comment in BattleGrid). */
+  .fx-bolt-strike {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    font-size: 2.4rem;
+    line-height: 1;
+    text-shadow: 0 0 10px rgb(250 204 21 / 0.9);
+    transform-origin: 50% 100%;
+    animation: fx-bolt var(--flight-ms, 300ms) ease-in forwards;
+    pointer-events: none;
+  }
+
+  @keyframes fx-bolt {
+    0% {
+      opacity: 0;
+      transform: rotateX(calc(-1 * var(--tilt))) translateY(-170%) scaleY(1.7);
+    }
+    30% {
+      opacity: 1;
+      transform: rotateX(calc(-1 * var(--tilt))) translateY(0) scaleY(1);
+    }
+    75% { opacity: 1; }
+    100% {
+      opacity: 0;
+      transform: rotateX(calc(-1 * var(--tilt))) translateY(0) scaleY(1);
+    }
+  }
+
+  /* Buff glow: a pulse in the board plane under the target's feet. */
+  .fx-glow {
+    position: absolute;
+    inset: 6%;
+    border-radius: 50%;
+    animation: fx-glow-pulse 0.9s ease-out forwards;
+    pointer-events: none;
+  }
+
+  .fx-glow-attack  { background: radial-gradient(ellipse at center, rgb(248 113 113 / 0.65), transparent 70%); }
+  .fx-glow-defense { background: radial-gradient(ellipse at center, rgb(148 163 184 / 0.7), transparent 70%); }
+
+  @keyframes fx-glow-pulse {
+    0%   { opacity: 0; transform: scale(0.4); }
+    35%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.15); }
+  }
+
   @keyframes float-up {
     0% {
       opacity: 0;
@@ -147,6 +212,10 @@
     }
     .fx-text.fx-delayed {
       animation-delay: 0ms;
+    }
+    .fx-bolt-strike,
+    .fx-glow {
+      animation: fade-only 0.9s ease-out forwards;
     }
     @keyframes fade-only {
       0% { opacity: 0; }
