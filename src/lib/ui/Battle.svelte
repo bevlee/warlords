@@ -24,6 +24,8 @@
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
   import UnitInfo from './UnitInfo.svelte';
+  import ArtifactStrip from './ArtifactStrip.svelte';
+  import type { ItemId } from '$lib/gauntlet/items';
   import Sprite from './Sprite.svelte';
   import SpellBook from './SpellBook.svelte';
   import { stepsFromLogEntry, applyLogEntry, type AnimStep } from './animSteps';
@@ -37,6 +39,7 @@
     allowRestart?: boolean;
     exitLabel?: string;
     armyBonuses?: ArmyBonuses;
+    items?: ItemId[];
   }
 
   let {
@@ -48,6 +51,7 @@
     allowRestart = true,
     exitLabel = 'Change army',
     armyBonuses,
+    items = [],
   }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
@@ -576,6 +580,10 @@
         >
           ⚙️
         </button>
+        {#if !settingsOpen}
+          <!-- Active artifacts: army-wide bonuses in play, tucked under the cog. -->
+          <ArtifactStrip {items} />
+        {/if}
         {#if settingsOpen}
           <div class="w-48 rounded-lg border border-slate-600 bg-slate-900/95 p-3 shadow-xl">
             <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Combat speed</p>
