@@ -11,9 +11,31 @@
     onunpin?: (() => void) | null;
     /** Render inside another surface (e.g. a draft card): no own border, no pin hint. */
     embedded?: boolean;
+    /** 'compact' fits the battle sidebar; 'large' is for roomy screens like the draft. */
+    size?: 'compact' | 'large';
   }
 
-  let { unit, hero = null, pinned = false, onunpin = null, embedded = false }: Props = $props();
+  let { unit, hero = null, pinned = false, onunpin = null, embedded = false, size = 'compact' }: Props = $props();
+
+  const sz = $derived(
+    size === 'large'
+      ? {
+          pad: 'px-4 py-3 gap-2.5',
+          sprite: 'h-16 w-14',
+          name: 'text-lg',
+          count: 'text-sm',
+          stat: 'text-sm gap-y-1.5',
+          ability: 'text-sm',
+        }
+      : {
+          pad: 'px-3 py-2 gap-1.5',
+          sprite: 'h-11 w-10',
+          name: 'text-sm',
+          count: 'text-xs',
+          stat: 'text-xs gap-y-0.5',
+          ability: 'text-[11px]',
+        }
+  );
 
   // Icon + label + hover explanation per stat, kept in one place so the meaning
   // of each glyph is discoverable via title tooltip as well as its label.
@@ -78,15 +100,15 @@
      panel can toggle the page scrollbar and reflow the width-driven board. A
      unit with many abilities scrolls rather than growing. -->
 <div
-  class="flex h-full flex-col gap-1.5 overflow-y-auto rounded-lg bg-slate-800 px-3 py-2
+  class="flex h-full flex-col overflow-y-auto rounded-lg bg-slate-800 {sz.pad}
     {embedded ? '' : `border ${pinned ? 'border-amber-500/60' : 'border-slate-700'}`}"
 >
   {#if unit}
     <div class="flex shrink-0 items-center gap-2">
-      <Sprite name={unit.definition.name} class="h-11 w-10" />
-      <span class="flex-1 truncate text-sm font-semibold {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
+      <Sprite name={unit.definition.name} class={sz.sprite} />
+      <span class="flex-1 truncate font-semibold {sz.name} {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
         {unit.isHero ? `Hero — level ${hero?.level ?? '?'}` : unit.definition.name}
-        {#if !unit.isHero}<span class="ml-1 font-mono text-xs text-slate-400">×{unit.count}</span>{/if}
+        {#if !unit.isHero}<span class="ml-1 font-mono text-slate-400 {sz.count}">×{unit.count}</span>{/if}
       </span>
       {#if pinned}
         <button
@@ -103,9 +125,9 @@
       {/if}
     </div>
 
-    <div class="grid shrink-0 grid-cols-2 gap-x-4 gap-y-0.5 border-t border-slate-700 pt-1.5">
+    <div class="grid shrink-0 grid-cols-2 gap-x-4 border-t border-slate-700 pt-1.5 {sz.stat}">
       {#each stats as stat (stat.key)}
-        <span class="flex cursor-help items-baseline gap-1.5 text-xs" title={STAT_META[stat.key].title}>
+        <span class="flex cursor-help items-baseline gap-1.5" title={STAT_META[stat.key].title}>
           <span aria-hidden="true">{STAT_META[stat.key].icon}</span>
           <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
           <span class="font-mono text-slate-100">
@@ -124,8 +146,8 @@
         {#each unit.definition.abilities as ability (ability)}
           {@const info = abilityInfo(ability)}
           <div>
-            <p class="text-[11px] font-semibold leading-tight text-amber-300">{info.label}</p>
-            <p class="text-[11px] leading-tight text-slate-400">{info.description}</p>
+            <p class="font-semibold leading-tight text-amber-300 {sz.ability}">{info.label}</p>
+            <p class="leading-tight text-slate-400 {sz.ability}">{info.description}</p>
           </div>
         {/each}
       </div>

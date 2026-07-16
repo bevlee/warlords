@@ -154,11 +154,11 @@
     {/key}
   {:else if run.status === 'draft'}
     <!-- Draft: pick 1 of 3 -->
-    <div class="mx-auto max-w-4xl">
-      <h2 class="mb-1 text-lg font-semibold text-amber-200">
+    <div class="mx-auto max-w-6xl">
+      <h2 class="mb-1 text-2xl font-semibold text-amber-200">
         Victory! {run.pendingDraft ? 'Choose your reinforcements' : 'Claim an artifact'}
       </h2>
-      <p class="mb-4 text-sm text-slate-400">
+      <p class="mb-5 text-base text-slate-400">
         Battle {run.encounterIndex - 1} won — {RUN_LENGTH - run.encounterIndex + 1} to go.
         {#if run.pendingDraft && run.pendingItems}Pick one of each.{/if}
       </p>
@@ -173,18 +173,18 @@
               hover:brightness-110 {ts.border} {ts.glow}"
             onclick={() => pick(card)}
           >
-            <span class="w-full py-1 text-center text-[10px] font-semibold uppercase tracking-wider {ts.text}">
+            <span class="w-full py-1.5 text-center text-xs font-semibold uppercase tracking-wider {ts.text}">
               Tier {unit?.tier ?? '?'} · {ts.label}
             </span>
             {#if unit}
-              <UnitInfo unit={draftStack(unit, card.count)} embedded />
+              <UnitInfo unit={draftStack(unit, card.count)} embedded size="large" />
             {/if}
           </button>
         {/each}
       </div>
       {/if}
       {#if run.pendingItems?.length}
-        <h3 class="mb-2 mt-5 text-sm font-semibold uppercase tracking-wide text-purple-300">
+        <h3 class="mb-3 mt-6 text-base font-semibold uppercase tracking-wide text-purple-300">
           {run.pendingDraft ? '…and claim an artifact' : 'Claim an artifact'} (buffs your whole army, every battle)
         </h3>
         <div class="grid grid-cols-2 gap-3">
@@ -193,13 +193,13 @@
             {@const rs = RARITY_STYLE[item.rarity]}
             <button
               type="button"
-              class="flex flex-col items-center gap-1 rounded-lg border-2 bg-slate-800 p-4
+              class="flex flex-col items-center gap-1.5 rounded-lg border-2 bg-slate-800 p-6
                 hover:bg-slate-700 hover:brightness-110 {rs.border}"
               onclick={() => pickItem(id)}
             >
-              <span class="font-bold {rs.text}">{item.name}</span>
-              <span class="text-[10px] font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
-              <span class="font-mono text-xs text-amber-200">{itemEffectText(item)}</span>
+              <span class="text-xl font-bold {rs.text}">{item.name}</span>
+              <span class="text-xs font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
+              <span class="font-mono text-base text-amber-200">{itemEffectText(item)}</span>
             </button>
           {/each}
         </div>
