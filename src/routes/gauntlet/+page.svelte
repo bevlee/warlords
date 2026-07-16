@@ -136,10 +136,16 @@
   {:else if run.status === 'draft'}
     <!-- Draft: pick 1 of 3 -->
     <div class="mx-auto max-w-2xl">
-      <h2 class="mb-1 text-lg font-semibold text-amber-200">Victory! Choose your reinforcements</h2>
-      <p class="mb-4 text-sm text-slate-400">Battle {run.encounterIndex - 1} won — {RUN_LENGTH - run.encounterIndex + 1} to go.</p>
+      <h2 class="mb-1 text-lg font-semibold text-amber-200">
+        Victory! {run.pendingDraft ? 'Choose your reinforcements' : 'Claim an artifact'}
+      </h2>
+      <p class="mb-4 text-sm text-slate-400">
+        Battle {run.encounterIndex - 1} won — {RUN_LENGTH - run.encounterIndex + 1} to go.
+        {#if run.pendingDraft && run.pendingItems}Pick one of each.{/if}
+      </p>
+      {#if run.pendingDraft}
       <div class="grid grid-cols-3 gap-3">
-        {#each run.pendingDraft ?? [] as card (card.unitName)}
+        {#each run.pendingDraft as card (card.unitName)}
           {@const unit = unitFor(card.unitName)}
           {@const ts = unit ? TIER_STYLE[unit.tier] : TIER_STYLE[1]}
           <button
@@ -161,9 +167,10 @@
           </button>
         {/each}
       </div>
+      {/if}
       {#if run.pendingItems?.length}
         <h3 class="mb-2 mt-5 text-sm font-semibold uppercase tracking-wide text-purple-300">
-          …or claim an artifact (buffs your whole army, every battle)
+          {run.pendingDraft ? '…and claim an artifact' : 'Claim an artifact'} (buffs your whole army, every battle)
         </h3>
         <div class="grid grid-cols-2 gap-3">
           {#each run.pendingItems as id (id)}

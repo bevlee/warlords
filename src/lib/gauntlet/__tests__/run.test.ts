@@ -152,27 +152,44 @@ describe('gauntlet run', () => {
     }
   });
 
-  it('applyItemPick adds the item to the run and returns to the map', () => {
+  it('on an item draft the player takes one of EACH: unit first, then artifact', () => {
     let run = { ...newRun('barbarian', 9), battlesWon: 3 };
     run = { ...run, status: 'draft' as const, pendingDraft: draftOptions(run), pendingItems: itemDraftOptions(run) };
 
-    const next = applyItemPick(run, run.pendingItems![0]);
+    const afterUnit = applyPick(run, run.pendingDraft![0]);
+    expect(afterUnit.pendingDraft).toBeNull();
+    expect(afterUnit.pendingItems).toEqual(run.pendingItems); // artifact still owed
+    expect(afterUnit.status).toBe('draft');
 
-    expect(next.items).toEqual([run.pendingItems![0]]);
-    expect(next.status).toBe('map');
-    expect(next.pendingDraft).toBeNull();
-    expect(next.pendingItems).toBeNull();
-    expect(next.army).toEqual(run.army); // no unit was taken
+    const afterBoth = applyItemPick(afterUnit, afterUnit.pendingItems![0]);
+    expect(afterBoth.items).toEqual([run.pendingItems![0]]);
+    expect(afterBoth.pendingItems).toBeNull();
+    expect(afterBoth.status).toBe('map');
   });
 
-  it('applyPick (unit) clears a pending item offer too', () => {
+  it('on an item draft the player takes one of EACH: artifact first, then unit', () => {
     let run = { ...newRun('barbarian', 9), battlesWon: 3 };
     run = { ...run, status: 'draft' as const, pendingDraft: draftOptions(run), pendingItems: itemDraftOptions(run) };
 
-    const next = applyPick(run, run.pendingDraft![0]);
+    const afterItem = applyItemPick(run, run.pendingItems![0]);
+    expect(afterItem.items).toEqual([run.pendingItems![0]]);
+    expect(afterItem.pendingDraft).toEqual(run.pendingDraft); // unit still owed
+    expect(afterItem.status).toBe('draft');
+    expect(afterItem.army).toEqual(run.army); // no unit taken yet
 
-    expect(next.pendingItems).toBeNull();
-    expect(next.items).toEqual([]);
+    const afterBoth = applyPick(afterItem, afterItem.pendingDraft![0]);
+    expect(afterBoth.pendingDraft).toBeNull();
+    expect(afterBoth.status).toBe('map');
+  });
+
+  it('a units-only draft (no item offer) still returns to the map on one pick', () => {
+    let run = newRun('barbarian', 9);
+    run = recordBattle(run, true, run.army); // 1st win: no items
+    expect(run.pendingItems).toBeNull();
+
+    const next = applyPick(run, run.pendingDraft![0]);
+    expect(next.status).toBe('map');
+    expect(next.pendingDraft).toBeNull();
   });
 
   it('survivorsFrom keeps living player stacks, drops the hero and the dead', () => {

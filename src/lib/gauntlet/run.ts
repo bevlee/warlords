@@ -157,16 +157,16 @@ export function applyPick(run: RunState, card: UnitCard): RunState {
   const army = existing
     ? run.army.map(s => (s.unit.name === card.unitName ? { ...s, count: s.count + card.count } : s))
     : [...run.army, { unit, count: card.count }];
-  return { ...run, army, pendingDraft: null, pendingItems: null, status: 'map' };
+  // Item-offer drafts grant one of each; the draft holds until both are taken.
+  return { ...run, army, pendingDraft: null, status: run.pendingItems ? 'draft' : 'map' };
 }
 
 export function applyItemPick(run: RunState, itemId: ItemId): RunState {
   return {
     ...run,
     items: [...run.items, itemId],
-    pendingDraft: null,
     pendingItems: null,
-    status: 'map',
+    status: run.pendingDraft ? 'draft' : 'map',
   };
 }
 
