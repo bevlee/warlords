@@ -6,10 +6,12 @@ import {
   generateGauntletEnemy,
   draftOptions,
   applyPick,
+  applyItemPick,
   recordBattle,
   survivorsFrom,
   mixSeed,
 } from '../run';
+import { itemDraftOptions } from '../items';
 import { armyCost, UNIT_COSTS } from '../../engine/recruit';
 import { FACTION_UNITS } from '../../engine/factions';
 import type { UnitStack } from '../../engine/types';
@@ -135,6 +137,42 @@ describe('gauntlet run', () => {
     const next2 = recordBattle(next, true, next.army);
     expect(next2.endlessDepth).toBe(2);
     expect(next2.encounterIndex).toBe(12);
+  });
+
+  it('recordBattle offers items on every 3rd win, units-only otherwise', () => {
+    let run = newRun('barbarian', 9);
+    for (let i = 1; i <= 6; i++) {
+      run = recordBattle(run, true, run.army);
+      if (i % 3 === 0) {
+        expect(run.pendingItems).toHaveLength(2);
+      } else {
+        expect(run.pendingItems).toBeNull();
+      }
+      run = applyPick(run, run.pendingDraft![0]);
+    }
+  });
+
+  it('applyItemPick adds the item to the run and returns to the map', () => {
+    let run = { ...newRun('barbarian', 9), battlesWon: 3 };
+    run = { ...run, status: 'draft' as const, pendingDraft: draftOptions(run), pendingItems: itemDraftOptions(run) };
+
+    const next = applyItemPick(run, run.pendingItems![0]);
+
+    expect(next.items).toEqual([run.pendingItems![0]]);
+    expect(next.status).toBe('map');
+    expect(next.pendingDraft).toBeNull();
+    expect(next.pendingItems).toBeNull();
+    expect(next.army).toEqual(run.army); // no unit was taken
+  });
+
+  it('applyPick (unit) clears a pending item offer too', () => {
+    let run = { ...newRun('barbarian', 9), battlesWon: 3 };
+    run = { ...run, status: 'draft' as const, pendingDraft: draftOptions(run), pendingItems: itemDraftOptions(run) };
+
+    const next = applyPick(run, run.pendingDraft![0]);
+
+    expect(next.pendingItems).toBeNull();
+    expect(next.items).toEqual([]);
   });
 
   it('survivorsFrom keeps living player stacks, drops the hero and the dead', () => {

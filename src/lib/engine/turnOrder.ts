@@ -1,8 +1,9 @@
 import type { BattleState, UnitStack } from './types';
 
-/** ATB fill rate in scale-units per round; initiative 10 = one turn per round. */
+/** ATB fill rate in scale-units per round; initiative 10 = one turn per round.
+ *  Floored at 1 so a stacked penalty can never freeze a unit entirely. */
 function rate(unit: UnitStack): number {
-  return unit.definition.initiative / 10;
+  return Math.max(1, unit.definition.initiative + (unit.initiativeBonus ?? 0)) / 10;
 }
 
 /** Time in rounds until the stack reaches the act point (atb = 1). */

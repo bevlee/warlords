@@ -10,3 +10,15 @@ export function mulberry32(seed: number) {
 }
 
 export type Rng = () => number;
+
+/** Hash-mixes a run seed with a salt into a well-distributed 32-bit seed.
+ *  Unlike a linear combination (seed*a + salt*b), this doesn't collide for
+ *  seed/salt pairs a fixed offset apart — important since seeds are commonly
+ *  Date.now()-derived and close together across runs. */
+export function mixSeed(seed: number, salt: number): number {
+  let h = (seed | 0) ^ salt;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = h ^ (h >>> 16);
+  return h;
+}

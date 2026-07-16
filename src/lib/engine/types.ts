@@ -33,6 +33,7 @@ export interface UnitStack {
   isAlly?: boolean;    // summoned ally stack: fights on the player side, AI-controlled
   attackBuff?: number;  // battle-long spell bonus to attack
   defenseBuff?: number; // battle-long spell bonus to defense
+  initiativeBonus?: number; // battle-long flat bonus to ATB fill rate (gauntlet items)
   lastMovedFrom?: Pos;  // set when a unit moves this turn; cleared at round start (Knight jousting)
   speedBonus?: number;        // battle-long movement bonus (Ranger Logistics), set once at battle start
   speedPenalty?: number;      // temporary movement reduction (Zombie slow_on_hit); cleared at round start
@@ -81,6 +82,15 @@ export type SpellId = 'lightning' | 'bloodlust' | 'stoneskin';
 export interface ArmySlot {
   unit: UnitDef;
   count: number;
+}
+
+/** Army-wide flat stat bonuses (gauntlet items) applied to player stacks at battle start. */
+export interface ArmyBonuses {
+  attack: number;
+  defense: number;
+  initiative: number;
+  luck: number;
+  morale: number;
 }
 
 export type BattleEventType =

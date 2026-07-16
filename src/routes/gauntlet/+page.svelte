@@ -4,10 +4,12 @@
   import Sprite from '$lib/ui/Sprite.svelte';
   import { FACTION_INFO, FACTION_UNITS } from '$lib/engine/factions';
   import { armyCost } from '$lib/engine/recruit';
+  import { ITEMS, itemBonuses, itemEffectText, type ItemId } from '$lib/gauntlet/items';
   import {
     newRun,
     recordBattle,
     applyPick,
+    applyItemPick,
     generateGauntletEnemy,
     survivorsFrom,
     encounterBudget,
@@ -35,7 +37,9 @@
   let loaded = $state(false);
 
   onMount(async () => {
-    run = await loadRun<RunState>();
+    const saved = await loadRun<RunState>();
+    // Saves from before the items feature lack these fields.
+    run = saved ? { ...saved, items: saved.items ?? [], pendingItems: saved.pendingItems ?? null } : null;
     loaded = true;
   });
 
@@ -62,6 +66,18 @@
     run = applyPick(run, card);
     void saveRun(run);
   }
+
+  function pickItem(id: ItemId) {
+    if (!run) return;
+    run = applyItemPick(run, id);
+    void saveRun(run);
+  }
+
+  const RARITY_STYLE = {
+    common: { border: 'border-slate-500', text: 'text-slate-200', label: 'Common' },
+    rare: { border: 'border-sky-400', text: 'text-sky-300', label: 'Rare' },
+    epic: { border: 'border-purple-400', text: 'text-purple-300', label: 'Epic' },
+  } as const;
 
   async function abandon() {
     run = null;
@@ -110,6 +126,7 @@
         playerArmy={run.army}
         enemyArmy={encounter?.army ?? []}
         hero={run.hero}
+        armyBonuses={itemBonuses(run.items)}
         allowRestart={false}
         exitLabel="Continue"
         onexit={() => (inBattle = false)}
@@ -144,6 +161,27 @@
           </button>
         {/each}
       </div>
+      {#if run.pendingItems?.length}
+        <h3 class="mb-2 mt-5 text-sm font-semibold uppercase tracking-wide text-purple-300">
+          …or claim an artifact (buffs your whole army, every battle)
+        </h3>
+        <div class="grid grid-cols-2 gap-3">
+          {#each run.pendingItems as id (id)}
+            {@const item = ITEMS[id]}
+            {@const rs = RARITY_STYLE[item.rarity]}
+            <button
+              type="button"
+              class="flex flex-col items-center gap-1 rounded-lg border-2 bg-slate-800 p-4
+                hover:bg-slate-700 hover:brightness-110 {rs.border}"
+              onclick={() => pickItem(id)}
+            >
+              <span class="font-bold {rs.text}">{item.name}</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
+              <span class="font-mono text-xs text-amber-200">{itemEffectText(item)}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
       <div class="mt-4 rounded border border-slate-700 bg-slate-800 p-2 text-sm text-slate-300">
         Your army: {run.army.map(s => `${s.count}× ${s.unit.name}`).join(' · ')}
       </div>
@@ -218,6 +256,16 @@
     <span class="font-mono text-[10px] text-amber-300">{skill.level}</span>
   </div>
 {/each}
+          {#if run.items.length > 0}
+            <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Artifacts</p>
+            {#each run.items as id (id)}
+              {@const item = ITEMS[id]}
+              <div class="flex items-center justify-between gap-2 py-0.5" title={itemEffectText(item)}>
+                <span class="text-xs {RARITY_STYLE[item.rarity].text}">{item.name}</span>
+                <span class="font-mono text-[10px] text-amber-300">{itemEffectText(item)}</span>
+              </div>
+            {/each}
+          {/if}
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Army ({armyCost(run.army)} power)</p>
           {#each run.army as slot (slot.unit.name)}
             {@const ts = TIER_STYLE[slot.unit.tier]}

@@ -12,6 +12,7 @@
     damagePreview,
   } from '$lib/engine/selectors';
   import type {
+    ArmyBonuses,
     ArmySlot,
     BattleEvent,
     BattleState,
@@ -35,6 +36,7 @@
     onresult?: (result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[]) => void;
     allowRestart?: boolean;
     exitLabel?: string;
+    armyBonuses?: ArmyBonuses;
   }
 
   let {
@@ -45,6 +47,7 @@
     onresult,
     allowRestart = true,
     exitLabel = 'Change army',
+    armyBonuses,
   }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
@@ -54,7 +57,7 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero));
+  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
 
   // Incremental reveal: an action's sub-events (hit, retaliate, death) play
   // as separate beats. While a sequence runs, `animating` locks player input
@@ -356,7 +359,7 @@
     dyingIds = new Set();
     pendingSpell = null;
     resultAnnounced = false;
-    battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
+    battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
   }
 
   function unitLabel(id: unknown): string {

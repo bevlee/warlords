@@ -60,7 +60,7 @@
       { key: 'defense', value: `${d.defense + (unit.defenseBuff ?? 0)}`, buff: unit.defenseBuff ?? 0 },
       { key: 'damage', value: `${d.minDamage}–${d.maxDamage}` },
       { key: 'speed', value: `${d.speed}` },
-      { key: 'initiative', value: `${d.initiative}` },
+      { key: 'initiative', value: `${d.initiative + (unit.initiativeBonus ?? 0)}`, buff: unit.initiativeBonus ?? 0 },
       { key: 'morale', value: `${unit.morale}` },
       { key: 'luck', value: `${unit.luck}` },
       { key: 'range', value: d.range > 0 ? `${d.range}` : '—' },

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, UnitStack } from './types';
+import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, UnitStack } from './types';
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat';
@@ -182,12 +182,15 @@ function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, co
   };
 }
 
+const clampProc = (v: number) => Math.max(-3, Math.min(3, v));
+
 export function initBattle(
   playerArmy: ArmySlot[],
   enemyArmy: ArmySlot[],
   hero: Hero,
   seed = Date.now(),
-  allyArmy: ArmySlot[] = []
+  allyArmy: ArmySlot[] = [],
+  armyBonuses?: ArmyBonuses
 ): BattleState {
   let grid = createGrid(GRID_W, GRID_H);
 
@@ -200,6 +203,16 @@ export function initBattle(
     if (moraleBonus > 0) stack = { ...stack, morale: stack.morale + moraleBonus };
     if (logisticsBonus > 0) stack = { ...stack, speedBonus: logisticsBonus };
     if (luckBonus > 0) stack = { ...stack, luck: stack.luck + luckBonus };
+    if (armyBonuses) {
+      stack = {
+        ...stack,
+        attackBuff: (stack.attackBuff ?? 0) + armyBonuses.attack,
+        defenseBuff: (stack.defenseBuff ?? 0) + armyBonuses.defense,
+        initiativeBonus: armyBonuses.initiative,
+        morale: clampProc(stack.morale + armyBonuses.morale),
+        luck: clampProc(stack.luck + armyBonuses.luck),
+      };
+    }
     return stack;
   });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
