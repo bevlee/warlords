@@ -22,6 +22,7 @@
   } from '$lib/gauntlet/run';
   import { loadRun, saveRun, clearRun } from '$lib/storage';
   import { TIER_STYLE } from '$lib/ui/tierStyle';
+  import { abilityInfo } from '$lib/ui/abilities';
   import type { FactionClass, UnitStack } from '$lib/engine/types';
 
   const ACT_NAMES: Record<1 | 2 | 3, string> = {
@@ -160,9 +161,22 @@
               <span class="text-[10px] font-semibold uppercase tracking-wider {ts.text}">
                 Tier {unit.tier} · {ts.label}
               </span>
-              <span class="font-mono text-[10px] text-slate-400">
-                HP {unit.hp} · Atk {unit.attack} · Def {unit.defense} · Spd {unit.speed}
+              <span class="font-mono text-[10px] leading-tight text-slate-400">
+                HP {unit.hp} · Atk {unit.attack} · Def {unit.defense}<br />
+                Dmg {unit.minDamage}–{unit.maxDamage} · Spd {unit.speed} · Init {unit.initiative}
+                {#if unit.shots > 0}<br />🏹 {unit.shots} shots, range {unit.range}{/if}
               </span>
+              {#if unit.abilities.length > 0}
+                <span class="flex flex-col gap-0.5 text-left">
+                  {#each unit.abilities as ability (ability)}
+                    {@const info = abilityInfo(ability)}
+                    <span class="text-[10px] leading-tight" title={info.description}>
+                      <span class="font-semibold text-amber-300">{info.label}</span>
+                      <span class="text-slate-400"> — {info.description}</span>
+                    </span>
+                  {/each}
+                </span>
+              {/if}
             {/if}
           </button>
         {/each}
