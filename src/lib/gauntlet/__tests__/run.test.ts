@@ -73,17 +73,18 @@ describe('gauntlet run', () => {
     expect(a.army.length).toBeGreaterThan(0);
   });
 
-  it('draftOptions offers 3 distinct own-faction unit cards, tier-gated by act', () => {
-    const run = { ...newRun('knight', 5), encounterIndex: 2 }; // act I
+  it('draftOptions offers distinct own-faction unit cards, tier-gated by node', () => {
+    const run = { ...newRun('knight', 5), encounterIndex: 2 }; // node 1-2: T1-T2
     const cards = draftOptions(run);
 
-    expect(cards).toHaveLength(3);
+    const poolSize = FACTION_UNITS.knight.filter(u => u.tier <= 2).length;
+    expect(cards).toHaveLength(Math.min(3, poolSize));
     const names = cards.map(c => c.unitName);
-    expect(new Set(names).size).toBe(3);
+    expect(new Set(names).size).toBe(cards.length);
     for (const c of cards) {
       const unit = FACTION_UNITS.knight.find(u => u.name === c.unitName)!;
       expect(unit).toBeTruthy();
-      expect(unit.tier).toBeLessThanOrEqual(3); // act I: T1–T3
+      expect(unit.tier).toBeLessThanOrEqual(2); // node 1-2: T1-T2
       expect(c.count).toBe(Math.max(1, Math.round(60 / UNIT_COSTS[c.unitName])));
     }
   });
@@ -112,13 +113,28 @@ describe('gauntlet run', () => {
     expect(next.encounterIndex).toBe(2);
     expect(next.army).toEqual(survivors); // losses persist
     expect(next.status).toBe('draft');
-    expect(next.pendingDraft).toHaveLength(3);
+    const poolSize = FACTION_UNITS.barbarian.filter(u => u.tier <= 2).length; // node 2: T1-T2
+    expect(next.pendingDraft).toHaveLength(Math.min(3, poolSize));
   });
 
-  it('recordBattle: winning encounter 10 ends the run; losing ends it anywhere', () => {
-    const run = { ...newRun('barbarian', 9), encounterIndex: 10 };
-    expect(recordBattle(run, true, run.army).status).toBe('won');
+  it('recordBattle: losing ends the run anywhere; winning never ends it', () => {
     expect(recordBattle(newRun('barbarian', 9), false, []).status).toBe('lost');
+    const run = { ...newRun('barbarian', 9), encounterIndex: 10 };
+    expect(recordBattle(run, true, run.army).status).not.toBe('won');
+  });
+
+  it('recordBattle past node 10 increments endlessDepth and keeps drafting', () => {
+    const run = { ...newRun('barbarian', 9), encounterIndex: 10 };
+    const next = recordBattle(run, true, run.army);
+
+    expect(next.status).not.toBe('won');
+    expect(next.status).toBe('draft');
+    expect(next.encounterIndex).toBe(11);
+    expect(next.endlessDepth).toBe(1);
+
+    const next2 = recordBattle(next, true, next.army);
+    expect(next2.endlessDepth).toBe(2);
+    expect(next2.encounterIndex).toBe(12);
   });
 
   it('survivorsFrom keeps living player stacks, drops the hero and the dead', () => {

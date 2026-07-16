@@ -24,6 +24,7 @@ export interface RunState {
   status: 'map' | 'draft' | 'won' | 'lost';
   battlesWon: number;
   startedAt: number;
+  endlessDepth: number;
 }
 
 export function actOf(n: number): 1 | 2 | 3 {
@@ -76,6 +77,7 @@ export function newRun(faction: FactionClass, seed = Date.now()): RunState {
     status: 'map',
     battlesWon: 0,
     startedAt: Date.now(),
+    endlessDepth: 0,
   };
 }
 
@@ -128,18 +130,15 @@ export function generateGauntletEnemy(run: RunState): GauntletEncounter {
   return { faction, budget, army: buildArmy(roster, budget, rng), isBoss: BOSS_NODES.has(n) };
 }
 
-const ACT_CARD_POWER: Record<1 | 2 | 3, number> = { 1: 60, 2: 110, 3: 170 };
-const ACT_TIERS: Record<1 | 2 | 3, [number, number]> = { 1: [1, 3], 2: [2, 5], 3: [4, 7] };
-
-/** Three distinct own-faction unit cards, tier-gated by act. */
+/** Three distinct own-faction unit cards, tier-gated by node progression. */
 export function draftOptions(run: RunState): UnitCard[] {
-  const act = actOf(run.encounterIndex);
-  const [lo, hi] = ACT_TIERS[act];
-  const power = ACT_CARD_POWER[act];
+  const node = run.encounterIndex;
+  const maxTier = node <= 2 ? 2 : node <= 5 ? 3 : node <= 8 ? 5 : 7;
+  const power = node <= 3 ? 60 : node <= 7 ? 110 : 170;
   const atCap = run.army.length >= MAX_STACKS;
   const ownNames = new Set(run.army.map(s => s.unit.name));
 
-  let pool = FACTION_UNITS[run.faction].filter(u => u.tier >= lo && u.tier <= hi);
+  let pool = FACTION_UNITS[run.faction].filter(u => u.tier >= 1 && u.tier <= maxTier);
   if (atCap) {
     const owned = pool.filter(u => ownNames.has(u.name));
     if (owned.length >= 1) pool = owned;
@@ -188,9 +187,9 @@ export function recordBattle(run: RunState, won: boolean, survivors: ArmySlot[])
     army: survivors,
     battlesWon: run.battlesWon + 1,
     encounterIndex: run.encounterIndex + 1,
+    endlessDepth: run.encounterIndex >= RUN_LENGTH ? run.endlessDepth + 1 : 0,
     pendingDraft: null,
     status: 'map',
   };
-  if (run.encounterIndex >= RUN_LENGTH) return { ...next, status: 'won' };
   return { ...next, status: 'draft', pendingDraft: draftOptions(next) };
 }
