@@ -281,7 +281,7 @@
     {stepMs}
     steps={activeSteps
       .filter(({ step }) => step.kind !== 'move' && step.kind !== 'strike')
-      .map(({ unitId, step }) => {
+      .map(({ unitId, step }): { step: AnimStep; pos: Pos; fromPos?: Pos; art?: 'arrow' | 'bolt'; key: string } | null => {
         const key = `${unitId}-${step.kind}-${battleState.log.length}`;
         if (step.kind === 'projectile') {
           // Anchor at the target cell (always on-grid); the source only feeds
@@ -289,12 +289,12 @@
           const from = unitsById.get(unitId);
           const target = unitsById.get(step.targetId);
           if (!from || !target) return null;
-          return { step, pos: target.pos, fromPos: from.pos, art: from.isHero ? ('bolt' as const) : ('arrow' as const), key };
+          return { step, pos: target.pos, fromPos: from.pos, art: from.isHero ? 'bolt' : 'arrow', key };
         }
         const u = unitsById.get(unitId);
         return u ? { step, pos: u.pos, key } : null;
       })
-      .filter((s): s is { step: AnimStep; pos: Pos; fromPos?: Pos; art?: 'arrow' | 'bolt'; key: string } => s !== null)}
+      .filter(s => s !== null)}
   />
 </div>
 </div>
