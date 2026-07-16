@@ -14,16 +14,20 @@ const STATUS_ICON: Partial<Record<string, string>> = {
 };
 
 export type AnimStep =
-  | { unitId: string; kind: 'damage'; value: number }
-  | { unitId: string; kind: 'buff'; value: number; label: string }
+  | { unitId: string; kind: 'damage'; value: number; delayed?: boolean }
+  | { unitId: string; kind: 'buff'; value: number; label: string; delayed?: boolean }
   | { unitId: string; kind: 'death' }
   | { unitId: string; kind: 'status'; icon: string }
   | { unitId: string; kind: 'move'; from: Pos; to: Pos }
   // Melee lunge: the attacker bumps into the target and springs back.
-  // Future combat animations (projectiles, cast flashes, sprite sheets)
-  // should follow this pattern: a new kind here, resolved visually in
-  // BattleGrid/BattleFx by unit id at beat time.
-  | { unitId: string; kind: 'strike'; targetId: string };
+  // Future combat animations (cast flashes, sprite sheets) should follow
+  // this pattern: a new kind here, resolved visually in BattleGrid/BattleFx
+  // by unit id at beat time.
+  | { unitId: string; kind: 'strike'; targetId: string }
+  // Ranged shot: unitId is the shooter (or the off-grid hero); BattleGrid
+  // resolves both ids to positions at beat time. Anchored at the target cell,
+  // flight starts translated back at the source.
+  | { unitId: string; kind: 'projectile'; targetId: string };
 
 /** Translates one battle log entry into the visual steps it should play. */
 export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
@@ -37,8 +41,18 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       ];
     }
     case 'shoot': {
-      const { targetId, damage } = entry.data as { targetId: string; damage: number };
-      return [{ unitId: targetId, kind: 'damage', value: damage }];
+      const { attackerId, targetId, damage, splash } = entry.data as {
+        attackerId: string;
+        targetId: string;
+        damage: number;
+        splash?: boolean;
+      };
+      // Splash hits radiate from the primary impact — no second arrow.
+      if (splash) return [{ unitId: targetId, kind: 'damage', value: damage }];
+      return [
+        { unitId: attackerId, kind: 'projectile', targetId },
+        { unitId: targetId, kind: 'damage', value: damage, delayed: true },
+      ];
     }
     case 'cast': {
       const { targetId, damage, spell } = entry.data as {

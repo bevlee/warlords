@@ -65,13 +65,18 @@ describe('stepsFromLogEntry: damage', () => {
     ]);
   });
 
-  it('maps a shoot entry to damage only (no lunge; projectiles come later)', () => {
+  it('maps a shoot entry to a projectile from the attacker plus delayed damage on the target', () => {
     const entry: BattleEvent = {
       type: 'shoot',
-      data: { attackerId: 'a1', targetId: 't1', damage: 9, killed: 0 },
+      data: { attackerId: 'a1', targetId: 't1', damage: 5, killed: 0 },
     };
 
-    expect(stepsFromLogEntry(entry)).toEqual([{ unitId: 't1', kind: 'damage', value: 9 }]);
+    const steps = stepsFromLogEntry(entry);
+
+    expect(steps).toEqual([
+      { unitId: 'a1', kind: 'projectile', targetId: 't1' },
+      { unitId: 't1', kind: 'damage', value: 5, delayed: true },
+    ]);
   });
 
   it('maps a shoot entry with splash to a damage step keyed on its own target', () => {
