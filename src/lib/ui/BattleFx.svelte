@@ -5,10 +5,18 @@
   interface Props {
     gridWidth: number;
     gridHeight: number;
-    steps: { step: AnimStep; pos: Pos; key: string }[];
+    /** Beat length — flight/flash durations and text delays derive from it. */
+    stepMs: number;
+    steps: {
+      step: AnimStep;
+      pos: Pos;               // anchor cell (target for projectiles)
+      fromPos?: Pos;          // projectile launch cell (may be off-grid: hero col -2)
+      art?: 'arrow' | 'bolt'; // projectile look: archer arrow vs hero bolt
+      key: string;
+    }[];
   }
 
-  let { gridWidth, gridHeight, steps }: Props = $props();
+  let { gridWidth, gridHeight, stepMs, steps }: Props = $props();
 </script>
 
 <div
