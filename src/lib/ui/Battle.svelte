@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { initBattle, applyAction, spellPreview, SPELLS } from '$lib/engine/battle';
+  import { initBattle, applyAction, spellPreview, getSpellDef } from '$lib/engine/battle';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
@@ -149,20 +149,19 @@
 
   const isHeroTurn = $derived(isPlayerTurn && !!activeUnit?.isHero);
 
-  const SPELL_META: Record<SpellId, { glyph: string; label: string }> = {
-    lightning: { glyph: '⚡', label: 'Lightning' },
-    bloodlust: { glyph: '💪', label: 'Bloodlust' },
-    stoneskin: { glyph: '🗿', label: 'Stoneskin' },
-  };
-
   // Spell targeting: pick a spell on the hero's turn, then click a stack.
+  // Per-spell canTarget rules (e.g. Raise Dead's damaged-undead-only) filter here too.
   let pendingSpell: SpellId | null = $state(null);
   const spellTargetIds = $derived.by(() => {
     if (!pendingSpell || !isHeroTurn) return null;
-    const friendly = SPELLS[pendingSpell].friendly;
+    const def = getSpellDef(pendingSpell)!;
+    const friendly = def.target === 'friendly';
     return new Set(
       battle.units
-        .filter(u => u.count > 0 && !u.isHero && (friendly ? u.side === 'player' : u.side === 'enemy'))
+        .filter(u =>
+          u.count > 0 && !u.isHero &&
+          (friendly ? u.side === 'player' : u.side === 'enemy') &&
+          (!def.canTarget || def.canTarget(battle.hero, u)))
         .map(u => u.id)
     );
   });
@@ -382,10 +381,16 @@
         return `${unitLabel(d.unitId)} move to (${(d.to as Pos).col}, ${(d.to as Pos).row}).`;
       case 'defend':
         return `${unitLabel(d.unitId)} brace for defense.`;
-      case 'cast':
-        return d.spell === 'lightning'
-          ? `Your hero casts Lightning at ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`
-          : `Your hero casts ${SPELL_META[d.spell as SpellId].label} on ${unitLabel(d.targetId)}.`;
+      case 'cast': {
+        const name = getSpellDef(d.spell as SpellId)?.name ?? String(d.spell);
+        if (d.damage !== undefined) {
+          return `Your hero casts ${name} at ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}${d.splash ? ' (splash)' : ''}.`;
+        }
+        if (d.healed !== undefined) {
+          return `Your hero casts ${name} on ${unitLabel(d.targetId)}, restoring ${d.healed} HP${(d.revived as number) > 0 ? ` and reviving ${d.revived}` : ''}.`;
+        }
+        return `Your hero casts ${name} on ${unitLabel(d.targetId)}.`;
+      }
       case 'attack':
         return `${unitLabel(d.attackerId)} strike ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
       case 'retaliate':
@@ -431,8 +436,8 @@
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
     if (pendingSpell) {
-      const friendly = SPELLS[pendingSpell].friendly;
-      return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
+      const def = getSpellDef(pendingSpell)!;
+      return `Casting ${def.name} — click ${def.target === 'friendly' ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
     }
     if (isPlayerTurn && activeUnit.isHero) {
       return 'Your hero\'s turn — click any enemy to strike, or cast a spell.';

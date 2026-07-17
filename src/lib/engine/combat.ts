@@ -131,6 +131,37 @@ export function applyDamage(defender: UnitStack, damage: number): DamageResult {
 }
 
 /**
+ * Inverse of applyDamage: pours healHp into a living stack — first topping up
+ * the top creature, then reviving whole creatures at full HP — capped at the
+ * stack's battle-start count (startCount). Dead stacks stay dead.
+ */
+export function reviveHeal(
+  stack: UnitStack,
+  healHp: number
+): { healed: number; revived: number; remaining: UnitStack } {
+  if (stack.count <= 0 || healHp <= 0) return { healed: 0, revived: 0, remaining: stack };
+
+  const fullHp = stack.definition.hp;
+  const maxCount = Math.max(stack.count, stack.startCount ?? stack.count);
+  let pool = healHp;
+  let hp = stack.hp;
+  let count = stack.count;
+
+  const topHeal = Math.min(pool, fullHp - hp);
+  hp += topHeal;
+  pool -= topHeal;
+
+  let revived = 0;
+  while (count < maxCount && pool >= fullHp) {
+    count += 1;
+    revived += 1;
+    pool -= fullHp;
+  }
+
+  return { healed: healHp - pool, revived, remaining: { ...stack, hp, count } };
+}
+
+/**
  * Whether `defender` can retaliate against `attacker`'s hit.
  * Two independent abilities gate this: the defender's own `no_retaliation`
  * (it never retaliates, regardless of who hit it) and the attacker's

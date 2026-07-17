@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Hero, SpellId } from '$lib/engine/types';
-  import { SPELLS, lightningDamage } from '$lib/engine/battle';
+  import { getKnownSpells, SPELL_DEFS } from '$lib/engine/spells';
   import { maxMana } from '$lib/engine/factionSkills';
 
   interface Props {
@@ -12,52 +12,13 @@
   let { hero, onpick, onclose }: Props = $props();
 
   const mana = $derived(hero.mana ?? 0);
-
-  interface SpellEntry {
-    id: SpellId;
-    glyph: string;
-    label: string;
-    target: string;
-    effect: string;
-    tooltip: string;
-    ring: string;
-  }
-
-  const entries: SpellEntry[] = $derived([
-    {
-      id: 'lightning' as SpellId,
-      glyph: '⚡',
-      label: 'Lightning',
-      target: 'Enemy stack',
-      effect: `${lightningDamage(hero.level)} true damage`,
-      tooltip:
-        `A bolt of raw lightning strikes one enemy stack for ${lightningDamage(hero.level)} damage ` +
-        `(12 + 8 × hero level). True damage: ignores attack, defense, and buffs. No retaliation.`,
-      ring: 'ring-sky-400 bg-sky-100',
-    },
-    {
-      id: 'bloodlust' as SpellId,
-      glyph: '💪',
-      label: 'Bloodlust',
-      target: 'Friendly stack',
-      effect: '+4 attack',
-      tooltip:
-        'Fills a friendly stack with battle fury: +4 attack for the rest of the battle. ' +
-        'Casting it again on the same stack adds another +4.',
-      ring: 'ring-red-400 bg-red-100',
-    },
-    {
-      id: 'stoneskin' as SpellId,
-      glyph: '🗿',
-      label: 'Stoneskin',
-      target: 'Friendly stack',
-      effect: '+4 defense',
-      tooltip:
-        'Turns a friendly stack’s skin to granite: +4 defense for the rest of the battle. ' +
-        'Casting it again on the same stack adds another +4.',
-      ring: 'ring-stone-400 bg-stone-200',
-    },
-  ]);
+  const known = $derived(getKnownSpells(hero));
+  // The faction's unique spell, shown locked until its unlock level.
+  const locked = $derived(
+    Object.values(SPELL_DEFS).filter(
+      d => d.factions !== 'all' && d.factions.includes(hero.class) && hero.level < d.unlockLevel
+    )
+  );
 </script>
 
 <!-- Backdrop: click anywhere outside the book to close. -->
@@ -75,24 +36,24 @@
   >
     <!-- Open pages -->
     <div class="book-pages relative grid grid-cols-2 rounded-lg">
-      {#each entries as s, i (s.id)}
-        {@const affordable = mana >= SPELLS[s.id].cost}
+      {#each known as s, i (s.id)}
+        {@const affordable = mana >= s.cost}
         <div class="group relative flex flex-col items-center px-6 py-5 {i % 2 === 0 ? 'page-left' : 'page-right'}">
           <button
             type="button"
             class="relative flex h-16 w-16 items-center justify-center rounded-full text-3xl shadow-md ring-4
               transition {s.ring}
               {affordable ? 'hover:scale-110 hover:shadow-lg' : 'cursor-not-allowed opacity-40 grayscale'}"
-            aria-label="Cast {s.label}"
+            aria-label="Cast {s.name}"
             disabled={!affordable}
             onclick={() => onpick(s.id)}
           >
             {s.glyph}
           </button>
-          <p class="mt-2 text-sm font-bold text-stone-800">{s.label}</p>
-          <p class="font-mono text-[11px] leading-tight text-stone-600">Mana: {SPELLS[s.id].cost}</p>
-          <p class="font-mono text-[11px] leading-tight text-stone-600">{s.effect}</p>
-          <p class="text-[10px] italic leading-tight text-stone-500">{s.target}</p>
+          <p class="mt-2 text-sm font-bold text-stone-800">{s.name}</p>
+          <p class="font-mono text-[11px] leading-tight text-stone-600">Mana: {s.cost}</p>
+          <p class="font-mono text-[11px] leading-tight text-stone-600">{s.effectLine(hero)}</p>
+          <p class="text-[10px] italic leading-tight text-stone-500">{s.targetHint}</p>
 
           <!-- Tooltip -->
           <div
@@ -101,16 +62,32 @@
               opacity-0 shadow-xl transition-opacity group-hover:opacity-100"
             role="tooltip"
           >
-            <p class="mb-1 font-bold text-amber-300">{s.label} — {SPELLS[s.id].cost} mana</p>
-            {s.tooltip}
+            <p class="mb-1 font-bold text-amber-300">{s.name} — {s.cost} mana</p>
+            {s.description(hero)}
             {#if !affordable}
               <p class="mt-1 font-semibold text-red-400">Not enough mana.</p>
             {/if}
           </div>
         </div>
       {/each}
+
+      <!-- The faction's unique spell teases its unlock level until earned. -->
+      {#each locked as s, i (s.id)}
+        <div class="relative flex flex-col items-center px-6 py-5 {(known.length + i) % 2 === 0 ? 'page-left' : 'page-right'}">
+          <div
+            class="flex h-16 w-16 items-center justify-center rounded-full text-3xl shadow-inner ring-4
+              ring-stone-400 bg-stone-300 opacity-50 grayscale"
+            aria-label="{s.name} locked"
+          >
+            {s.glyph}
+          </div>
+          <p class="mt-2 text-sm font-bold text-stone-500">{s.name}</p>
+          <p class="font-mono text-[11px] leading-tight text-stone-500">🔒 Unlocks at level {s.unlockLevel}</p>
+        </div>
+      {/each}
+
       <!-- pad the last page cell so both pages have equal height -->
-      {#if entries.length % 2 === 1}
+      {#if (known.length + locked.length) % 2 === 1}
         <div class="page-right"></div>
       {/if}
     </div>

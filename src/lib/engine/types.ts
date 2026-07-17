@@ -40,6 +40,7 @@ export interface UnitStack {
   burnDamage?: number;        // flat damage applied at the start of this stack's turn while burnRoundsLeft > 0
   burnRoundsLeft?: number;    // remaining turns of burn damage (Efreet)
   boundUntilRound?: number;   // set on bind proc; blocks movement on this stack's next turn, then clears
+  startCount?: number;        // battle-start creature count: the ceiling for heals/revivals
 }
 
 export interface Cell {
@@ -78,7 +79,14 @@ export interface Hero {
   unitAugments?: Record<string, string[]>; // unit name -> augment ids, max 2 per unit
 }
 
-export type SpellId = 'lightning' | 'bloodlust' | 'stoneskin';
+export type SpellId =
+  | 'lightning' | 'bloodlust' | 'stoneskin'          // shared
+  | 'battle_cry'                                     // barbarian
+  | 'healing_light'                                  // knight
+  | 'fireball'                                       // wizard
+  | 'raise_dead'                                     // necromancer
+  | 'wasp_swarm'                                     // ranger
+  | 'immolate';                                      // demon
 
 export interface ArmySlot {
   unit: UnitDef;

@@ -15,3 +15,4 @@ export * from './progression';
 export * from './factionSkills';
 export * from './augments';
 export * from './deploy';
+export * from './spells';

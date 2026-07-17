@@ -15,7 +15,6 @@ import {
   getMoraleBonus,
   getLogisticsBonus,
   getNatureLuckBonus,
-  getSorceryMultiplier,
   getMysticismRegen,
   maxMana,
 } from './factionSkills';
@@ -29,6 +28,7 @@ import {
   validateDeployment,
   type Deployment,
 } from './deploy';
+import { getKnownSpells, getSpellDef } from './spells';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
  *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon
@@ -149,23 +149,13 @@ function handleDeath(s: BattleState, dead: UnitStack, rng: Rng): BattleState {
   return { ...next, grid: setOccupant(next.grid, dead.pos, null) };
 }
 
-export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
-  lightning: { cost: 3, friendly: false },
-  bloodlust: { cost: 2, friendly: true },
-  stoneskin: { cost: 2, friendly: true },
-};
+// The spell registry lives in spells.ts; re-exported here for existing callers.
+export { SPELLS, lightningDamage, getKnownSpells, getSpellDef } from './spells';
 
-/** Lightning is true damage: flat, level-scaled, ignores attack/defense. */
-export function lightningDamage(level: number): number {
-  return 12 + 8 * level;
-}
-
-/** Forecast for the spell-aiming tooltip: Lightning's exact true damage; null for buffs. */
+/** Forecast for the spell-aiming tooltip: exact damage for damage spells; null for buffs. */
 export function spellPreview(hero: Hero, spell: SpellId, target: UnitStack): DamagePreview | null {
-  if (SPELLS[spell].friendly) return null;
-  const damage = Math.round(lightningDamage(hero.level) * getSorceryMultiplier(hero));
-  const { killed } = applyDamage(target, damage);
-  return { min: damage, max: damage, killsMin: killed, killsMax: killed };
+  const def = getSpellDef(spell);
+  return def?.preview ? (def.preview(hero, target) ?? null) : null;
 }
 
 function deploymentToStack(d: Deployment, side: 'player' | 'enemy'): UnitStack {
@@ -182,6 +172,7 @@ function deploymentToStack(d: Deployment, side: 'player' | 'enemy'): UnitStack {
     luck: 0,
     atb: 0,
     isDefending: false,
+    startCount: d.count, // ceiling for Healing Light / Raise Dead
   };
 }
 
@@ -340,16 +331,18 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
   // Invalid casts are rejected outright: turn is kept, nothing changes.
   if (action.type === 'cast') {
-    const spell = SPELLS[action.spell];
+    const def = getSpellDef(action.spell);
     const target = s.units.find(u => u.id === action.targetId);
     if (
       !actor.isHero ||
-      !spell ||
-      (s.hero.mana ?? 0) < spell.cost ||
+      !def ||
+      !getKnownSpells(s.hero).some(d => d.id === def.id) ||
+      (s.hero.mana ?? 0) < def.cost ||
       !target ||
       target.count === 0 ||
       target.isHero ||
-      (spell.friendly ? target.side !== actor.side : target.side === actor.side)
+      (def.target === 'friendly' ? target.side !== actor.side : target.side === actor.side) ||
+      (def.canTarget && !def.canTarget(s.hero, target))
     ) {
       return state;
     }
@@ -363,28 +356,19 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   }
 
   if (action.type === 'cast') {
-    const spell = SPELLS[action.spell];
-    const targetIdx = s.units.findIndex(u => u.id === action.targetId);
-    const target = s.units[targetIdx];
+    const def = getSpellDef(action.spell)!;
+    const countsBefore = new Map(s.units.map(u => [u.id, u.count]));
 
-    if (action.spell === 'lightning') {
-      const damage = Math.round(lightningDamage(s.hero.level) * getSorceryMultiplier(s.hero));
-      const { killed, remaining } = applyDamage(target, damage);
-      s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? remaining : u)) };
-      s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id, damage, killed } }];
-      if (remaining.count === 0) {
-        s = handleDeath(s, remaining, rng);
+    const { units, events } = def.resolve(s, actorId, action.targetId, rng);
+    s = { ...s, units, hero: { ...s.hero, mana: (s.hero.mana ?? 0) - def.cost } };
+    s.log = [...s.log, ...events];
+
+    // Settle any stacks the spell killed (splash can kill several).
+    for (const u of s.units) {
+      if (u.count === 0 && (countsBefore.get(u.id) ?? 0) > 0) {
+        s = handleDeath(s, u, rng);
       }
-    } else {
-      const buffed =
-        action.spell === 'bloodlust'
-          ? { ...target, attackBuff: (target.attackBuff ?? 0) + 4 }
-          : { ...target, defenseBuff: (target.defenseBuff ?? 0) + 4 };
-      s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? buffed : u)) };
-      s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id } }];
     }
-
-    s = { ...s, hero: { ...s.hero, mana: (s.hero.mana ?? 0) - spell.cost } };
 
   } else if (action.type === 'defend') {
     const newUnits = s.units.map((u, i) => (i === actorIdx ? { ...u, isDefending: true } : u));

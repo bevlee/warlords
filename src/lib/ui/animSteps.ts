@@ -41,16 +41,19 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       return [{ unitId: targetId, kind: 'damage', value: damage }];
     }
     case 'cast': {
-      const { targetId, damage, spell } = entry.data as {
+      const { targetId, damage, healed, spell } = entry.data as {
         targetId: string;
         damage?: number;
-        spell: 'lightning' | 'bloodlust' | 'stoneskin';
+        healed?: number;
+        spell: string;
       };
       if (damage !== undefined) {
         return [{ unitId: targetId, kind: 'damage', value: damage }];
       }
+      if (healed !== undefined) return [{ unitId: targetId, kind: 'buff', value: healed, label: 'HP' }];
       if (spell === 'bloodlust') return [{ unitId: targetId, kind: 'buff', value: 4, label: 'ATK' }];
       if (spell === 'stoneskin') return [{ unitId: targetId, kind: 'buff', value: 4, label: 'DEF' }];
+      if (spell === 'battle_cry') return [{ unitId: targetId, kind: 'buff', value: 2, label: 'ATK' }];
       return [];
     }
     case 'death': {
@@ -118,11 +121,13 @@ export function applyLogEntry(state: BattleState, entry: BattleEvent): BattleSta
       const { targetId, damage, spell } = entry.data as {
         targetId: string;
         damage?: number;
-        spell: 'lightning' | 'bloodlust' | 'stoneskin';
+        spell: string;
       };
       if (damage !== undefined) return patchUnit(targetId, u => applyDamage(u, damage).remaining);
       if (spell === 'bloodlust') return patchUnit(targetId, u => ({ ...u, attackBuff: (u.attackBuff ?? 0) + 4 }));
       if (spell === 'stoneskin') return patchUnit(targetId, u => ({ ...u, defenseBuff: (u.defenseBuff ?? 0) + 4 }));
+      // Heals/army buffs: skip the beat-level patch; the engine's final state
+      // corrects everything after the last entry plays.
       return state;
     }
     default:
