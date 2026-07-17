@@ -28,6 +28,9 @@ export type AnimStep =
   // resolves both ids to positions at beat time. Anchored at the target cell,
   // flight starts translated back at the source.
   | { unitId: string; kind: 'projectile'; targetId: string }
+  // Hit reaction: the target flinches away from the attack direction.
+  // `delayed` waits for the projectile flight before flinching (ranged).
+  | { unitId: string; kind: 'recoil'; fromId: string; delayed?: boolean }
   // Cast visual at the target cell: lightning bolt flash or buff glow.
   | { unitId: string; kind: 'spell_fx'; spell: 'lightning' | 'bloodlust' | 'stoneskin' };
 
@@ -50,6 +53,7 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       const { attackerId, targetId, damage, killed } = entry.data as { attackerId: string; targetId: string; damage: number; killed?: number };
       return [
         { unitId: attackerId, kind: 'strike', targetId },
+        { unitId: targetId, kind: 'recoil', fromId: attackerId },
         dmgStep(targetId, damage, killed),
       ];
     }
@@ -65,6 +69,7 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       if (splash) return [dmgStep(targetId, damage, killed)];
       return [
         { unitId: attackerId, kind: 'projectile', targetId },
+        { unitId: targetId, kind: 'recoil', fromId: attackerId, delayed: true },
         dmgStep(targetId, damage, killed, true),
       ];
     }

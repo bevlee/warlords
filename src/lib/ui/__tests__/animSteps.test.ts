@@ -49,6 +49,7 @@ describe('stepsFromLogEntry: damage', () => {
 
     expect(steps).toEqual([
       { unitId: 'a1', kind: 'strike', targetId: 't1' },
+      { unitId: 't1', kind: 'recoil', fromId: 'a1' },
       { unitId: 't1', kind: 'damage', value: 7 },
     ]);
   });
@@ -83,6 +84,7 @@ describe('stepsFromLogEntry: damage', () => {
 
     expect(stepsFromLogEntry(entry)).toEqual([
       { unitId: 't1', kind: 'strike', targetId: 'a1' },
+      { unitId: 'a1', kind: 'recoil', fromId: 't1' },
       { unitId: 'a1', kind: 'damage', value: 4 },
     ]);
   });
@@ -97,11 +99,12 @@ describe('stepsFromLogEntry: damage', () => {
 
     expect(steps).toEqual([
       { unitId: 'a1', kind: 'projectile', targetId: 't1' },
+      { unitId: 't1', kind: 'recoil', fromId: 'a1', delayed: true },
       { unitId: 't1', kind: 'damage', value: 5, delayed: true },
     ]);
   });
 
-  it('maps a shoot entry with splash to a damage step keyed on its own target', () => {
+  it('maps a shoot entry with splash to a damage step only — no recoil, no second arrow', () => {
     const entry: BattleEvent = {
       type: 'shoot',
       data: { attackerId: 'a1', targetId: 't2', damage: 3, killed: 0, splash: true },
