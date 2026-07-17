@@ -76,15 +76,12 @@
 
   const STEP_DELAY_MS = $derived({ slow: 700, normal: 450, fast: 200 }[battleSpeed]);
 
-  // A beat's CSS outlives its beat: the floating damage/status text runs 0.9s
-  // and the death fade 0.6s, against a 200–700ms beat. Mid-sequence that's
-  // fine — the next beat's delay gives it room to finish. The last beat has no
-  // next, so clearing straight after it cuts the animation off mid-flight;
-  // retaliations and deaths land last most often, which is why they were the
-  // ones that looked like they had no animation at all. Hold for the longest
-  // CSS before tearing the layer down. Not speed-scaled: the point is to let a
-  // fixed-duration animation finish.
-  const FX_TAIL_MS = 900;
+  // Hold after the last beat so its CSS can finish before teardown unmounts
+  // everything: floaters self-buffer inside BattleFx now (they survive beat
+  // swaps), but teardown clears that buffer and dyingIds, so the hold must
+  // cover the longest tail — the 1.1s death fade, or a ranged floater's
+  // flight delay (60% of a beat) plus its 0.9s float.
+  const fxTailMs = $derived(Math.max(1300, 900 + Math.round(STEP_DELAY_MS * 0.6)));
 
   async function revealAction(result: BattleState) {
     const token = ++revealToken;
@@ -104,7 +101,7 @@
     }
 
     if (activeSteps.length > 0 || dyingIds.size > 0) {
-      await new Promise(r => setTimeout(r, FX_TAIL_MS - STEP_DELAY_MS));
+      await new Promise(r => setTimeout(r, fxTailMs - STEP_DELAY_MS));
       if (token !== revealToken) return;
     }
 

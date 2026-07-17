@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy, untrack } from 'svelte';
   import type { AnimStep } from './animSteps';
   import { damageTier, type DamageTier } from './logLines';
   import type { Pos } from '$lib/engine/types';
@@ -26,13 +27,51 @@
   }
 
   let { gridWidth, gridHeight, stepMs, steps }: Props = $props();
+
+  // One-shot FX must outlive the beat that spawned them: Battle.svelte
+  // replaces `steps` every beat, but a floater runs 0.9s (plus flight delay)
+  // against a 200–700ms beat — un-buffered, a kill's damage number vanished
+  // the instant the death beat arrived. Buffer incoming steps (keys are
+  // unique per beat) and prune each after its full run. An emptied `steps`
+  // means sequence teardown or restart — drop everything with it.
+  type FxItem = Props['steps'][number];
+  let live = $state<FxItem[]>([]);
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  $effect(() => {
+    if (steps.length === 0) {
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
+      live = [];
+      return;
+    }
+    const have = new Set(untrack(() => live).map(i => i.key));
+    const incoming = steps.filter(i => !have.has(i.key));
+    if (incoming.length === 0) return;
+    live = [...untrack(() => live), ...incoming];
+    // Longest run: flight delay (60% of a beat) + 0.9s float + slack.
+    const ttl = Math.round(stepMs * 0.6) + 900 + 200;
+    for (const item of incoming) {
+      timers.set(
+        item.key,
+        setTimeout(() => {
+          timers.delete(item.key);
+          live = live.filter(i => i.key !== item.key);
+        }, ttl)
+      );
+    }
+  });
+
+  onDestroy(() => {
+    for (const t of timers.values()) clearTimeout(t);
+  });
 </script>
 
 <div
   class="fx-layer grid"
   style="grid-template-columns: repeat({gridWidth}, minmax(0, 1fr)); grid-template-rows: repeat({gridHeight}, minmax(0, 1fr)); --flight-ms: {Math.round(stepMs * 0.6)}ms;"
 >
-  {#each steps as { step, pos, fromPos, art, key } (key)}
+  {#each live as { step, pos, fromPos, art, key } (key)}
     <div class="fx-cell" style="grid-column: {pos.col + 1}; grid-row: {pos.row + 1};">
       {#if step.kind === 'projectile' && fromPos}
         {@const angle = (Math.atan2(pos.row - fromPos.row, pos.col - fromPos.col) * 180) / Math.PI}
@@ -43,6 +82,7 @@
         >
           <span class="fx-proj-glyph" style="transform: rotate({angle}deg)">{art === 'bolt' ? '✦' : '➤'}</span>
         </span>
+        <span class="fx-impact" aria-hidden="true"></span>
       {:else if step.kind === 'spell_fx'}
         {#if step.spell === 'lightning'}
           <!-- Bolt stands up out of the board like a standee and strikes downward. -->
@@ -142,22 +182,56 @@
   }
 
   .fx-proj-glyph {
-    font-size: 1.1rem;
+    font-size: 1.7rem;
     line-height: 1;
   }
 
-  .fx-proj-arrow { color: #fbbf24; text-shadow: 0 1px 2px rgb(0 0 0 / 0.7); }
-  .fx-proj-bolt  { color: #c084fc; text-shadow: 0 0 6px rgb(192 132 252 / 0.9); font-size: 1.3rem; }
+  .fx-proj-arrow { color: #fbbf24; text-shadow: 0 1px 2px rgb(0 0 0 / 0.8), 0 0 8px rgb(251 191 36 / 0.6); }
+  .fx-proj-bolt  { color: #c084fc; text-shadow: 0 0 12px rgb(192 132 252 / 1); font-size: 2.1rem; }
 
+  /* Flight holds full size/opacity until just before landing, then bursts —
+     scales up ~1.5× while vanishing — so arrival reads as an impact, not a
+     fade. The 92% frame pins translate/scale so the pop lives only in the
+     final stretch. */
   @keyframes fx-fly {
     0% {
-      transform: translate(calc(var(--from-x) * 100%), calc(var(--from-y) * 100%));
+      transform: translate(calc(var(--from-x) * 100%), calc(var(--from-y) * 100%)) scale(1);
       opacity: 1;
     }
-    85% { opacity: 1; }
+    92% {
+      transform: translate(calc(var(--from-x) * 8%), calc(var(--from-y) * 8%)) scale(1);
+      opacity: 1;
+    }
     100% {
-      transform: translate(0, 0);
+      transform: translate(0, 0) scale(1.55);
       opacity: 0;
+    }
+  }
+
+  /* White-hot burst at the target cell the instant the projectile lands.
+     `both` fill: invisible through the flight delay, holds faded-out end. */
+  .fx-impact {
+    position: absolute;
+    inset: 18%;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgb(255 255 255 / 0.9), rgb(251 191 36 / 0.5) 45%, transparent 70%);
+    animation: fx-impact-pop 250ms ease-out;
+    animation-delay: var(--flight-ms, 300ms);
+    animation-fill-mode: both;
+    pointer-events: none;
+  }
+
+  @keyframes fx-impact-pop {
+    0% {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    25% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.4);
     }
   }
 
@@ -239,9 +313,10 @@
     .fx-text {
       animation: fade-only 0.9s ease-out forwards;
     }
-    .fx-projectile {
+    .fx-projectile,
+    .fx-impact {
       animation: none;
-      opacity: 0; /* no flight — the damage number alone tells the story */
+      opacity: 0; /* no flight/burst — the damage number alone tells the story */
     }
     .fx-text.fx-delayed,
     .fx-kills,
