@@ -1,6 +1,7 @@
 import type { ArmySlot } from './types';
 import type { Rng } from './rng';
 import { BARBARIAN_UNITS, GOBLIN } from './barbarian';
+import { isTierUnlocked } from './progression';
 
 /** Gold price per creature, by unit name. */
 export const UNIT_COSTS: Record<string, number> = {
@@ -60,17 +61,24 @@ export function armyCost(slots: ArmySlot[]): number {
   return slots.reduce((sum, s) => sum + s.count * (UNIT_COSTS[s.unit.name] ?? 0), 0);
 }
 
+/** Drops slots whose tier the hero hasn't unlocked yet. */
+export function filterToUnlockedTiers(slots: ArmySlot[], level: number): ArmySlot[] {
+  return slots.filter(s => isTierUnlocked(level, s.unit.tier));
+}
+
 /**
  * Seeded enemy roster: 3–5 stack picks spending random shares of the budget,
  * then a goblin top-up so at least ~70% of the gold is always fielded.
  * Duplicate picks merge, so the result stays within MAX_STACKS.
+ * maxTier keeps the enemy on the same unlock schedule as the player.
  */
-export function generateEnemyArmy(budget: number, rng: Rng): ArmySlot[] {
+export function generateEnemyArmy(budget: number, rng: Rng, maxTier = 7): ArmySlot[] {
+  const roster = BARBARIAN_UNITS.filter(u => u.tier <= maxTier);
   const slots: ArmySlot[] = [];
   let remaining = budget;
 
   const addTo = (name: string, count: number) => {
-    const unit = BARBARIAN_UNITS.find(u => u.name === name)!;
+    const unit = roster.find(u => u.name === name)!;
     const existing = slots.find(s => s.unit.name === name);
     if (existing) existing.count += count;
     else slots.push({ unit, count });
@@ -79,7 +87,7 @@ export function generateEnemyArmy(budget: number, rng: Rng): ArmySlot[] {
 
   const picks = 3 + Math.floor(rng() * 3); // 3–5
   for (let i = 0; i < picks; i++) {
-    const affordable = BARBARIAN_UNITS.filter(u => UNIT_COSTS[u.name] <= remaining);
+    const affordable = roster.filter(u => UNIT_COSTS[u.name] <= remaining);
     if (affordable.length === 0) break;
     const unit = affordable[Math.floor(rng() * affordable.length)];
     const cost = UNIT_COSTS[unit.name];

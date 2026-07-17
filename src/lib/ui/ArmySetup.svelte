@@ -1,7 +1,7 @@
 <script lang="ts">
   import { FACTION_UNITS, FACTION_INFO } from '$lib/engine/factions';
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
-  import { xpToReach } from '$lib/engine/progression';
+  import { xpToReach, isTierUnlocked, tierUnlockLevel, maxUnlockedTier } from '$lib/engine/progression';
   import { maxMana } from '$lib/engine/factionSkills';
   import Sprite from './Sprite.svelte';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
@@ -25,10 +25,19 @@
 
   let counts: Record<string, number> = $state({});
 
-  // Switching faction shows a different roster, so any prior picks no longer apply.
+  // Switching faction shows a different roster, and a level change (level-up or
+  // hero reset) can change which tiers are recruitable — both invalidate picks.
   $effect(() => {
+    void hero.level;
     counts = Object.fromEntries(units.map(u => [u.name, 0]));
   });
+
+  // Level-up note: did the last battle's levels open a new tier?
+  const unlockedNewTier = $derived(
+    lastBattle && lastBattle.levels > 0
+      ? maxUnlockedTier(hero.level) > maxUnlockedTier(hero.level - lastBattle.levels)
+      : false
+  );
 
   const slots = $derived(
     units.filter(u => counts[u.name] > 0).map(u => ({ unit: u, count: counts[u.name] }))
@@ -41,6 +50,8 @@
   }
 
   function canAdd(name: string): boolean {
+    const unit = units.find(u => u.name === name);
+    if (!unit || !isTierUnlocked(hero.level, unit.tier)) return false;
     if (UNIT_COSTS[name] > goldLeft) return false;
     return counts[name] > 0 || slots.length < MAX_STACKS;
   }
@@ -78,6 +89,7 @@
         <p class="ml-3 text-sm {lastBattle.xp > 0 ? 'text-emerald-300' : 'text-red-300'}">
           {lastBattle.xp > 0 ? `+${lastBattle.xp} XP` : 'No XP — defeated'}
           {#if lastBattle.levels > 0}<span class="ml-1 font-bold text-amber-300">Level up!</span>{/if}
+          {#if unlockedNewTier}<span class="ml-1 font-semibold text-emerald-300">New tier unlocked!</span>{/if}
         </p>
       {/if}
       {#if hero.bonusSkeletons}
@@ -126,30 +138,37 @@
   <div class="overflow-hidden rounded-lg border border-slate-700">
     {#each units as unit (unit.name)}
       {@const n = counts[unit.name]}
+      {@const locked = !isTierUnlocked(hero.level, unit.tier)}
       <div
         class="flex items-center gap-3 border-b border-slate-700/60 bg-slate-800 px-4 py-2 last:border-b-0
           {n > 0 ? 'bg-slate-700/60' : ''}"
       >
-        <Sprite name={unit.name} class="h-11 w-9 shrink-0" />
-        <div class="w-32">
+        <div class={locked ? 'opacity-40 grayscale' : ''}>
+          <Sprite name={unit.name} class="h-11 w-9 shrink-0" />
+        </div>
+        <div class="w-32 {locked ? 'opacity-40' : ''}">
           <p class="text-sm font-semibold text-slate-100">{unit.name}</p>
           <p class="font-mono text-[10px] text-amber-300">🪙 {UNIT_COSTS[unit.name]} each</p>
         </div>
-        <p class="flex-1 font-mono text-[11px] leading-tight text-slate-400">
+        <p class="flex-1 font-mono text-[11px] leading-tight text-slate-400 {locked ? 'opacity-40' : ''}">
           HP {unit.hp} · Atk {unit.attack} · Def {unit.defense} · Dmg {unit.minDamage}–{unit.maxDamage}<br />
           Spd {unit.speed} · Init {unit.initiative}{unit.shots > 0 ? ` · 🏹 ${unit.shots} shots, range ${unit.range}` : ''}
         </p>
-        <div class="flex items-center gap-1">
-          <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
-            disabled={n === 0} onclick={() => remove(unit.name, 5)} aria-label="remove 5 {unit.name}">‹5</button>
-          <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
-            disabled={n === 0} onclick={() => remove(unit.name, 1)} aria-label="remove {unit.name}">−</button>
-          <span class="w-10 text-center font-mono text-sm text-slate-100">{n}</span>
-          <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
-            disabled={!canAdd(unit.name)} onclick={() => add(unit.name, 1)} aria-label="add {unit.name}">+</button>
-          <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
-            disabled={!canAdd(unit.name)} onclick={() => add(unit.name, 5)} aria-label="add 5 {unit.name}">5›</button>
-        </div>
+        {#if locked}
+          <p class="text-xs font-semibold text-slate-500">🔒 Unlocks at level {tierUnlockLevel(unit.tier)}</p>
+        {:else}
+          <div class="flex items-center gap-1">
+            <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
+              disabled={n === 0} onclick={() => remove(unit.name, 5)} aria-label="remove 5 {unit.name}">‹5</button>
+            <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
+              disabled={n === 0} onclick={() => remove(unit.name, 1)} aria-label="remove {unit.name}">−</button>
+            <span class="w-10 text-center font-mono text-sm text-slate-100">{n}</span>
+            <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
+              disabled={!canAdd(unit.name)} onclick={() => add(unit.name, 1)} aria-label="add {unit.name}">+</button>
+            <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
+              disabled={!canAdd(unit.name)} onclick={() => add(unit.name, 5)} aria-label="add 5 {unit.name}">5›</button>
+          </div>
+        {/if}
       </div>
     {/each}
   </div>

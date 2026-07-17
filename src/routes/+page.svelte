@@ -3,8 +3,8 @@
   import Battle from '$lib/ui/Battle.svelte';
   import ArmySetup from '$lib/ui/ArmySetup.svelte';
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
-  import { generateEnemyArmy, armyCost } from '$lib/engine/recruit';
-  import { budgetForLevel, applyXp } from '$lib/engine/progression';
+  import { generateEnemyArmy, armyCost, filterToUnlockedTiers } from '$lib/engine/recruit';
+  import { budgetForLevel, applyXp, maxUnlockedTier } from '$lib/engine/progression';
   import { updateFactionSkills, necromancyBonusSkeletons } from '$lib/engine/factionSkills';
   import { SKELETON } from '$lib/engine/necromancer';
   import { mulberry32 } from '$lib/engine/rng';
@@ -55,16 +55,18 @@
   }
 
   function startBattle(army: ArmySlot[]) {
+    // Defense in depth: the setup UI already locks these rows.
+    const unlocked = filterToUnlockedTiers(army, hero.level);
     playerArmy = hero.bonusSkeletons
-      ? [...army, { unit: SKELETON, count: hero.bonusSkeletons }]
-      : army;
+      ? [...unlocked, { unit: SKELETON, count: hero.bonusSkeletons }]
+      : unlocked;
     if (hero.bonusSkeletons) {
       hero = { ...hero, bonusSkeletons: 0 };
       void saveHero(hero);
     }
     enemyArmy = activeEncounter
       ? generateCampaignArmy(activeEncounter, hero.level)
-      : generateEnemyArmy(budget, mulberry32(Date.now() % 2 ** 31));
+      : generateEnemyArmy(budget, mulberry32(Date.now() % 2 ** 31), maxUnlockedTier(hero.level));
     battleKey += 1;
     lastBattle = null;
     lastReward = null;
