@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: warlords-ingress
+  namespace: warlords
+  labels:
+    app: warlords
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - warlords.bevsoft.com
+      secretName: warlords-tls
+  rules:
+    - host: warlords.bevsoft.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: warlords
+                port:
+                  number: 80

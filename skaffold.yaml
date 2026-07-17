@@ -1,0 +1,19 @@
+apiVersion: skaffold/v4beta14
+kind: Config
+metadata:
+  name: warlords
+build:
+  artifacts:
+    - image: docker.io/bevdev1/warlords
+      docker:
+        dockerfile: Dockerfile
+deploy:
+  kubectl:
+    defaultNamespace: warlords
+manifests:
+  rawYaml:
+    - k8s/certificate.yaml
+    - k8s/deployment.yaml
+    - k8s/ingress.yaml
+    - k8s/namespace.yaml
+    - k8s/service.yaml

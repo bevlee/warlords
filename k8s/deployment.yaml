@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warlords
+  namespace: warlords
+  labels:
+    app: warlords
+spec: 
+  replicas: 1
+  selector:
+    matchLabels:
+      app: warlords
+  template:
+    metadata: 
+      labels:
+        app: warlords
+    spec:
+      containers:
+        - name: warlords
+          image: docker.io/bevdev1/warlords:0.1
+          ports:
+            - name: http
+              containerPort: 80

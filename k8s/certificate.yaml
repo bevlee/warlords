@@ -1,0 +1,17 @@
+# Single-host cert, not the *.bevsoft.com wildcard the other namespaces use:
+# letsencrypt-prod only defines an http01 solver, and Let's Encrypt requires
+# dns-01 for wildcards — so a wildcard request here sits pending forever with
+# no challenge created. HTTP-01 covers this one host fine.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: warlords
+  namespace: warlords
+spec:
+  commonName: warlords.bevsoft.com
+  dnsNames:
+    - warlords.bevsoft.com
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  secretName: warlords-tls
