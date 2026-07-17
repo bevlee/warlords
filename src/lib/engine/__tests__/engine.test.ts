@@ -187,7 +187,7 @@ describe('initBattle obstacles', () => {
 
     for (const c of a.grid.cells.flat()) {
       if (c.blocked) {
-        expect(c.col).toBeGreaterThanOrEqual(3);
+        expect(c.col).toBeGreaterThanOrEqual(5); // clear of both deployment zones
         expect(c.col).toBeLessThanOrEqual(8);
         expect(c.occupantId).toBeNull(); // never under a unit
       }

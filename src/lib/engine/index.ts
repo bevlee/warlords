@@ -14,3 +14,4 @@ export * from './recruit';
 export * from './progression';
 export * from './factionSkills';
 export * from './augments';
+export * from './deploy';

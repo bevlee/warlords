@@ -2,7 +2,9 @@ import type { ArmySlot, FactionClass, Hero, UnitStack } from '../engine/types';
 import { FACTION_UNITS, FACTION_INFO } from '../engine/factions';
 import { UNIT_COSTS } from '../engine/recruit';
 import { updateFactionSkills } from '../engine/factionSkills';
-import { mulberry32, type Rng } from '../engine/rng';
+import { mulberry32, mixSeed, type Rng } from '../engine/rng';
+
+export { mixSeed };
 
 export const RUN_LENGTH = 10;
 export const BOSS_NODES = new Set([3, 7, 10]);
@@ -28,18 +30,6 @@ export interface RunState {
 
 export function actOf(n: number): 1 | 2 | 3 {
   return n <= 3 ? 1 : n <= 7 ? 2 : 3;
-}
-
-/** Hash-mixes a run seed with a salt into a well-distributed 32-bit seed.
- *  Unlike a linear combination (seed*a + salt*b), this doesn't collide for
- *  seed/salt pairs a fixed offset apart — important since seeds are commonly
- *  Date.now()-derived and close together across runs. */
-export function mixSeed(seed: number, salt: number): number {
-  let h = (seed | 0) ^ salt;
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
-  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
-  h = h ^ (h >>> 16);
-  return h;
 }
 
 /** Power budget: 90 × 1.32^(n−1), bosses (3/7/10) pay a 10% premium. */

@@ -17,10 +17,18 @@ import {
   getNatureLuckBonus,
   getSorceryMultiplier,
   getMysticismRegen,
-  getTacticsShift,
   maxMana,
 } from './factionSkills';
 import { DEMON_UNITS } from './demon';
+import {
+  GRID_W,
+  GRID_H,
+  autoDeploy,
+  enemyAutoDeploy,
+  generateObstacles,
+  validateDeployment,
+  type Deployment,
+} from './deploy';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
  *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon
@@ -141,9 +149,6 @@ function handleDeath(s: BattleState, dead: UnitStack, rng: Rng): BattleState {
   return { ...next, grid: setOccupant(next.grid, dead.pos, null) };
 }
 
-const GRID_W = 12;
-const GRID_H = 10;
-
 export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
   lightning: { cost: 3, friendly: false },
   bloodlust: { cost: 2, friendly: true },
@@ -163,18 +168,16 @@ export function spellPreview(hero: Hero, spell: SpellId, target: UnitStack): Dam
   return { min: damage, max: damage, killsMin: killed, killsMax: killed };
 }
 
-function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, colShift = 0): UnitStack {
-  const col = side === 'player' ? 1 + colShift : GRID_W - 2;
-  const row = 1 + index * Math.floor((GRID_H - 2) / 6);
+function deploymentToStack(d: Deployment, side: 'player' | 'enemy'): UnitStack {
   return {
     id: uuidv4(),
-    definition: slot.unit,
-    count: slot.count,
-    hp: slot.unit.hp,
-    pos: { col, row },
+    definition: d.unit,
+    count: d.count,
+    hp: d.unit.hp,
+    pos: { ...d.pos },
     side,
     hasRetaliated: false,
-    shotsLeft: slot.unit.shots,
+    shotsLeft: d.unit.shots,
     morale: 0,
     luck: 0,
     atb: 0,
@@ -186,22 +189,34 @@ export function initBattle(
   playerArmy: ArmySlot[],
   enemyArmy: ArmySlot[],
   hero: Hero,
-  seed = Date.now()
+  seed = Date.now(),
+  playerDeployment?: Deployment[]
 ): BattleState {
   let grid = createGrid(GRID_W, GRID_H);
 
+  // Rocks come from their own seeded stream (independent of army makeup), so
+  // the deployment preview and the battle always agree on the battlefield.
+  const obstacles = generateObstacles(seed);
+  for (const pos of obstacles) grid = setBlocked(grid, pos);
+
+  if (playerDeployment) {
+    const problem = validateDeployment(playerArmy, playerDeployment, hero);
+    if (problem) throw new Error(`invalid deployment: ${problem}`);
+  }
+  const deployment = playerDeployment ?? autoDeploy(playerArmy, hero);
+
   const moraleBonus = getMoraleBonus(hero);
-  const tacticsShift = getTacticsShift(hero);
   const logisticsBonus = getLogisticsBonus(hero);
   const luckBonus = getNatureLuckBonus(hero);
-  const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
-    let stack = slotToStack(slot, 'player', i, tacticsShift);
+  // Per-stack bonuses apply to each deployed stack, so splits keep them.
+  const playerUnits: UnitStack[] = deployment.map(d => {
+    let stack = deploymentToStack(d, 'player');
     if (moraleBonus > 0) stack = { ...stack, morale: stack.morale + moraleBonus };
     if (logisticsBonus > 0) stack = { ...stack, speedBonus: logisticsBonus };
     if (luckBonus > 0) stack = { ...stack, luck: stack.luck + luckBonus };
     return stack;
   });
-  const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
+  const enemyUnits: UnitStack[] = enemyAutoDeploy(enemyArmy).map(d => deploymentToStack(d, 'enemy'));
 
   // The hero fights too: off-grid on the flank, ATB-scheduled, untargetable.
   // Whole-board ranged strike via the shoot action (no retaliation). attack: 0
@@ -232,17 +247,6 @@ export function initBattle(
   const allUnits = [...playerUnits, ...enemyUnits, heroStack].map(u => ({ ...u, atb: rng() * 0.1 }));
 
   grid = placeUnits(grid, allUnits);
-
-  // Scatter impassable rocks in the middle columns (3–8), away from spawns.
-  const OBSTACLES = 7;
-  for (let placed = 0, guard = 0; placed < OBSTACLES && guard < 100; guard++) {
-    const col = 3 + Math.floor(rng() * 6);
-    const row = Math.floor(rng() * GRID_H);
-    const cell = grid.cells[row][col];
-    if (cell.blocked || cell.occupantId) continue;
-    grid = setBlocked(grid, { col, row });
-    placed++;
-  }
 
   const state: BattleState = {
     grid,

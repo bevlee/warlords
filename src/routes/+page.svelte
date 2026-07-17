@@ -3,6 +3,8 @@
   import Battle from '$lib/ui/Battle.svelte';
   import ArmySetup from '$lib/ui/ArmySetup.svelte';
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
+  import DeploymentScreen from '$lib/ui/DeploymentScreen.svelte';
+  import type { Deployment } from '$lib/engine/deploy';
   import { generateEnemyArmy, armyCost, filterToUnlockedTiers } from '$lib/engine/recruit';
   import { budgetForLevel, applyXp, maxUnlockedTier } from '$lib/engine/progression';
   import { applyAugmentsToArmy, MAX_AUGMENTS_PER_UNIT } from '$lib/engine/augments';
@@ -28,13 +30,15 @@
 
   let hero: Hero = $state({ ...DEFAULT_HERO });
   let lastBattle: { xp: number; levels: number } | null = $state(null);
-  let screen: 'setup' | 'campaign' | 'battle' | 'result' = $state('setup');
+  let screen: 'setup' | 'campaign' | 'deploy' | 'battle' | 'result' = $state('setup');
   let campaign: CampaignState | null = $state(null);
   let activeEncounter: Encounter | null = $state(null);
   let lastReward: { xp: number; gold: number } | null = $state(null);
   let lastOutcome: 'player_wins' | 'enemy_wins' | null = $state(null);
   let playerArmy: ArmySlot[] = $state([]);
   let enemyArmy: ArmySlot[] = $state([]);
+  let battleSeed = $state(0);
+  let battleDeployment: Deployment[] | undefined = $state(undefined);
   let battleKey = $state(0);
 
   const budget = $derived(budgetForLevel(hero.level));
@@ -77,10 +81,18 @@
     enemyArmy = activeEncounter
       ? generateCampaignArmy(activeEncounter, hero.level)
       : generateEnemyArmy(budget, mulberry32(Date.now() % 2 ** 31), maxUnlockedTier(hero.level));
-    battleKey += 1;
+    // The seed is fixed here so the deployment preview and the battle share rocks.
+    battleSeed = Date.now() % 2 ** 31;
+    battleDeployment = undefined;
     lastBattle = null;
     lastReward = null;
     lastOutcome = null;
+    screen = 'deploy';
+  }
+
+  function confirmDeployment(deployment: Deployment[]) {
+    battleDeployment = deployment;
+    battleKey += 1;
     screen = 'battle';
   }
 
@@ -181,6 +193,15 @@
     <ArmySetup {hero} {budget} {lastBattle} onstart={startBattle} onreset={handleReset} onclass={handleClass} onaugment={handleAugment} />
   {:else if screen === 'campaign' && campaign}
     <CampaignMap {hero} {campaign} onselect={selectEncounter} onback={backToSetup} />
+  {:else if screen === 'deploy'}
+    <DeploymentScreen
+      {playerArmy}
+      {enemyArmy}
+      {hero}
+      seed={battleSeed}
+      onconfirm={confirmDeployment}
+      onback={() => (screen = 'setup')}
+    />
   {:else if screen === 'result'}
     <div class="mx-auto mt-10 max-w-md rounded-lg border border-slate-700 bg-slate-800/60 p-6 text-center">
       <p class="text-3xl font-bold {lastOutcome === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
@@ -221,6 +242,8 @@
         {playerArmy}
         {enemyArmy}
         {hero}
+        seed={battleSeed}
+        deployment={battleDeployment}
         onexit={exitBattle}
         onresult={handleResult}
         allowRestart={!activeEncounter}

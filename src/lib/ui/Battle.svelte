@@ -20,6 +20,7 @@
     SpellId,
     UnitStack,
   } from '$lib/engine/types';
+  import type { Deployment } from '$lib/engine/deploy';
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
   import UnitInfo from './UnitInfo.svelte';
@@ -35,6 +36,8 @@
     onresult?: (result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[]) => void;
     allowRestart?: boolean;
     exitLabel?: string;
+    seed?: number;              // share the battlefield with a deployment preview
+    deployment?: Deployment[];  // player-chosen stack placement (auto layout when absent)
   }
 
   let {
@@ -45,6 +48,8 @@
     onresult,
     allowRestart = true,
     exitLabel = 'Change army',
+    seed,
+    deployment,
   }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
@@ -54,7 +59,7 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero));
+  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero, seed ?? Date.now(), deployment));
 
   // Incremental reveal: an action's sub-events (hit, retaliate, death) play
   // as separate beats. While a sequence runs, `animating` locks player input
@@ -356,7 +361,9 @@
     dyingIds = new Set();
     pendingSpell = null;
     resultAnnounced = false;
-    battle = initBattle(playerArmy, enemyArmy, hero, Date.now());
+    // Rocks never spawn inside the deployment zone, so a kept layout stays
+    // valid under the fresh seed's battlefield.
+    battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), deployment);
   }
 
   function unitLabel(id: unknown): string {
