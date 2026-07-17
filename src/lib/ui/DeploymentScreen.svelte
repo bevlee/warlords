@@ -14,6 +14,7 @@
     type DraftEntry,
   } from '$lib/engine/deploy';
   import { createGrid, placeUnits, setBlocked } from '$lib/engine/grid';
+  import { generateStructures } from '$lib/engine/structures';
   import type { ArmySlot, BattleState, Hero, Pos, UnitStack } from '$lib/engine/types';
   import BattleGrid from './BattleGrid.svelte';
   import Sprite from './Sprite.svelte';
@@ -37,6 +38,8 @@
   const zoneKeys = new Set(deploymentZone(hero).map(p => `${p.col},${p.row}`));
   // svelte-ignore state_referenced_locally
   const enemyLine = enemyAutoDeploy(enemyArmy);
+  // svelte-ignore state_referenced_locally
+  const structures = generateStructures(seed, obstacles);
 
   // svelte-ignore state_referenced_locally
   let draft: DraftEntry[] = $state(autoDeploy(playerArmy, hero).map(d => ({ ...d })));
@@ -65,7 +68,7 @@
     grid = placeUnits(grid, units);
     return {
       grid, units, hero, round: 1, battleTime: 0,
-      currentUnitId: null, log: [], result: 'ongoing', seed,
+      currentUnitId: null, log: [], result: 'ongoing', seed, structures,
     };
   });
 

@@ -96,10 +96,10 @@
     screen = 'battle';
   }
 
-  function handleResult(result: 'player_wins' | 'enemy_wins') {
+  function handleResult(result: 'player_wins' | 'enemy_wins', _finalUnits?: unknown, lootXp = 0) {
     lastOutcome = result;
     if (result === 'player_wins') {
-      const gained = activeEncounter ? activeEncounter.xpReward : armyCost(enemyArmy);
+      const gained = (activeEncounter ? activeEncounter.xpReward : armyCost(enemyArmy)) + lootXp;
       const { hero: next, levels } = applyXp(hero, gained);
       const bonusSkeletons = (hero.bonusSkeletons ?? 0) + necromancyBonusSkeletons(hero, enemyArmy);
       hero = updateFactionSkills({ ...next, bonusSkeletons });

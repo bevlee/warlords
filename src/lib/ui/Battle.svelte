@@ -1,5 +1,6 @@
 <script lang="ts">
   import { initBattle, applyAction, spellPreview, getSpellDef } from '$lib/engine/battle';
+  import { STRUCTURE_META, type StructureKind } from '$lib/engine/structures';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
@@ -33,7 +34,7 @@
     enemyArmy: ArmySlot[];
     hero: Hero;
     onexit?: () => void;
-    onresult?: (result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[]) => void;
+    onresult?: (result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[], lootXp?: number) => void;
     allowRestart?: boolean;
     exitLabel?: string;
     seed?: number;              // share the battlefield with a deployment preview
@@ -258,7 +259,7 @@
   $effect(() => {
     if (battle.result !== 'ongoing' && !resultAnnounced) {
       resultAnnounced = true;
-      onresult?.(battle.result, $state.snapshot(battle).units as UnitStack[]);
+      onresult?.(battle.result, $state.snapshot(battle).units as UnitStack[], battle.lootXp ?? 0);
     }
   });
 
@@ -418,6 +419,10 @@
           case 'burn': return `${label} burn for ${d.damage} damage.`;
           case 'bind': return `${label} are bound in place.`;
           case 'bind_block': return `${label} strain against their bindings and cannot move.`;
+          case 'structure_claim': {
+            const meta = STRUCTURE_META[d.kind as StructureKind];
+            return `${label} claim the ${meta.name} — ${meta.blurb}.`;
+          }
           default: return `${label} are affected by ${d.effect}.`;
         }
       }

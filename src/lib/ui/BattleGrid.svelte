@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BattleState, Pos, UnitStack } from '$lib/engine/types';
   import type { DamagePreview } from '$lib/engine/selectors';
+  import { STRUCTURE_META } from '$lib/engine/structures';
   import type { AnimStep } from './animSteps';
   import UnitToken from './UnitToken.svelte';
   import Sprite from './Sprite.svelte';
@@ -91,6 +92,11 @@
   // grid cell — through the death-fade transition.
   const unitsById = $derived(
     new Map(battleState.units.filter(u => u.count > 0 || dyingIds.has(u.id)).map(u => [u.id, u]))
+  );
+
+  // Claimable battlefield objectives, keyed by cell.
+  const structuresByCell = $derived(
+    new Map((battleState.structures ?? []).map(s => [`${s.pos.col},${s.pos.row}`, s]))
   );
 
   // LordsWM-style cursors: the pointer itself becomes a sword/bow near targets.
@@ -212,6 +218,7 @@
     {#each battleState.grid.cells as row (row[0].row)}
       {#each row as cell (cellKey(cell.col, cell.row))}
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
+        {@const structure = structuresByCell.get(cellKey(cell.col, cell.row))}
         {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row))}
         {@const inHoverRange = rangeKeys.has(cellKey(cell.col, cell.row))}
         {@const attackable = !!occupant && targetIds.has(occupant.id)}
@@ -229,7 +236,12 @@
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant
               ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}`
-              : `cell ${cell.col},${cell.row}`}
+              : structure
+                ? `${STRUCTURE_META[structure.kind].name}${structure.claimedBy ? ` (${structure.claimedBy})` : ''} at ${cell.col},${cell.row}`
+                : `cell ${cell.col},${cell.row}`}
+          title={structure
+            ? `${STRUCTURE_META[structure.kind].name} — ${STRUCTURE_META[structure.kind].blurb}${structure.claimedBy ? ` (claimed by ${structure.claimedBy})` : ' (unclaimed: end a move here)'}`
+            : undefined}
           onclick={e => handleClick(cell.col, cell.row, e.shiftKey)}
           oncontextmenu={e => {
             e.preventDefault(); // suppress the browser menu: right-click inspects
@@ -242,6 +254,12 @@
             if (aim && occupant && aim.targetId === occupant.id) aim = null;
           }}
         >
+          {#if structure}
+            <span
+              class="structure {structure.claimedBy === 'player' ? 'claimed-player' : structure.claimedBy === 'enemy' ? 'claimed-enemy' : ''}"
+              aria-hidden="true"
+            >{STRUCTURE_META[structure.kind].emoji}</span>
+          {/if}
           {#if occupant}
             <span class="token-shadow" aria-hidden="true"></span>
             {#if occupant.id === activeId}
@@ -413,6 +431,29 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
+  }
+
+  /* Claimable objective: drawn flat on the tile, under any standee. A soft
+     glow marks it unclaimed; the owner's colour takes over once claimed. */
+  .structure {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    pointer-events: none;
+    filter: drop-shadow(0 0 4px rgb(250 204 21 / 0.8));
+  }
+
+  .structure.claimed-player {
+    filter: drop-shadow(0 0 4px rgb(56 189 248 / 0.9));
+    opacity: 0.65;
+  }
+
+  .structure.claimed-enemy {
+    filter: drop-shadow(0 0 4px rgb(239 68 68 / 0.9));
+    opacity: 0.65;
   }
 
   /* Damage/kill forecast beside the aimed target (LordsWM tooltip).

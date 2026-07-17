@@ -113,6 +113,10 @@ export interface BattleState {
   log: BattleEvent[];
   result: 'ongoing' | 'player_wins' | 'enemy_wins';
   seed: number;
+  /** Claimable battlefield objectives (see structures.ts). Optional so
+   *  hand-built states in tests and previews stay valid. */
+  structures?: import('./structures').Structure[];
+  lootXp?: number; // accumulated war_chest bonuses, paid out on player_wins
 }
 
 export type BattleAction =

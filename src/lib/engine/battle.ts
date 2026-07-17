@@ -29,6 +29,7 @@ import {
   type Deployment,
 } from './deploy';
 import { getKnownSpells, getSpellDef } from './spells';
+import { generateStructures, WAR_CHEST_XP } from './structures';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
  *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon
@@ -127,6 +128,50 @@ function applyOnHitEffects(
   }
 
   return { striker: a, victim: v, events };
+}
+
+/**
+ * A stack ending its move on an unclaimed structure claims it for its side,
+ * permanently for the battle. Buffs land on every living stack of that side;
+ * mana/loot rewards only mean anything to the player.
+ */
+function claimStructureAt(s: BattleState, actorId: string): BattleState {
+  const actor = s.units.find(u => u.id === actorId);
+  if (!actor || actor.isHero || actor.count === 0) return s;
+  const idx = (s.structures ?? []).findIndex(
+    st => !st.claimedBy && st.pos.col === actor.pos.col && st.pos.row === actor.pos.row
+  );
+  if (idx < 0) return s;
+
+  const structure = s.structures![idx];
+  const side = actor.side;
+  let next: BattleState = {
+    ...s,
+    structures: s.structures!.map((st, i) => (i === idx ? { ...st, claimedBy: side } : st)),
+    log: [...s.log, { type: 'status', data: { effect: 'structure_claim', kind: structure.kind, unitId: actorId, side } }],
+  };
+
+  const buffArmy = (f: (u: UnitStack) => UnitStack): BattleState => ({
+    ...next,
+    units: next.units.map(u => (u.side === side && !u.isHero && u.count > 0 ? f(u) : u)),
+  });
+
+  switch (structure.kind) {
+    case 'shrine_attack':
+      return buffArmy(u => ({ ...u, attackBuff: (u.attackBuff ?? 0) + 2 }));
+    case 'shrine_defense':
+      return buffArmy(u => ({ ...u, defenseBuff: (u.defenseBuff ?? 0) + 2 }));
+    case 'fountain_luck':
+      return buffArmy(u => ({ ...u, luck: Math.min(3, u.luck + 1) }));
+    case 'idol_morale':
+      return buffArmy(u => ({ ...u, morale: Math.min(3, u.morale + 1) }));
+    case 'mana_crystal':
+      return side === 'player'
+        ? { ...next, hero: { ...next.hero, mana: (next.hero.mana ?? 0) + 4 } }
+        : next;
+    case 'war_chest':
+      return side === 'player' ? { ...next, lootXp: (next.lootXp ?? 0) + WAR_CHEST_XP } : next;
+  }
 }
 
 /**
@@ -239,7 +284,7 @@ export function initBattle(
 
   grid = placeUnits(grid, allUnits);
 
-  const state: BattleState = {
+  let state: BattleState = {
     grid,
     units: allUnits,
     hero: { ...hero, mana: hero.mana ?? maxMana(hero) },
@@ -249,7 +294,11 @@ export function initBattle(
     log: [{ type: 'round_start', data: { round: 1 } }],
     result: 'ongoing',
     seed,
+    structures: generateStructures(seed, obstacles),
+    lootXp: 0,
   };
+  // A stack deployed straight onto a structure claims it at battle start.
+  for (const u of state.units) state = claimStructureAt(state, u.id);
   return advance(state);
 }
 
@@ -305,7 +354,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
         s = handleDeath(s, burned, rng);
         const endResult = checkBattleEnd(s);
         if (endResult) {
-          s.log = [...s.log, { type: 'battle_end', data: { result: endResult } }];
+          s.log = [...s.log, { type: 'battle_end', data: { result: endResult, lootXp: s.lootXp ?? 0 } }];
           return { ...s, result: endResult };
         }
         return advance(reenter(s, 0));
@@ -385,6 +434,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     const newUnits = s.units.map((u, i) => i === actorIdx ? updatedActor : u);
     s = { ...s, grid: newGrid, units: newUnits };
     s.log = [...s.log, { type: 'move', data: { unitId: actorId, from: updatedActor.lastMovedFrom, to: action.to } }];
+    s = claimStructureAt(s, actorId);
 
   } else if (action.type === 'attack') {
     const targetId = action.targetId;
@@ -402,6 +452,8 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       const movedUnits = s.units.map((u, i) => (i === actorIdx ? attacker : u));
       s = { ...s, grid: newGrid, units: movedUnits };
       s.log = [...s.log, { type: 'move', data: { unitId: actorId, from: attacker.lastMovedFrom, to: action.moveTo } }];
+      s = claimStructureAt(s, actorId);
+      attacker = s.units[actorIdx]; // claim buffs (e.g. War Shrine) apply to this very strike
     }
 
     const { damage, luckEvents } = rollHit(s.hero, attacker, target, rng, s.hero.attack);
@@ -426,7 +478,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     // Check end before retaliation
     const endResult = checkBattleEnd(s);
     if (endResult) {
-      s.log = [...s.log, { type: 'battle_end', data: { result: endResult } }];
+      s.log = [...s.log, { type: 'battle_end', data: { result: endResult, lootXp: s.lootXp ?? 0 } }];
       return { ...s, result: endResult };
     }
 
@@ -512,7 +564,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
   const endResult = checkBattleEnd(s);
   if (endResult) {
-    s.log = [...s.log, { type: 'battle_end', data: { result: endResult } }];
+    s.log = [...s.log, { type: 'battle_end', data: { result: endResult, lootXp: s.lootXp ?? 0 } }];
     return { ...s, result: endResult };
   }
 

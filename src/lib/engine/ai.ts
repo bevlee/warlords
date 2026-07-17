@@ -28,11 +28,27 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
       : { type: 'attack', targetId: target.id };
   }
 
-  // Out of reach: walk toward the target
+  // Out of reach of any attack: an unclaimed structure this stack can stand
+  // on this turn beats plain approach — the buffs are army-wide and free.
+  const speed = effectiveSpeed(unit);
+  let bestClaim: { to: { col: number; row: number }; dist: number } | null = null;
+  for (const st of state.structures ?? []) {
+    if (st.claimedBy) continue;
+    const cell = state.grid.cells[st.pos.row][st.pos.col];
+    if (cell.blocked || cell.occupantId) continue;
+    const claimPath = findPath(state.grid, unit.pos, st.pos, unit.id);
+    if (claimPath.length === 0 || claimPath.length > speed) continue;
+    if (!bestClaim || claimPath.length < bestClaim.dist) {
+      bestClaim = { to: st.pos, dist: claimPath.length };
+    }
+  }
+  if (bestClaim) return { type: 'move', to: bestClaim.to };
+
+  // Walk toward the target
   const path = findPath(state.grid, unit.pos, target.pos, unit.id);
   if (path.length > 0) {
     // Move up to `speed` cells; -1: don't step onto the target's cell
-    const steps = Math.min(effectiveSpeed(unit), path.length - 1);
+    const steps = Math.min(speed, path.length - 1);
     const moveTo = steps > 0 ? path[steps - 1] : path[0];
     return { type: 'move', to: moveTo };
   }

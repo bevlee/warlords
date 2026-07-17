@@ -11,6 +11,7 @@ const STATUS_ICON: Partial<Record<string, string>> = {
   drain_morale: '💔',
   life_drain: '🩸',
   gating: '✨',
+  structure_claim: '🚩',
 };
 
 export type AnimStep =

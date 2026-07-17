@@ -16,3 +16,4 @@ export * from './factionSkills';
 export * from './augments';
 export * from './deploy';
 export * from './spells';
+export * from './structures';
