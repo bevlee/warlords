@@ -14,13 +14,13 @@
   import type {
     ArmyBonuses,
     ArmySlot,
-    BattleEvent,
     BattleState,
     Hero,
     Pos,
     SpellId,
     UnitStack,
   } from '$lib/engine/types';
+  import { describeEvent, SPELL_META } from './logLines';
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
   import UnitInfo from './UnitInfo.svelte';
@@ -28,6 +28,7 @@
   import type { ItemId } from '$lib/gauntlet/items';
   import Sprite from './Sprite.svelte';
   import SpellBook from './SpellBook.svelte';
+  import GameLog from './GameLog.svelte';
   import { stepsFromLogEntry, applyLogEntry, type AnimStep } from './animSteps';
 
   interface Props {
@@ -150,12 +151,6 @@
   const targetIds = $derived(new Set(actionIcons.keys()));
 
   const isHeroTurn = $derived(isPlayerTurn && !!activeUnit?.isHero);
-
-  const SPELL_META: Record<SpellId, { glyph: string; label: string }> = {
-    lightning: { glyph: '⚡', label: 'Lightning' },
-    bloodlust: { glyph: '💪', label: 'Bloodlust' },
-    stoneskin: { glyph: '🗿', label: 'Stoneskin' },
-  };
 
   // Spell targeting: pick a spell on the hero's turn, then click a stack.
   let pendingSpell: SpellId | null = $state(null);
@@ -366,65 +361,7 @@
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
   }
 
-  function unitLabel(id: unknown): string {
-    const u = battle.units.find(u => u.id === id);
-    if (!u) return 'a unit';
-    if (u.isHero) return u.side === 'enemy' ? 'the enemy hero' : 'your hero';
-    return `${u.side === 'enemy' ? 'enemy ' : ''}${u.definition.name}s`;
-  }
-
-  function describe(ev: BattleEvent): string {
-    const d = ev.data;
-    switch (ev.type) {
-      case 'round_start':
-        return `— Round ${d.round} —`;
-      case 'move':
-        return `${unitLabel(d.unitId)} move to (${(d.to as Pos).col}, ${(d.to as Pos).row}).`;
-      case 'defend':
-        return `${unitLabel(d.unitId)} brace for defense.`;
-      case 'cast':
-        return d.spell === 'lightning'
-          ? `Your hero casts Lightning at ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`
-          : `Your hero casts ${SPELL_META[d.spell as SpellId].label} on ${unitLabel(d.targetId)}.`;
-      case 'attack':
-        return `${unitLabel(d.attackerId)} strike ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
-      case 'retaliate':
-        return `${unitLabel(d.attackerId)} retaliate against ${unitLabel(d.targetId)} for ${d.damage} damage, killing ${d.killed}.`;
-      case 'shoot':
-        return `${unitLabel(d.attackerId)} shoot ${unitLabel(d.targetId)} for ${d.damage} damage${d.farShot ? ' (long shot — half damage)' : ''}, killing ${d.killed}.`;
-      case 'death':
-        return `${unitLabel(d.unitId)} are wiped out!`;
-      case 'morale_boost':
-        return `High morale! ${unitLabel(d.unitId)} act again.`;
-      case 'morale_freeze':
-        return `Low morale — ${unitLabel(d.unitId)} freeze and skip their turn.`;
-      case 'luck':
-        return d.kind === 'good'
-          ? `Lucky strike! ${unitLabel(d.unitId)} land a double-damage blow.`
-          : `Bad luck — ${unitLabel(d.unitId)} fumble for half damage.`;
-      case 'status': {
-        const label = unitLabel(d.unitId);
-        switch (d.effect) {
-          case 'life_drain': return `${label} drain ${d.heal} HP of life.`;
-          case 'slow': return `${label} are slowed.`;
-          case 'drain_morale': return `${label} morale is drained.`;
-          case 'blind': return `${label} are blinded and skip their turn.`;
-          case 'burn_apply': return `${label} catch fire.`;
-          case 'burn': return `${label} burn for ${d.damage} damage.`;
-          case 'bind': return `${label} are bound in place.`;
-          case 'bind_block': return `${label} strain against their bindings and cannot move.`;
-          default: return `${label} are affected by ${d.effect}.`;
-        }
-      }
-      case 'battle_end':
-        return 'The battle is over.';
-      default:
-        return ev.type;
-    }
-  }
-
-  const logLines = $derived(battle.log.map(describe));
-  const logTail = $derived(logLines.filter(l => l.trim()).slice(-2));
+  const logLines = $derived(battle.log.map(ev => describeEvent(ev, battle.units, battle.hero)));
 
   const statusText = $derived.by(() => {
     if (battle.result === 'player_wins') return 'Victory!';
@@ -459,12 +396,13 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="flex justify-center">
+<div class="flex items-stretch justify-center gap-3">
   <!-- Cap the board width by viewport height so the whole battle (board +
        turns bar) fits without scrolling on laptop screens. The subtrahend
        reserves the non-board chrome: status strip + the h-60 bottom row. -->
   <div class="w-full min-w-0" style="max-width: calc((100dvh - 430px) * 1.45 + 220px)">
-    <!-- Combat indicator: status + last log lines, above the battlefield.
+    <!-- Combat indicator: the current status/prompt above the battlefield.
+         Full event history lives in the Battle Log column to the right.
          Fixed height: content changes must never reflow the board below. -->
     <div class="mb-1 flex justify-center">
       <div
@@ -472,9 +410,6 @@
           border-slate-600/60 bg-slate-900/85 px-5 text-center shadow-lg"
       >
         <p class="text-sm font-medium text-slate-100">{statusText}</p>
-        {#each logTail as line, i (i)}
-          <p class="truncate font-mono text-[11px] leading-snug text-slate-400">{line}</p>
-        {/each}
       </div>
     </div>
 
@@ -674,6 +609,16 @@
           onunpin={() => (selectedId = null)}
         />
       </div>
+    </div>
+  </div>
+
+  <!-- Permanent, scrollable full-game history beside the board. Fixed width;
+       the relative/absolute wrapper pins the panel to the board column's
+       height so a long log scrolls INSIDE the panel instead of stretching
+       the row taller than the viewport. -->
+  <div class="relative hidden w-56 shrink-0 lg:block">
+    <div class="absolute inset-0">
+      <GameLog lines={logLines} />
     </div>
   </div>
 </div>
