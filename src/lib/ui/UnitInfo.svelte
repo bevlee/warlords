@@ -77,10 +77,14 @@
         { key: 'xp', value: `${hero.xp}` },
       ];
     }
+    // The hero's attack is added to every player stack in the damage formula,
+    // so fold it into the unit's shown attack — it's their real base. Spell
+    // buffs stay separate as the green (+N).
+    const heroAttack = !unit.isHero && unit.side === 'player' && hero ? hero.attack : 0;
     return [
       { key: 'count', value: `${unit.count}` },
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
-      { key: 'attack', value: `${d.attack + (unit.attackBuff ?? 0)}`, buff: unit.attackBuff ?? 0 },
+      { key: 'attack', value: `${d.attack + heroAttack + (unit.attackBuff ?? 0)}`, buff: unit.attackBuff ?? 0 },
       { key: 'defense', value: `${d.defense + (unit.defenseBuff ?? 0)}`, buff: unit.defenseBuff ?? 0 },
       { key: 'damage', value: `${d.minDamage}–${d.maxDamage}` },
       { key: 'speed', value: `${d.speed}` },
