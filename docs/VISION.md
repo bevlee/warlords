@@ -86,7 +86,22 @@ visual campaign map (locked/available/completed nodes) between the
 faction picker and army setup, and IndexedDB-persisted campaign progress
 alongside the hero record.
 
+Also done (2026-07-17, one plan doc each in `docs/plans/`): **tier
+unlocks** (recruiting gated by hero level, tier 7 at level 10, enemy
+generation matched) · **unit augments** (per-unit-type stat boosts and
+ability grants bought with level-up points, persisted on the hero) ·
+**pre-battle deployment phase** (place/split/merge stacks in the
+deployment zone, 7 field stacks max, obstacles on an independent seeded
+stream so preview and battle agree) · **faction-unique hero spells**
+(data-driven spell registry; Battle Cry / Healing Light / Fireball /
+Raise Dead / Wasp Swarm / Immolate, each unlocking at hero level 3) ·
+**neutral structures** (0–2 claimable battlefield objectives — shrines,
+fountain, idol, mana crystal, war chest — claimed by ending a move on
+them; AI contests them).
+
 1. **Long term** — unit art replacing emoji standees, PvP/economy layers,
-   remaining faction skills without combat effects yet (Tactics, Sorcery's
-   spell-damage hookup, Intelligence, Mysticism), and the deferred Demon
+   remaining faction skills without combat effects yet (Sorcery's
+   spell-damage hookup now feeds all damage spells; Intelligence and
+   Mysticism remain mana-only), neutral *guardian* units for structures
+   (phase 2 of the structures plan), and the deferred Demon
    Gate/Teleport/Haste abilities.
