@@ -2,6 +2,7 @@
   import type { BattleState, Pos, UnitStack } from '$lib/engine/types';
   import type { DamagePreview } from '$lib/engine/selectors';
   import type { AnimStep } from './animSteps';
+  import { pickOrigin } from './aim';
   import UnitToken from './UnitToken.svelte';
   import Sprite from './Sprite.svelte';
   import BattleFx from './BattleFx.svelte';
@@ -129,24 +130,15 @@
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const dx = e.clientX - (rect.left + rect.width / 2);
     const dy = (e.clientY - (rect.top + rect.height / 2)) / ROW_SQUASH;
-    const len = Math.hypot(dx, dy) || 1;
     // Too close to the centre to read a direction — keep the origin we already have
     // rather than letting sub-pixel jitter reassign it. Entering a tile still picks
     // one immediately; only re-deciding is suppressed.
-    if (len < rect.width * 0.18 && aim?.targetId === unit.id) return;
-    let best = origins[0];
-    let bestDot = -Infinity;
-    for (const o of origins) {
-      const oc = o.col - unit.pos.col;
-      const or = o.row - unit.pos.row;
-      const olen = Math.hypot(oc, or) || 1;
-      const dot = (dx / len) * (oc / olen) + (dy / len) * (or / olen);
-      if (dot > bestDot) {
-        bestDot = dot;
-        best = o;
-      }
-    }
-    aim = { targetId: unit.id, origin: best };
+    if (Math.hypot(dx, dy) < rect.width * 0.18 && aim?.targetId === unit.id) return;
+    // Hysteresis lives in pickOrigin: the held pick survives boundary jitter,
+    // and a pick that predates a board change (no longer in origins) is dropped.
+    const current = aim?.targetId === unit.id ? aim.origin : null;
+    const origin = pickOrigin(current, origins, unit.pos, { dx, dy });
+    if (origin) aim = { targetId: unit.id, origin };
   }
 
   const aimKey = $derived(aim ? `${aim.origin.col},${aim.origin.row}` : null);
