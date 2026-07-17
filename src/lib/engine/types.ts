@@ -14,6 +14,7 @@ export interface UnitDef {
   range: number;       // max shooting distance in cells (Chebyshev); 0 = melee only
   isLarge: boolean;
   abilities: string[]; // 'no_retaliation' | 'flying' | 'defense_reduction'
+  augmented?: boolean; // set by augmentedDef so the UI can badge boosted units
 }
 
 export interface UnitStack {
@@ -73,6 +74,8 @@ export interface Hero {
   factionSkills: FactionSkill[];
   mana?: number;       // set by initBattle (5 + 3·level) unless provided
   bonusSkeletons?: number; // Necromancer Necromancy: free Skeletons queued for the hero's next battle
+  augmentPoints?: number;                  // unspent augment points (1 earned per level-up)
+  unitAugments?: Record<string, string[]>; // unit name -> augment ids, max 2 per unit
 }
 
 export type SpellId = 'lightning' | 'bloodlust' | 'stoneskin';

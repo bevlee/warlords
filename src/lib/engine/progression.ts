@@ -32,8 +32,8 @@ export function budgetForLevel(level: number): number {
 }
 
 /**
- * Add XP and resolve any level-ups (+1 attack, +1 defense per level).
- * Returns the updated hero and how many levels were gained.
+ * Add XP and resolve any level-ups (+1 attack, +1 defense, +1 augment point
+ * per level). Returns the updated hero and how many levels were gained.
  */
 export function applyXp(hero: Hero, gained: number): { hero: Hero; levels: number } {
   const xp = hero.xp + gained;
@@ -47,5 +47,8 @@ export function applyXp(hero: Hero, gained: number): { hero: Hero; levels: numbe
     levels += 1;
   }
 
-  return { hero: { ...hero, xp, level, attack, defense }, levels };
+  return {
+    hero: { ...hero, xp, level, attack, defense, augmentPoints: (hero.augmentPoints ?? 0) + levels },
+    levels,
+  };
 }

@@ -35,7 +35,7 @@ describe('progression', () => {
     const { hero, levels } = applyXp(freshHero, 150);
 
     expect(levels).toBe(0);
-    expect(hero).toEqual({ ...freshHero, xp: 150 });
+    expect(hero).toEqual({ ...freshHero, xp: 150, augmentPoints: 0 });
   });
 
   it('budget grows 50 gold per level', () => {

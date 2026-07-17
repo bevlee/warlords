@@ -84,6 +84,7 @@
       <Sprite name={unit.definition.name} class="h-11 w-10" />
       <span class="flex-1 truncate text-sm font-semibold {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
         {unit.isHero ? `Hero — level ${hero?.level ?? '?'}` : unit.definition.name}
+        {#if unit.definition.augmented}<span class="ml-1 text-xs text-violet-300" title="Augmented">✦</span>{/if}
         {#if !unit.isHero}<span class="ml-1 font-mono text-xs text-slate-400">×{unit.count}</span>{/if}
       </span>
       {#if pinned}

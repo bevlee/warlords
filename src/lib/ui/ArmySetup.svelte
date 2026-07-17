@@ -3,7 +3,9 @@
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
   import { xpToReach, isTierUnlocked, tierUnlockLevel, maxUnlockedTier } from '$lib/engine/progression';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { augmentedDef } from '$lib/engine/augments';
   import Sprite from './Sprite.svelte';
+  import AugmentPicker from './AugmentPicker.svelte';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
   interface Props {
@@ -13,17 +15,21 @@
     onstart: (army: ArmySlot[]) => void;
     onreset: () => void;
     onclass: (cls: FactionClass) => void;
+    onaugment: (unitName: string, augmentId: string) => void;
   }
 
-  let { hero, budget, lastBattle, onstart, onreset, onclass }: Props = $props();
+  let { hero, budget, lastBattle, onstart, onreset, onclass, onaugment }: Props = $props();
 
   const xpFloor = $derived(xpToReach(hero.level));
   const xpCeil = $derived(xpToReach(hero.level + 1));
   const xpPct = $derived(Math.round(((hero.xp - xpFloor) / (xpCeil - xpFloor)) * 100));
 
-  const units = $derived(FACTION_UNITS[hero.class]);
+  // Rows display augmented stats; eligibility checks in the picker use the base def.
+  const baseUnits = $derived(FACTION_UNITS[hero.class]);
+  const units = $derived(baseUnits.map(u => augmentedDef(u, hero.unitAugments?.[u.name] ?? [])));
 
   let counts: Record<string, number> = $state({});
+  let augmentTarget: string | null = $state(null); // unit name with the picker open
 
   // Switching faction shows a different roster, and a level change (level-up or
   // hero reset) can change which tiers are recruitable — both invalidate picks.
@@ -39,8 +45,9 @@
       : false
   );
 
+  // Slots carry the *base* defs — startBattle applies augments once, centrally.
   const slots = $derived(
-    units.filter(u => counts[u.name] > 0).map(u => ({ unit: u, count: counts[u.name] }))
+    baseUnits.filter(u => counts[u.name] > 0).map(u => ({ unit: u, count: counts[u.name] }))
   );
   const spent = $derived(armyCost(slots));
   const goldLeft = $derived(budget - spent);
@@ -77,6 +84,9 @@
         <p class="text-sm font-semibold text-amber-200">
           Level {hero.level} {FACTION_INFO[hero.class].name}
           <span class="ml-2 font-mono text-xs text-slate-300">⚔{hero.attack} 🛡{hero.defense} 💧{maxMana(hero)}</span>
+          {#if (hero.augmentPoints ?? 0) > 0}
+            <span class="ml-2 font-mono text-xs text-violet-300">✦ {hero.augmentPoints} augment {hero.augmentPoints === 1 ? 'point' : 'points'}</span>
+          {/if}
         </p>
         <div class="mt-1 flex items-center gap-2">
           <div class="h-1.5 w-40 overflow-hidden rounded bg-black/50">
@@ -157,6 +167,16 @@
         {#if locked}
           <p class="text-xs font-semibold text-slate-500">🔒 Unlocks at level {tierUnlockLevel(unit.tier)}</p>
         {:else}
+          {@const owned = hero.unitAugments?.[unit.name] ?? []}
+          <button
+            type="button"
+            class="h-7 shrink-0 rounded px-1.5 font-mono text-xs
+              {owned.length > 0 ? 'bg-violet-900/60 text-violet-300' : 'bg-slate-600 text-slate-300'}
+              hover:bg-violet-800/60 hover:text-violet-200"
+            title="Augments"
+            aria-label="augments for {unit.name}"
+            onclick={() => (augmentTarget = unit.name)}
+          >✦{owned.length > 0 ? owned.length : ''}</button>
           <div class="flex items-center gap-1">
             <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
               disabled={n === 0} onclick={() => remove(unit.name, 5)} aria-label="remove 5 {unit.name}">‹5</button>
@@ -176,4 +196,17 @@
   <p class="mt-3 text-sm text-slate-400">
     The enemy warlord fields an army of the same value. Choose up to {MAX_STACKS} stacks.
   </p>
+
+  {#if augmentTarget}
+    {@const baseUnit = baseUnits.find(u => u.name === augmentTarget)}
+    {#if baseUnit}
+      <AugmentPicker
+        unit={baseUnit}
+        owned={hero.unitAugments?.[augmentTarget] ?? []}
+        points={hero.augmentPoints ?? 0}
+        onpick={(id) => onaugment(augmentTarget!, id)}
+        onclose={() => (augmentTarget = null)}
+      />
+    {/if}
+  {/if}
 </div>

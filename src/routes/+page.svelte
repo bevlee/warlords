@@ -5,6 +5,7 @@
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
   import { generateEnemyArmy, armyCost, filterToUnlockedTiers } from '$lib/engine/recruit';
   import { budgetForLevel, applyXp, maxUnlockedTier } from '$lib/engine/progression';
+  import { applyAugmentsToArmy, MAX_AUGMENTS_PER_UNIT } from '$lib/engine/augments';
   import { updateFactionSkills, necromancyBonusSkeletons } from '$lib/engine/factionSkills';
   import { SKELETON } from '$lib/engine/necromancer';
   import { mulberry32 } from '$lib/engine/rng';
@@ -22,6 +23,7 @@
 
   const DEFAULT_HERO: Hero = updateFactionSkills({
     class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [],
+    augmentPoints: 0, unitAugments: {},
   });
 
   let hero: Hero = $state({ ...DEFAULT_HERO });
@@ -39,9 +41,16 @@
 
   onMount(async () => {
     const saved = await loadHero();
-    // Migrate heroes persisted before faction skills existed.
+    // Migrate heroes persisted before faction skills / augments existed.
+    // Augment points are backfilled as one per level-up, minus any spent.
     if (saved) {
-      hero = updateFactionSkills({ ...saved, factionSkills: saved.factionSkills ?? [] });
+      const spent = Object.values(saved.unitAugments ?? {}).reduce((n, ids) => n + ids.length, 0);
+      hero = updateFactionSkills({
+        ...saved,
+        factionSkills: saved.factionSkills ?? [],
+        unitAugments: saved.unitAugments ?? {},
+        augmentPoints: saved.augmentPoints ?? Math.max(0, saved.level - 1 - spent),
+      });
       // Returning player: resume (or backfill) their campaign and skip straight to the map.
       campaign = (await loadCampaign()) ?? newCampaign();
       void saveCampaign(campaign);
@@ -57,9 +66,10 @@
   function startBattle(army: ArmySlot[]) {
     // Defense in depth: the setup UI already locks these rows.
     const unlocked = filterToUnlockedTiers(army, hero.level);
-    playerArmy = hero.bonusSkeletons
+    const withSkeletons = hero.bonusSkeletons
       ? [...unlocked, { unit: SKELETON, count: hero.bonusSkeletons }]
       : unlocked;
+    playerArmy = applyAugmentsToArmy(withSkeletons, hero);
     if (hero.bonusSkeletons) {
       hero = { ...hero, bonusSkeletons: 0 };
       void saveHero(hero);
@@ -130,6 +140,20 @@
     }
   }
 
+  // Spend an augment point on a unit type. The picker already filters to legal
+  // options; this re-checks the invariants that matter (points, cap, dup).
+  function handleAugment(unitName: string, augmentId: string) {
+    const owned = hero.unitAugments?.[unitName] ?? [];
+    if ((hero.augmentPoints ?? 0) <= 0) return;
+    if (owned.length >= MAX_AUGMENTS_PER_UNIT || owned.includes(augmentId)) return;
+    hero = {
+      ...hero,
+      augmentPoints: (hero.augmentPoints ?? 0) - 1,
+      unitAugments: { ...(hero.unitAugments ?? {}), [unitName]: [...owned, augmentId] },
+    };
+    void saveHero(hero);
+  }
+
   async function handleReset() {
     hero = { ...DEFAULT_HERO };
     lastBattle = null;
@@ -154,7 +178,7 @@
     <a href="/gauntlet" class="text-lg text-amber-400 hover:text-amber-300">🏰 Gauntlet mode →</a>
   </div>
   {#if screen === 'setup'}
-    <ArmySetup {hero} {budget} {lastBattle} onstart={startBattle} onreset={handleReset} onclass={handleClass} />
+    <ArmySetup {hero} {budget} {lastBattle} onstart={startBattle} onreset={handleReset} onclass={handleClass} onaugment={handleAugment} />
   {:else if screen === 'campaign' && campaign}
     <CampaignMap {hero} {campaign} onselect={selectEncounter} onback={backToSetup} />
   {:else if screen === 'result'}
