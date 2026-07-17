@@ -38,6 +38,12 @@
   let battleKey = $state(0);
   let loaded = $state(false);
 
+  // Debug: +99 hero attack, which the combat formula adds to every player
+  // stack's attack — a quick "win button" for testing. Session-only state,
+  // never saved to the run.
+  const DEBUG_ATTACK = 99;
+  let debugBoost = $state(false);
+
   onMount(async () => {
     const saved = await loadRun<RunState>();
     // Saves from before the items feature lack these fields.
@@ -146,7 +152,7 @@
       <Battle
         playerArmy={run.army}
         enemyArmy={encounter?.army ?? []}
-        hero={run.hero}
+        hero={debugBoost ? { ...run.hero, attack: run.hero.attack + DEBUG_ATTACK } : run.hero}
         armyBonuses={itemBonuses(run.items)}
         items={run.items}
         allowRestart={false}
@@ -336,7 +342,18 @@
         </div>
         <button
           type="button"
-          class="mt-3 w-full rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+          aria-pressed={debugBoost}
+          class="mt-3 w-full rounded border border-dashed px-2 py-1 text-xs font-medium transition
+            {debugBoost
+              ? 'border-lime-400 bg-lime-950/50 text-lime-300'
+              : 'border-slate-600 text-slate-500 hover:border-slate-500 hover:text-slate-300'}"
+          onclick={() => (debugBoost = !debugBoost)}
+        >
+          🐛 Debug +{DEBUG_ATTACK} ATK · {debugBoost ? 'ON' : 'OFF'}
+        </button>
+        <button
+          type="button"
+          class="mt-1 w-full rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-800 hover:text-slate-300"
           onclick={abandon}
         >
           Abandon run
