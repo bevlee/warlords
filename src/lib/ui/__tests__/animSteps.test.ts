@@ -53,6 +53,28 @@ describe('stepsFromLogEntry: damage', () => {
     ]);
   });
 
+  it('carries the kill count on the damage step', () => {
+    const entry: BattleEvent = {
+      type: 'attack',
+      data: { attackerId: 'a1', targetId: 't1', damage: 7, killed: 3 },
+    };
+
+    const steps = stepsFromLogEntry(entry);
+
+    expect(steps).toContainEqual({ unitId: 't1', kind: 'damage', value: 7, kills: 3 });
+  });
+
+  it('omits kills from the damage step when nothing died', () => {
+    const entry: BattleEvent = {
+      type: 'attack',
+      data: { attackerId: 'a1', targetId: 't1', damage: 7, killed: 0 },
+    };
+
+    const steps = stepsFromLogEntry(entry);
+
+    expect(steps).toContainEqual({ unitId: 't1', kind: 'damage', value: 7 });
+  });
+
   it('maps a retaliate entry to a strike lunge by the retaliator plus damage', () => {
     const entry: BattleEvent = {
       type: 'retaliate',

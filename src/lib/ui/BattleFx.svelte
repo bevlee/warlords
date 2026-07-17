@@ -1,6 +1,15 @@
 <script lang="ts">
   import type { AnimStep } from './animSteps';
+  import { damageTier, type DamageTier } from './logLines';
   import type { Pos } from '$lib/engine/types';
+
+  // Floater grows with the hit — same tiers as the log.
+  const DMG_SIZE: Record<DamageTier, string> = {
+    0: 'fx-dmg-0',
+    1: 'fx-dmg-1',
+    2: 'fx-dmg-2',
+    3: 'fx-dmg-3',
+  };
 
   interface Props {
     gridWidth: number;
@@ -45,7 +54,10 @@
           ></span>
         {/if}
       {:else if step.kind === 'damage'}
-        <span class="fx-text fx-damage" class:fx-delayed={step.delayed}>-{step.value}</span>
+        <span class="fx-text fx-damage {DMG_SIZE[damageTier(step.value)]}" class:fx-delayed={step.delayed}>-{step.value}</span>
+        {#if step.kills}
+          <span class="fx-text fx-kills" class:fx-delayed={step.delayed}>-{step.kills} 💀</span>
+        {/if}
       {:else if step.kind === 'buff'}
         <span class="fx-text fx-buff" class:fx-delayed={step.delayed}>+{step.value} {step.label}</span>
       {:else if step.kind === 'status'}
@@ -90,6 +102,27 @@
 
   .fx-status {
     font-size: 1.1rem;
+  }
+
+  /* Damage floater size tiers, matching the log's damageTier(). */
+  .fx-dmg-0 { font-size: 1rem; }
+  .fx-dmg-1 { font-size: 1.25rem; }
+  .fx-dmg-2 { font-size: 1.5rem; }
+  .fx-dmg-3 { font-size: 1.9rem; }
+
+  /* Kill tally floats up beneath the damage number, on a slight lag so the
+     two read as separate beats of the same hit. When the damage is itself
+     delayed (ranged/spell — waits for the projectile to land), the lag stacks
+     on top of the flight time. */
+  .fx-kills {
+    top: 55%;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    animation-delay: 150ms;
+    animation-fill-mode: backwards;
+  }
+  .fx-kills.fx-delayed {
+    animation-delay: calc(var(--flight-ms, 0ms) + 150ms);
   }
 
   /* Projectile wrapper is exactly cell-sized (inset: 0), so translate
@@ -210,7 +243,9 @@
       animation: none;
       opacity: 0; /* no flight — the damage number alone tells the story */
     }
-    .fx-text.fx-delayed {
+    .fx-text.fx-delayed,
+    .fx-kills,
+    .fx-kills.fx-delayed {
       animation-delay: 0ms;
     }
     .fx-bolt-strike,

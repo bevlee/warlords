@@ -14,7 +14,7 @@ const STATUS_ICON: Partial<Record<string, string>> = {
 };
 
 export type AnimStep =
-  | { unitId: string; kind: 'damage'; value: number; delayed?: boolean }
+  | { unitId: string; kind: 'damage'; value: number; delayed?: boolean; kills?: number }
   | { unitId: string; kind: 'buff'; value: number; label: string; delayed?: boolean }
   | { unitId: string; kind: 'death' }
   | { unitId: string; kind: 'status'; icon: string }
@@ -31,40 +31,53 @@ export type AnimStep =
   // Cast visual at the target cell: lightning bolt flash or buff glow.
   | { unitId: string; kind: 'spell_fx'; spell: 'lightning' | 'bloodlust' | 'stoneskin' };
 
+/** A damage floater step, carrying the stack-kill count only when something died. */
+function dmgStep(unitId: string, value: number, killed?: number, delayed?: boolean): AnimStep {
+  return {
+    unitId,
+    kind: 'damage',
+    value,
+    ...(killed && killed > 0 ? { kills: killed } : {}),
+    ...(delayed ? { delayed: true } : {}),
+  };
+}
+
 /** Translates one battle log entry into the visual steps it should play. */
 export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
   switch (entry.type) {
     case 'attack':
     case 'retaliate': {
-      const { attackerId, targetId, damage } = entry.data as { attackerId: string; targetId: string; damage: number };
+      const { attackerId, targetId, damage, killed } = entry.data as { attackerId: string; targetId: string; damage: number; killed?: number };
       return [
         { unitId: attackerId, kind: 'strike', targetId },
-        { unitId: targetId, kind: 'damage', value: damage },
+        dmgStep(targetId, damage, killed),
       ];
     }
     case 'shoot': {
-      const { attackerId, targetId, damage, splash } = entry.data as {
+      const { attackerId, targetId, damage, killed, splash } = entry.data as {
         attackerId: string;
         targetId: string;
         damage: number;
+        killed?: number;
         splash?: boolean;
       };
       // Splash hits radiate from the primary impact — no second arrow.
-      if (splash) return [{ unitId: targetId, kind: 'damage', value: damage }];
+      if (splash) return [dmgStep(targetId, damage, killed)];
       return [
         { unitId: attackerId, kind: 'projectile', targetId },
-        { unitId: targetId, kind: 'damage', value: damage, delayed: true },
+        dmgStep(targetId, damage, killed, true),
       ];
     }
     case 'cast': {
-      const { targetId, damage, spell } = entry.data as {
+      const { targetId, damage, killed, spell } = entry.data as {
         targetId: string;
         damage?: number;
+        killed?: number;
         spell: 'lightning' | 'bloodlust' | 'stoneskin';
       };
       const fx: AnimStep = { unitId: targetId, kind: 'spell_fx', spell };
       if (damage !== undefined) {
-        return [fx, { unitId: targetId, kind: 'damage', value: damage, delayed: true }];
+        return [fx, dmgStep(targetId, damage, killed, true)];
       }
       if (spell === 'bloodlust') return [fx, { unitId: targetId, kind: 'buff', value: 4, label: 'ATK', delayed: true }];
       if (spell === 'stoneskin') return [fx, { unitId: targetId, kind: 'buff', value: 4, label: 'DEF', delayed: true }];
