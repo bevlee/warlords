@@ -82,6 +82,20 @@
         const dx = Math.max(-1, Math.min(1, target.pos.col - attacker.pos.col)) * 0.45 * CELL_X;
         const dy = Math.max(-1, Math.min(1, target.pos.row - attacker.pos.row)) * 0.45 * CELL_Y;
         map.set(unitId, { cls: 'striking', style: `--strike-x: ${dx}%; --strike-y: ${dy}%; ${ms}` });
+      } else if (step.kind === 'recoil') {
+        // Hit reaction: flinch ~18% of a cell away from the attacker, delayed
+        // to the moment of impact — melee contact (~35% into the lunge, which
+        // peaks at 40%) or the projectile's landing (flight = 60% of the beat).
+        const victim = unitsById.get(unitId);
+        const attacker = unitsById.get(step.fromId);
+        if (!victim || !attacker) continue;
+        const dx = Math.max(-1, Math.min(1, victim.pos.col - attacker.pos.col)) * 0.18 * CELL_X;
+        const dy = Math.max(-1, Math.min(1, victim.pos.row - attacker.pos.row)) * 0.18 * CELL_Y;
+        const delay = Math.round(stepMs * (step.delayed ? 0.6 : 0.9 * 0.35));
+        map.set(unitId, {
+          cls: 'recoiling',
+          style: `--recoil-x: ${dx}%; --recoil-y: ${dy}%; --recoil-delay: ${delay}ms; ${ms}`,
+        });
       }
     }
     return map;
@@ -246,7 +260,7 @@
               class:dying={dyingIds.has(occupant.id)}
               style={anim?.style ?? ''}
             >
-              <UnitToken unit={occupant} active={occupant.id === activeId} />
+              <UnitToken unit={occupant} active={occupant.id === activeId} dying={dyingIds.has(occupant.id)} />
             </div>
             {#if attackable && (hoveredId === occupant.id || aim?.targetId === occupant.id) && previews.has(occupant.id)}
               {@const p = previews.get(occupant.id)!}
@@ -272,7 +286,7 @@
     gridHeight={battleState.grid.height}
     {stepMs}
     steps={activeSteps
-      .filter(({ step }) => step.kind !== 'move' && step.kind !== 'strike')
+      .filter(({ step }) => step.kind !== 'move' && step.kind !== 'strike' && step.kind !== 'recoil')
       .map(({ unitId, step }): { step: AnimStep; pos: Pos; fromPos?: Pos; art?: 'arrow' | 'bolt'; key: string } | null => {
         const key = `${unitId}-${step.kind}-${battleState.log.length}`;
         if (step.kind === 'projectile') {
@@ -393,6 +407,24 @@
     animation: standee-strike var(--anim-ms, 400ms) ease-in-out;
   }
 
+  /* Hit reaction: the target flinches away from the attack and settles
+     back. --recoil-delay times it to the moment of impact (melee contact
+     or projectile landing), not the start of the beat. */
+  .token-standing.recoiling {
+    animation: standee-recoil var(--anim-ms, 400ms) ease-out;
+    animation-delay: var(--recoil-delay, 0ms);
+  }
+
+  @keyframes standee-recoil {
+    0%,
+    100% {
+      transform: rotateX(calc(-1 * var(--tilt)));
+    }
+    30% {
+      transform: translate(var(--recoil-x), var(--recoil-y)) rotateX(calc(-1 * var(--tilt)));
+    }
+  }
+
   @keyframes standee-strike {
     0%,
     100% {
@@ -403,10 +435,12 @@
     }
   }
 
-  /* Dying stack: fades and sinks into the board rather than vanishing
-     instantly, timed to finish as the death step's reveal delay elapses. */
+  /* Dying stack: collapses (death pose via UnitToken) while slowly fading
+     and sinking into the board. ease-out so the drop is visible immediately
+     and the ghost lingers; duration must stay inside Battle.svelte's
+     fxTailMs hold or the stack unmounts mid-fade. */
   .token-standing.dying {
-    transition: opacity 0.5s ease-in, transform 0.5s ease-in;
+    transition: opacity 1.1s ease-out, transform 1.1s ease-out;
     opacity: 0;
     transform: rotateX(calc(-1 * var(--tilt))) translateY(15%);
   }
@@ -487,7 +521,8 @@
     }
 
     .token-standing.sliding,
-    .token-standing.striking {
+    .token-standing.striking,
+    .token-standing.recoiling {
       animation: none;
     }
   }
