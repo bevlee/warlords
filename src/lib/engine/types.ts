@@ -67,6 +67,7 @@ export interface FactionSkill {
 
 export interface Hero {
   class: FactionClass;
+  name?: string;       // display name; boss heroes are named, the player's may be
   level: number;
   xp: number;
   attack: number;
