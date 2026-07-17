@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { UnitStack } from '$lib/engine/types';
   import Sprite from './Sprite.svelte';
+  import { controllerOf, CONTROLLER_STYLE } from './controllers';
 
   interface Props {
     unit: UnitStack;
@@ -22,8 +23,8 @@
 
   <span
     class="absolute bottom-0 right-0 rounded-sm border px-1 font-mono font-bold leading-tight text-white
-      {small ? 'text-[9px]' : 'text-[11px]'}
-      {unit.side === 'player' ? 'border-sky-300 bg-sky-700' : 'border-red-300 bg-red-700'}"
+      {small ? 'text-[11px]' : 'text-[13px]'}
+      {CONTROLLER_STYLE[controllerOf(unit)].badge}"
   >
     {unit.count}
   </span>
