@@ -119,23 +119,24 @@
     <p class="text-slate-400">Loading…</p>
   {:else if !run}
     <!-- Run setup: pick a faction -->
-    <div class="mx-auto max-w-3xl">
-      <p class="mb-4 text-slate-300">
-        Fight 10 escalating battles. Losses persist — draft reinforcements after each victory.
-        Choose your faction:
+    <div class="mx-auto max-w-5xl">
+      <h2 class="mb-2 text-3xl font-bold text-amber-200">Choose your faction</h2>
+      <p class="mb-8 text-lg text-slate-300">
+        Fight 10 escalating battles, then continue forever in Endless. Losses persist —
+        draft reinforcements and army-wide artifacts after each victory.
       </p>
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {#each Object.entries(FACTION_INFO) as [id, info] (id)}
           {@const t7 = FACTION_UNITS[id as FactionClass].find(u => u.tier === 7)!}
           <button
             type="button"
-            class="flex flex-col items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 p-4
-              text-center hover:border-amber-400 hover:bg-slate-700"
+            class="flex flex-col items-center gap-3 rounded-xl border-2 border-slate-700 bg-slate-800 p-7
+              text-center transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-slate-700"
             onclick={() => begin(id as FactionClass)}
           >
-            <Sprite name={t7.name} class="h-16 w-14" />
-            <span class="font-semibold text-amber-200">{info.name}</span>
-            <span class="text-xs text-slate-400">{info.description}</span>
+            <Sprite name={t7.name} class="h-28 w-24" />
+            <span class="text-xl font-bold text-amber-200">{info.name}</span>
+            <span class="text-sm leading-snug text-slate-400">{info.description}</span>
           </button>
         {/each}
       </div>
@@ -218,7 +219,12 @@
         {run.status === 'won' ? '🏆 Gauntlet conquered!' : 'Run over'}
       </p>
       <p class="mb-1 text-slate-300">
-        {FACTION_INFO[run.faction].name} · {run.battlesWon} / {RUN_LENGTH} battles won
+        {FACTION_INFO[run.faction].name} ·
+        {#if run.endlessDepth > 0}
+          gauntlet cleared + {run.endlessDepth} endless {run.endlessDepth === 1 ? 'battle' : 'battles'}
+        {:else}
+          {run.battlesWon} / {RUN_LENGTH} battles won
+        {/if}
       </p>
       <p class="mb-4 text-sm text-slate-400">Hero reached level {run.hero.level}</p>
       <button
@@ -233,6 +239,32 @@
     <!-- Run map -->
     <div class="mx-auto flex max-w-3xl gap-6">
       <div class="flex-1">
+        {#if run.encounterIndex > RUN_LENGTH}
+          <!-- Endless: the 10-node gauntlet is cleared; battles continue with
+               ever-escalating enemies. The fixed act list would show all-cleared
+               and offer no current node, so drive endless from its own card. -->
+          {@const enc = generateGauntletEnemy(run)}
+          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-400">
+            🏆 Gauntlet cleared — 10/10
+          </p>
+          <div class="rounded-lg border-2 border-purple-500 bg-purple-950/30 p-4 shadow-lg">
+            <p class="mb-2 text-sm font-semibold uppercase tracking-wide text-purple-300">
+              ♾️ Endless — Depth {run.endlessDepth}
+            </p>
+            <div class="flex items-center gap-3">
+              <span class="flex-1 text-sm text-slate-200">
+                {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(run.encounterIndex)}
+              </span>
+              <button
+                type="button"
+                class="rounded bg-amber-600 px-4 py-1 text-sm font-semibold text-white hover:bg-amber-500"
+                onclick={fight}
+              >
+                Fight ⚔️
+              </button>
+            </div>
+          </div>
+        {:else}
         {#each [3, 2, 1] as act (act)}
           <p class="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
             {ACT_NAMES[act as 1 | 2 | 3]}
@@ -266,6 +298,7 @@
             </div>
           {/each}
         {/each}
+        {/if}
       </div>
 
       <div class="w-56 shrink-0">
