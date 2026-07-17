@@ -32,13 +32,12 @@ export function modifiedDamage(
 
   let totalDamage = dmgPerCreature * attacker.count;
 
-  // Attack/defense modifier
+  // Attack/defense modifier: +5% damage per point of attack over defense,
+  // −5%-equivalent per point under. Uncapped in both directions.
   if (atk > def) {
-    const bonus = Math.min(atk - def, 20);
-    totalDamage *= 1 + 0.05 * bonus;
+    totalDamage *= 1 + 0.05 * (atk - def);
   } else if (def > atk) {
-    const penalty = Math.min(def - atk, 20);
-    totalDamage /= 1 + 0.05 * penalty;
+    totalDamage /= 1 + 0.05 * (def - atk);
   }
 
   // Knight Jousting: cavalry deals +5% damage per cell moved before this attack.

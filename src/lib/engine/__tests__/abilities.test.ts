@@ -29,6 +29,24 @@ function sequenceRng(values: number[]) {
   return () => values[Math.min(i++, values.length - 1)];
 }
 
+describe('attack/defense modifier (uncapped)', () => {
+  const dmg = 10;
+
+  it('scales +5% per point of attack over defense, past the old 20-point cap', () => {
+    // atk − def = 40 → ×(1 + 0.05·40) = ×3.0 (the old cap held this at ×2.0).
+    const attacker = makeStack({ definition: { ...GOBLIN, attack: 45 } });
+    const defender = makeStack({ definition: { ...GOBLIN, defense: 5 }, side: 'enemy' });
+    expect(modifiedDamage(attacker, defender, 0, dmg)).toBeCloseTo(dmg * 10 * 3.0, 5);
+  });
+
+  it('scales damage down past the old 20-point cap when out-defended', () => {
+    // def − atk = 40 → ÷(1 + 0.05·40) = ÷3.0 (the old cap held this at ÷2.0).
+    const attacker = makeStack({ definition: { ...GOBLIN, attack: 5 } });
+    const defender = makeStack({ definition: { ...GOBLIN, defense: 45 }, side: 'enemy' });
+    expect(modifiedDamage(attacker, defender, 0, dmg)).toBeCloseTo((dmg * 10) / 3.0, 5);
+  });
+});
+
 describe('Jousting (Cavalier/Champion)', () => {
   // attack === defense cancels out the usual attack/defense modifier, isolating jousting.
   const evenDefender = () => makeStack({ definition: { ...GOBLIN, defense: CAVALIER.attack }, side: 'enemy' });
