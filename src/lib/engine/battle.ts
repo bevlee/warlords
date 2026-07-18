@@ -175,7 +175,8 @@ function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, co
     side,
     hasRetaliated: false,
     shotsLeft: slot.unit.shots,
-    morale: 0,
+    // Bravery: the unit carries its own morale into battle, either side.
+    morale: slot.unit.abilities.includes('bravery') ? 1 : 0,
     luck: 0,
     atb: 0,
     isDefending: false,

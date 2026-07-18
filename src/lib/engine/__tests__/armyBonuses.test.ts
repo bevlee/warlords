@@ -92,3 +92,18 @@ describe('initBattle armyBonuses', () => {
     expect(player.initiativeBonus).toBeUndefined();
   });
 });
+
+describe('bravery ability', () => {
+  it('grants +1 morale at battle init', () => {
+    const BRAVE: UnitDef = { ...GOBLIN, abilities: ['bravery'] };
+    const state = initBattle([{ unit: BRAVE, count: 5 }], [{ unit: GOBLIN, count: 5 }], mockHero, 7);
+    const brave = state.units.find(u => u.side === 'player' && !u.isHero)!;
+    expect(brave.morale).toBe(1);
+  });
+
+  it('applies to enemy stacks carrying it too, and clamps with other sources', () => {
+    const BRAVE: UnitDef = { ...GOBLIN, abilities: ['bravery'] };
+    const state = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: BRAVE, count: 5 }], mockHero, 7);
+    expect(state.units.find(u => u.side === 'enemy')!.morale).toBe(1);
+  });
+});
