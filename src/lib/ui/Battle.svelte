@@ -30,7 +30,7 @@
   import Sprite from './Sprite.svelte';
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
-  import { stepsFromLogEntry, applyLogEntry, type AnimStep } from './animSteps';
+  import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -136,6 +136,10 @@
   let animating = $state(false);
   let activeSteps = $state<{ unitId: string; step: AnimStep }[]>([]);
   let dyingIds = $state(new Set<string>());
+  // Units that die later in the current reveal batch: kept mounted (alive pose)
+  // through their lethal hit so projectiles land on a visible target; dyingIds
+  // takes over at the death beat to run the fade.
+  let doomedIds = $state(new Set<string>());
   let revealToken = 0;
 
   const STEP_DELAY_MS = $derived({ slow: 700, normal: 450, fast: 200 }[battleSpeed]);
@@ -151,6 +155,7 @@
     const token = ++revealToken;
     animating = true;
     const newEntries = result.log.slice(battle.log.length);
+    doomedIds = deathIdsIn(newEntries);
     let working = battle;
 
     for (const entry of newEntries) {
@@ -171,6 +176,7 @@
 
     activeSteps = [];
     dyingIds = new Set();
+    doomedIds = new Set();
     battle = result; // ground-truth correction
     animating = false;
   }
@@ -417,6 +423,7 @@
     animating = false;
     activeSteps = [];
     dyingIds = new Set();
+    doomedIds = new Set();
     pendingSpell = null;
     resultAnnounced = false;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
@@ -564,6 +571,7 @@
           hoveredId={hovered?.id ?? null}
           {activeSteps}
           {dyingIds}
+          {doomedIds}
           stepMs={STEP_DELAY_MS}
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}

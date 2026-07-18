@@ -24,6 +24,8 @@
     hoveredId: string | null;
     activeSteps: { unitId: string; step: AnimStep }[];
     dyingIds: Set<string>;
+    /** Die later in this reveal batch — kept mounted at count 0 until then. */
+    doomedIds: Set<string>;
     stepMs: number;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
@@ -50,6 +52,7 @@
     hoveredId,
     activeSteps,
     dyingIds,
+    doomedIds,
     stepMs,
     oncellclick,
     onunitclick,
@@ -116,7 +119,11 @@
   // the engine's real state) but must keep rendering — still occupying its
   // grid cell — through the death-fade transition.
   const unitsById = $derived(
-    new Map(battleState.units.filter(u => u.count > 0 || dyingIds.has(u.id)).map(u => [u.id, u]))
+    new Map(
+      battleState.units
+        .filter(u => u.count > 0 || dyingIds.has(u.id) || doomedIds.has(u.id))
+        .map(u => [u.id, u])
+    )
   );
 
   // LordsWM-style cursors: the pointer itself becomes a sword/bow near targets.
