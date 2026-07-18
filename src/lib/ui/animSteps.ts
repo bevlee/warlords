@@ -122,6 +122,18 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
   }
 }
 
+/** Unit ids that die anywhere in this entry batch. Known before the reveal
+ *  starts, so the grid can keep doomed units mounted at count 0 until their
+ *  death beat starts the fade — otherwise they unmount the instant the
+ *  lethal hit's damage is applied, one beat before dyingIds knows. */
+export function deathIdsIn(entries: BattleEvent[]): Set<string> {
+  const ids = new Set<string>();
+  for (const e of entries) {
+    if (e.type === 'death') ids.add((e.data as { unitId: string }).unitId);
+  }
+  return ids;
+}
+
 /** Patches only what an animation step needs to read (count/hp/buffs) from
  *  one log entry. Not a full engine replica — Battle.svelte always
  *  overwrites with the engine's real result after the last entry. */

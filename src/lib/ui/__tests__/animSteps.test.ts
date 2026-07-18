@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stepsFromLogEntry, applyLogEntry } from '../animSteps';
+import { stepsFromLogEntry, applyLogEntry, deathIdsIn } from '../animSteps';
 import { createGrid, placeUnits } from '$lib/engine/grid';
 import { GOBLIN } from '$lib/engine/barbarian';
 import type { BattleEvent, BattleState, UnitDef, UnitStack, Pos } from '$lib/engine/types';
@@ -284,5 +284,21 @@ describe('applyLogEntry', () => {
     const next = applyLogEntry(state, entry);
 
     expect(next.units).toEqual(state.units);
+  });
+});
+
+describe('deathIdsIn', () => {
+  it('collects every death entry unit id from a batch', () => {
+    const entries: BattleEvent[] = [
+      { type: 'attack', data: { attackerId: 'a1', targetId: 't1', damage: 9, killed: 3 } },
+      { type: 'death', data: { unitId: 't1' } },
+      { type: 'retaliate', data: { attackerId: 't2', targetId: 'a1', damage: 4, killed: 1 } },
+      { type: 'death', data: { unitId: 'a1' } },
+    ];
+    expect(deathIdsIn(entries)).toEqual(new Set(['t1', 'a1']));
+  });
+
+  it('returns an empty set when nothing dies', () => {
+    expect(deathIdsIn([{ type: 'move', data: { unitId: 'u1', to: { col: 1, row: 1 } } }])).toEqual(new Set());
   });
 });
