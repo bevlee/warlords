@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, SpellId, UnitStack } from './types';
+import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types';
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat';
@@ -275,8 +275,104 @@ export function initBattle(
     log: [{ type: 'round_start', data: { round: 1 } }],
     result: 'ongoing',
     seed,
+    // Battles open in deployment; the first actor is already chosen (advance
+    // below), but the UI freezes the turn loop until beginCombat flips this.
+    phase: 'deploy',
   };
   return advance(state);
+}
+
+/** Left columns the player may deploy in (before Knight Tactics). */
+export const DEPLOY_COLS = 3;
+
+/** Max on-field player stacks; splitting is refused past this (HoMM-style). */
+export const MAX_FIELD_STACKS = 7;
+
+/** A cell is deployable if it's in the left zone (widened forward by Tactics)
+ *  and on the board. Occupancy/obstacles are checked separately by the ops. */
+export function isInDeployZone(pos: Pos, tacticsShift: number): boolean {
+  return (
+    pos.col >= 0 &&
+    pos.col <= DEPLOY_COLS - 1 + tacticsShift &&
+    pos.row >= 0 &&
+    pos.row < GRID_H
+  );
+}
+
+/** Whether a stack is one the player may reposition during deployment. */
+function isDeployable(u: UnitStack | undefined): u is UnitStack {
+  return !!u && u.side === 'player' && !u.isHero && !u.isAlly;
+}
+
+/** Move one of the player's stacks to `to` during deployment. Empty in-zone
+ *  cell → move; another of the player's stacks → swap. Any other target
+ *  (out of zone, obstacle, enemy, hero) is a no-op returning the same state. */
+export function deployMove(state: BattleState, unitId: string, to: Pos): BattleState {
+  const unit = state.units.find(u => u.id === unitId);
+  if (!isDeployable(unit)) return state;
+  if (!isInDeployZone(to, getTacticsShift(state.hero))) return state;
+  const cell = state.grid.cells[to.row][to.col];
+  if (cell.blocked) return state;
+  if (cell.occupantId === unitId) return state;
+
+  const occupant = cell.occupantId ? state.units.find(u => u.id === cell.occupantId) : undefined;
+  if (cell.occupantId && !isDeployable(occupant)) return state; // can't displace enemies/hero
+
+  const from = unit.pos;
+  if (occupant) {
+    const units = state.units.map(u =>
+      u.id === unitId ? { ...u, pos: to } : u.id === occupant.id ? { ...u, pos: from } : u
+    );
+    const grid = setOccupant(setOccupant(state.grid, from, occupant.id), to, unitId);
+    return { ...state, units, grid };
+  }
+  const units = state.units.map(u => (u.id === unitId ? { ...u, pos: to } : u));
+  const grid = setOccupant(setOccupant(state.grid, from, null), to, unitId);
+  return { ...state, units, grid };
+}
+
+/** Peel `amount` creatures off a player stack into a new same-unit stack at an
+ *  empty in-zone cell `to`. No-op if amount is out of (0, count), `to` isn't an
+ *  empty in-zone cell, or the field-stack cap is reached. Battle-scoped —
+ *  survivorsFrom merges same-unit stacks back into the persistent army. */
+export function splitStack(state: BattleState, unitId: string, amount: number, to: Pos): BattleState {
+  const unit = state.units.find(u => u.id === unitId);
+  if (!isDeployable(unit)) return state;
+  if (!Number.isInteger(amount) || amount < 1 || amount >= unit.count) return state;
+  if (!isInDeployZone(to, getTacticsShift(state.hero))) return state;
+  const cell = state.grid.cells[to.row][to.col];
+  if (cell.blocked || cell.occupantId) return state;
+  const fieldStacks = state.units.filter(u => isDeployable(u) && u.count > 0).length;
+  if (fieldStacks >= MAX_FIELD_STACKS) return state;
+
+  const id = uuidv4();
+  const created: UnitStack = {
+    id,
+    definition: unit.definition,
+    count: amount,
+    hp: unit.definition.hp,
+    pos: to,
+    side: 'player',
+    hasRetaliated: false,
+    shotsLeft: unit.definition.shots,
+    morale: unit.morale,
+    luck: unit.luck,
+    atb: 0,
+    isDefending: false,
+    ...(unit.attackBuff !== undefined ? { attackBuff: unit.attackBuff } : {}),
+    ...(unit.defenseBuff !== undefined ? { defenseBuff: unit.defenseBuff } : {}),
+    ...(unit.initiativeBonus !== undefined ? { initiativeBonus: unit.initiativeBonus } : {}),
+  };
+  const units = state.units
+    .map(u => (u.id === unitId ? { ...u, count: u.count - amount } : u))
+    .concat(created);
+  return { ...state, units, grid: setOccupant(state.grid, to, id) };
+}
+
+/** Leave deployment and start the battle. The first actor was already chosen
+ *  in initBattle, so this only unfreezes the turn loop. */
+export function beginCombat(state: BattleState): BattleState {
+  return { ...state, phase: 'combat' };
 }
 
 /** advanceTurn, plus Wizard Mysticism's mana regen whenever a new round starts. */

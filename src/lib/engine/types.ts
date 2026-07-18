@@ -114,6 +114,10 @@ export interface BattleState {
   log: BattleEvent[];
   result: 'ongoing' | 'player_wins' | 'enemy_wins';
   seed: number;
+  /** 'deploy' = pre-combat troop placement (UI freezes the turn loop);
+   *  'combat' = normal battle. Absent on states built before this existed,
+   *  treated as 'combat'. */
+  phase?: 'deploy' | 'combat';
 }
 
 export type BattleAction =
