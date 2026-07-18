@@ -113,7 +113,12 @@ whole class of "click does nothing" stalls).
 
 Roguelite run: faction select (6 cards) → 10-node map (`Fight ⚔️` on the
 current node, bosses at 3/7/10) → battle (Continue on the overlay) → draft
-(3 unit cards, click one) → map. Run persists in IndexedDB key `gauntletRun`
+(3 unit cards, click one) → map.
+
+**Every battle opens in a deploy phase** — the turn loop is frozen and the
+status strip is replaced by a banner until you click
+`getByRole('button', { name: 'Begin battle ⚔️' })`. Any driver that waits
+for "Your …" turn text without clicking Begin first will idle forever. Run persists in IndexedDB key `gauntletRun`
 (kv store) — but note each Playwright launch is a fresh profile, so
 persistence checks must reload within one browser session. To test late-run
 states, inject a crafted RunState into idb via page.evaluate and reload.
