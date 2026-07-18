@@ -90,6 +90,19 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
     label: 'Cast haste',
     description: 'Occasionally casts Haste on a friendly stack.',
   },
+  // Run-taught unit skills (gauntlet skill drafts).
+  double_strike: {
+    label: 'Double strike',
+    description: 'Melee attacks land a second blow after the retaliation.',
+  },
+  fleet_footwork: {
+    label: 'Fleet footwork',
+    description: '+1 speed.',
+  },
+  bravery: {
+    label: 'Bravery',
+    description: '+1 morale.',
+  },
 };
 
 export function abilityInfo(ability: string): { label: string; description: string } {

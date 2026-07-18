@@ -2,6 +2,7 @@
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import { abilityInfo } from './abilities';
+  import { skillIconFor, skillGlyph } from './skillIcons';
   import Sprite from './Sprite.svelte';
 
   interface Props {
@@ -149,8 +150,23 @@
       <div class="flex flex-col gap-1 border-t border-slate-700 pt-1.5">
         {#each unit.definition.abilities as ability (ability)}
           {@const info = abilityInfo(ability)}
+          {@const taught = unit.definition.grantedAbilities?.includes(ability) ?? false}
           <div>
-            <p class="font-semibold leading-tight text-amber-300 {sz.ability}">{info.label}</p>
+            {#if taught}
+              <!-- Run-taught skill: violet, with its icon (PNG when art exists,
+                   glyph until then) — visually distinct from base abilities. -->
+              <p class="flex items-center gap-1 font-semibold leading-tight text-violet-300 {sz.ability}">
+                {#if skillIconFor(ability)}
+                  <img src={skillIconFor(ability)} alt="" class="h-4 w-4" />
+                {:else}
+                  <span aria-hidden="true">{skillGlyph(ability)}</span>
+                {/if}
+                {info.label}
+                <span class="text-[9px] font-normal uppercase tracking-wider text-violet-400/80">taught</span>
+              </p>
+            {:else}
+              <p class="font-semibold leading-tight text-amber-300 {sz.ability}">{info.label}</p>
+            {/if}
             <p class="leading-tight text-slate-400 {sz.ability}">{info.description}</p>
           </div>
         {/each}

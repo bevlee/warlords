@@ -5,11 +5,14 @@
   import { FACTION_INFO, FACTION_UNITS } from '$lib/engine/factions';
   import { armyCost } from '$lib/engine/recruit';
   import { ITEMS, itemBonuses, itemEffectText, type ItemId } from '$lib/gauntlet/items';
+  import { UNIT_SKILLS, applyUnitSkills, type SkillId } from '$lib/gauntlet/skills';
+  import { skillIconFor, skillGlyph } from '$lib/ui/skillIcons';
   import {
     newRun,
     recordBattle,
     applyPick,
     applyItemPick,
+    applySkillPick,
     generateGauntletEnemy,
     survivorsFrom,
     encounterBudget,
@@ -47,7 +50,15 @@
   onMount(async () => {
     const saved = await loadRun<RunState>();
     // Saves from before the items feature lack these fields.
-    run = saved ? { ...saved, items: saved.items ?? [], pendingItems: saved.pendingItems ?? null } : null;
+    run = saved
+      ? {
+          ...saved,
+          items: saved.items ?? [],
+          pendingItems: saved.pendingItems ?? null,
+          unitSkills: saved.unitSkills ?? {},
+          pendingSkills: saved.pendingSkills ?? null,
+        }
+      : null;
     loaded = true;
   });
 
@@ -78,6 +89,23 @@
   function pickItem(id: ItemId) {
     if (!run) return;
     run = applyItemPick(run, id);
+    void saveRun(run);
+  }
+
+  // Skill draft: pick a skill card, then click the unit that learns it.
+  let chosenSkill = $state<SkillId | null>(null);
+
+  function canLearn(unitName: string, skill: SkillId): boolean {
+    if (!run) return false;
+    const slot = run.army.find(s => s.unit.name === unitName);
+    if (!slot) return false;
+    return !(run.unitSkills[unitName] ?? []).includes(skill) && !slot.unit.abilities.includes(skill);
+  }
+
+  function teachSkill(unitName: string) {
+    if (!run || !chosenSkill || !canLearn(unitName, chosenSkill)) return;
+    run = applySkillPick(run, chosenSkill, unitName);
+    chosenSkill = null;
     void saveRun(run);
   }
 
@@ -150,7 +178,7 @@
   {:else if inBattle}
     {#key battleKey}
       <Battle
-        playerArmy={run.army}
+        playerArmy={applyUnitSkills(run.army, run.unitSkills)}
         enemyArmy={encounter?.army ?? []}
         hero={debugBoost ? { ...run.hero, attack: run.hero.attack + DEBUG_ATTACK } : run.hero}
         armyBonuses={itemBonuses(run.items)}
@@ -165,11 +193,11 @@
     <!-- Draft: pick 1 of 3 -->
     <div class="mx-auto max-w-6xl">
       <h2 class="mb-1 text-2xl font-semibold text-amber-200">
-        Victory! {run.pendingDraft ? 'Choose your reinforcements' : 'Claim an artifact'}
+        Victory! {run.pendingDraft ? 'Choose your reinforcements' : run.pendingItems ? 'Claim an artifact' : 'Teach a skill'}
       </h2>
       <p class="mb-5 text-base text-slate-400">
-        Battle {run.encounterIndex - 1} won — {RUN_LENGTH - run.encounterIndex + 1} to go.
-        {#if run.pendingDraft && run.pendingItems}Pick one of each.{/if}
+        Battle {run.encounterIndex - 1} won.
+        {#if [run.pendingDraft, run.pendingItems, run.pendingSkills].filter(Boolean).length > 1}Pick one of each.{/if}
       </p>
       {#if run.pendingDraft}
       <div class="grid grid-cols-3 gap-3">
@@ -213,6 +241,54 @@
             </button>
           {/each}
         </div>
+      {/if}
+      {#if run.pendingSkills?.length}
+        <h3 class="mb-3 mt-6 text-base font-semibold uppercase tracking-wide text-violet-300">
+          {run.pendingDraft || run.pendingItems ? '…and teach a unit a skill' : 'Teach a unit a skill'} (permanent for this run)
+        </h3>
+        <div class="grid grid-cols-3 gap-3">
+          {#each run.pendingSkills as id (id)}
+            {@const skill = UNIT_SKILLS[id]}
+            <button
+              type="button"
+              class="flex flex-col items-center gap-1.5 rounded-lg border-2 bg-slate-800 p-5
+                hover:bg-slate-700 hover:brightness-110
+                {chosenSkill === id ? 'border-violet-300 ring-2 ring-violet-400/60' : 'border-violet-500/60'}"
+              onclick={() => (chosenSkill = chosenSkill === id ? null : id)}
+            >
+              {#if skillIconFor(id)}
+                <img src={skillIconFor(id)} alt="" class="h-12 w-12" />
+              {:else}
+                <span class="text-4xl leading-none" aria-hidden="true">{skillGlyph(id)}</span>
+              {/if}
+              <span class="text-lg font-bold text-violet-300">{skill.name}</span>
+              <span class="text-center text-sm leading-snug text-slate-400">{skill.description}</span>
+            </button>
+          {/each}
+        </div>
+        {#if chosenSkill}
+          <p class="mb-2 mt-4 text-sm font-semibold text-violet-200">
+            Teach {UNIT_SKILLS[chosenSkill].name} to:
+          </p>
+          <div class="flex flex-wrap gap-2">
+            {#each run.army as slot (slot.unit.name)}
+              {@const learnable = canLearn(slot.unit.name, chosenSkill)}
+              <button
+                type="button"
+                class="flex items-center gap-2 rounded-lg border-2 px-3 py-2
+                  {learnable
+                    ? 'border-violet-400 bg-slate-800 hover:bg-slate-700'
+                    : 'cursor-not-allowed border-slate-700 bg-slate-800/50 opacity-40'}"
+                disabled={!learnable}
+                title={learnable ? '' : 'Already knows this skill'}
+                onclick={() => teachSkill(slot.unit.name)}
+              >
+                <Sprite name={slot.unit.name} class="h-9 w-8" />
+                <span class="text-sm font-semibold text-slate-200">{slot.count} × {slot.unit.name}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
       {/if}
       <div class="mt-4 rounded border border-slate-700 bg-slate-800 p-2 text-sm text-slate-300">
         Your army: {run.army.map(s => `${s.count}× ${s.unit.name}`).join(' · ')}
@@ -334,10 +410,23 @@
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Army ({armyCost(run.army)} power)</p>
           {#each run.army as slot (slot.unit.name)}
             {@const ts = TIER_STYLE[slot.unit.tier]}
+            {@const taught = run.unitSkills[slot.unit.name] ?? []}
             <div class="flex items-center gap-2 py-0.5">
               <span class="rounded ring-1 {ts.ring}"><Sprite name={slot.unit.name} class="h-7 w-6" /></span>
               <span class="text-xs {ts.text}">{slot.count} × {slot.unit.name}</span>
             </div>
+            {#if taught.length > 0}
+              <div class="mb-0.5 ml-8 flex flex-wrap gap-1">
+                {#each taught as sk (sk)}
+                  <span
+                    class="rounded bg-violet-950/60 px-1 text-[10px] font-medium text-violet-300 ring-1 ring-violet-500/40"
+                    title={UNIT_SKILLS[sk].description}
+                  >
+                    {skillGlyph(sk)} {UNIT_SKILLS[sk].name}
+                  </span>
+                {/each}
+              </div>
+            {/if}
           {/each}
         </div>
         <button
