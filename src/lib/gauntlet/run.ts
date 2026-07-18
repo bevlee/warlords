@@ -171,10 +171,18 @@ export function applyItemPick(run: RunState, itemId: ItemId): RunState {
 }
 
 /** Living player stacks (minus the hero) from a finished battle. */
+/** Living player stacks (minus the hero and summoned allies) collapsed to one
+ *  slot per unit type — so battle-time stack splits don't permanently fragment
+ *  the persistent army. Preserves first-seen unit order. */
 export function survivorsFrom(units: UnitStack[]): ArmySlot[] {
-  return units
-    .filter(u => u.side === 'player' && !u.isHero && u.count > 0)
-    .map(u => ({ unit: u.definition, count: u.count }));
+  const byUnit = new Map<string, ArmySlot>();
+  for (const u of units) {
+    if (u.side !== 'player' || u.isHero || u.isAlly || u.count <= 0) continue;
+    const existing = byUnit.get(u.definition.name);
+    if (existing) existing.count += u.count;
+    else byUnit.set(u.definition.name, { unit: u.definition, count: u.count });
+  }
+  return [...byUnit.values()];
 }
 
 export function recordBattle(run: RunState, won: boolean, survivors: ArmySlot[]): RunState {

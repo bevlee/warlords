@@ -214,4 +214,27 @@ describe('gauntlet run', () => {
     expect(survivors[0].unit.name).toBe('Goblin');
     expect(survivors[0].count).toBe(7);
   });
+
+  it('survivorsFrom merges split same-unit stacks back into one slot and drops allies', () => {
+    const mk = (name: string, count: number, side: 'player' | 'enemy', extra: Record<string, unknown> = {}) =>
+      ({
+        definition: FACTION_UNITS.barbarian.find(u => u.name === name) ?? { name },
+        count,
+        side,
+        ...extra,
+      }) as unknown as UnitStack;
+
+    const units = [
+      mk('Goblin', 4, 'player'),                       // a split half
+      mk('Goblin', 6, 'player'),                       // the other half
+      mk('Wolf Rider', 3, 'player', { isAlly: true }), // summoned ally — not kept
+      mk('Wolf Rider', 2, 'player'),
+    ];
+
+    const survivors = survivorsFrom(units);
+    const goblin = survivors.filter(s => s.unit.name === 'Goblin');
+    expect(goblin).toHaveLength(1);
+    expect(goblin[0].count).toBe(10); // 4 + 6 merged back
+    expect(survivors.find(s => s.unit.name === 'Wolf Rider')!.count).toBe(2); // ally dropped
+  });
 });
