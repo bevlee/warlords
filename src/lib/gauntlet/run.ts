@@ -4,6 +4,7 @@ import { UNIT_COSTS } from '../engine/recruit';
 import { updateFactionSkills } from '../engine/factionSkills';
 import { mixSeed, mulberry32, type Rng } from '../engine/rng';
 import { itemDraftOptions, type ItemId } from './items';
+import { skillDraftOptions, type SkillId } from './skills';
 
 export { mixSeed };
 
@@ -25,7 +26,10 @@ export interface RunState {
   army: ArmySlot[];
   pendingDraft: UnitCard[] | null;
   pendingItems: ItemId[] | null;
+  pendingSkills: SkillId[] | null;
   items: ItemId[];
+  /** Unit skills taught this run: unit name → granted ability ids. */
+  unitSkills: Record<string, SkillId[]>;
   status: 'map' | 'draft' | 'won' | 'lost';
   battlesWon: number;
   startedAt: number;
@@ -68,7 +72,9 @@ export function newRun(faction: FactionClass, seed = Date.now()): RunState {
     army,
     pendingDraft: null,
     pendingItems: null,
+    pendingSkills: null,
     items: [],
+    unitSkills: {},
     status: 'map',
     battlesWon: 0,
     startedAt: Date.now(),

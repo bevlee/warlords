@@ -14,6 +14,9 @@ export interface UnitDef {
   range: number;       // max shooting distance in cells (Chebyshev); 0 = melee only
   isLarge: boolean;
   abilities: string[]; // 'no_retaliation' | 'flying' | 'defense_reduction'
+  /** Subset of `abilities` granted by run skills rather than the base unit —
+   *  the UI colors these differently in stat previews. */
+  grantedAbilities?: string[];
 }
 
 export interface UnitStack {
