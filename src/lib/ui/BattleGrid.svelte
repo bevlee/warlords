@@ -14,6 +14,10 @@
     targetIds: Set<string>;
     activeId: string | null;
     interactive: boolean;
+    /** Deployment: highlight `deployableKeys`, route clicks to ondeploy*. */
+    deployMode?: boolean;
+    deployableKeys?: Set<string>;
+    selectedDeployId?: string | null;
     actionIcons: Map<string, 'melee' | 'shoot' | 'spell'>;
     originsByTarget: Map<string, Pos[]>;
     previews: Map<string, DamagePreview>;
@@ -24,6 +28,8 @@
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
     onmeleeaim: (targetId: string, origin: Pos) => void;
+    ondeploycell?: (pos: Pos) => void;
+    ondeployunit?: (unit: UnitStack) => void;
     onunithover: (unit: UnitStack | null) => void;
     onunitinspect: (unit: UnitStack | null) => void;
   }
@@ -35,6 +41,9 @@
     targetIds,
     activeId,
     interactive,
+    deployMode = false,
+    deployableKeys = new Set<string>(),
+    selectedDeployId = null,
     actionIcons,
     originsByTarget,
     previews,
@@ -45,6 +54,8 @@
     oncellclick,
     onunitclick,
     onmeleeaim,
+    ondeploycell,
+    ondeployunit,
     onunithover,
     onunitinspect,
   }: Props = $props();
@@ -187,10 +198,15 @@
   }
 
   function handleClick(col: number, row: number, shift: boolean) {
-    if (!interactive) return;
     const cell = battleState.grid.cells[row][col];
     if (cell.blocked) return;
     const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined;
+    if (deployMode) {
+      if (occupant) ondeployunit?.(occupant);
+      else ondeploycell?.({ col, row });
+      return;
+    }
+    if (!interactive) return;
     if (occupant) {
       if (aim && aim.targetId === occupant.id && meleeAimable(occupant.id)) {
         onmeleeaim(occupant.id, aim.origin);
@@ -218,10 +234,12 @@
     {#each battleState.grid.cells as row (row[0].row)}
       {#each row as cell (cellKey(cell.col, cell.row))}
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
-        {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row))}
+        {@const deployTarget = deployMode && deployableKeys.has(cellKey(cell.col, cell.row))}
+        {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row)) || deployTarget}
         {@const inHoverRange = rangeKeys.has(cellKey(cell.col, cell.row))}
-        {@const attackable = !!occupant && targetIds.has(occupant.id)}
+        {@const attackable = !deployMode && !!occupant && targetIds.has(occupant.id)}
         {@const isAimOrigin = aimKey === cellKey(cell.col, cell.row)}
+        {@const deploySelected = deployMode && !!occupant && occupant.id === selectedDeployId}
         <button
           type="button"
           class="cell relative aspect-square border border-indigo-300/15
@@ -229,8 +247,9 @@
             {inHoverRange ? 'range-cell' : ''}
             {attackable ? 'attackable' : ''}
             {isAimOrigin ? 'aim-origin' : ''}
-            {!interactive ? 'cursor-default' : ''}"
-          style:cursor={cursorFor(cell.occupantId, attackable)}
+            {deploySelected ? 'deploy-selected' : ''}
+            {!interactive && !deployMode ? 'cursor-default' : ''}"
+          style:cursor={deployMode ? (occupant?.side === 'player' && !occupant.isHero ? 'pointer' : deployTarget ? 'pointer' : 'default') : cursorFor(cell.occupantId, attackable)}
           aria-label={cell.blocked
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant
@@ -242,7 +261,7 @@
             onunitinspect(occupant ?? null);
           }}
           onmouseenter={() => onunithover(occupant ?? null)}
-          onmousemove={occupant ? e => updateAim(e, occupant) : undefined}
+          onmousemove={occupant && !deployMode ? e => updateAim(e, occupant) : undefined}
           onmouseleave={() => {
             onunithover(null);
             if (aim && occupant && aim.targetId === occupant.id) aim = null;
@@ -352,6 +371,12 @@
 
   .cell.aim-origin {
     background-color: rgb(239 68 68 / 0.18);
+  }
+
+  /* The stack picked up during deployment. */
+  .cell.deploy-selected {
+    box-shadow: inset 0 0 0 2.5px rgb(251 191 36 / 0.95);
+    background-color: rgb(251 191 36 / 0.15);
   }
 
   .aim-arrow {

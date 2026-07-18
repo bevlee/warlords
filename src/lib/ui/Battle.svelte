@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { initBattle, applyAction, spellPreview, SPELLS } from '$lib/engine/battle';
+  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, splitStack, beginCombat } from '$lib/engine/battle';
+  import { getTacticsShift } from '$lib/engine/factionSkills';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
@@ -63,6 +64,69 @@
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
   let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
+  // The pristine deploy layout, for the Reset button. Deploy ops are pure
+  // (they return new states), so this reference stays untouched. Restart
+  // refreshes it.
+  // svelte-ignore state_referenced_locally
+  let deployBaseline: BattleState = battle;
+
+  // --- Deployment phase ---
+  const inDeploy = $derived(battle.phase === 'deploy');
+  const tacticsShift = $derived(getTacticsShift(battle.hero));
+  let selectedDeployId = $state<string | null>(null);
+  let splitArmed = $state(false); // next empty-cell click splits rather than moves
+  let splitAmount = $state(1);
+  const selectedDeployUnit = $derived(
+    selectedDeployId ? (battle.units.find(u => u.id === selectedDeployId) ?? null) : null
+  );
+
+  const deployableKeys = $derived.by(() => {
+    const keys = new Set<string>();
+    if (!inDeploy) return keys;
+    for (const row of battle.grid.cells) {
+      for (const cell of row) {
+        if (!cell.blocked && !cell.occupantId && isInDeployZone({ col: cell.col, row: cell.row }, tacticsShift)) {
+          keys.add(`${cell.col},${cell.row}`);
+        }
+      }
+    }
+    return keys;
+  });
+
+  function selectDeploy(id: string | null) {
+    selectedDeployId = id;
+    splitArmed = false;
+    const u = id ? battle.units.find(s => s.id === id) : null;
+    splitAmount = u ? Math.max(1, Math.floor(u.count / 2)) : 1;
+  }
+
+  function handleDeployUnit(unit: UnitStack) {
+    if (unit.side !== 'player' || unit.isHero || unit.isAlly) return;
+    if (selectedDeployId === unit.id) return selectDeploy(null); // click again to deselect
+    if (selectedDeployId && !splitArmed) {
+      battle = deployMove(battle, selectedDeployId, unit.pos); // swap
+      return selectDeploy(null);
+    }
+    selectDeploy(unit.id); // (a stack click cancels an armed split)
+  }
+
+  function handleDeployCell(pos: Pos) {
+    if (!selectedDeployId) return;
+    battle = splitArmed
+      ? splitStack(battle, selectedDeployId, splitAmount, pos)
+      : deployMove(battle, selectedDeployId, pos);
+    selectDeploy(null);
+  }
+
+  function beginBattle() {
+    battle = beginCombat(battle);
+    selectDeploy(null);
+  }
+
+  function resetDeploy() {
+    battle = deployBaseline;
+    selectDeploy(null);
+  }
 
   // Incremental reveal: an action's sub-events (hit, retaliate, death) play
   // as separate beats. While a sequence runs, `animating` locks player input
@@ -114,7 +178,7 @@
   const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
   const heroUnit = $derived(battle.units.find(u => u.isHero) ?? null);
   const isPlayerTurn = $derived(
-    battle.result === 'ongoing' && activeUnit !== null && activeUnit.side === 'player'
+    battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player'
   );
 
   const reachableKeys = $derived(
@@ -259,7 +323,7 @@
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
-    if (battle.result !== 'ongoing' || animating) return;
+    if (battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
@@ -356,6 +420,8 @@
     pendingSpell = null;
     resultAnnounced = false;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
+    deployBaseline = battle; // restart re-enters deploy with a fresh layout
+    selectDeploy(null);
   }
 
   const logLines = $derived(battle.log.map(ev => describeEvent(ev, battle.units, battle.hero)));
@@ -402,12 +468,57 @@
          Full event history lives in the Battle Log column to the right.
          Fixed height: content changes must never reflow the board below. -->
     <div class="mb-1 flex justify-center">
-      <div
-        class="flex h-16 max-w-2xl flex-col justify-center overflow-hidden rounded-lg border
-          border-slate-600/60 bg-slate-900/85 px-5 text-center shadow-lg"
-      >
-        <p class="text-sm font-medium text-slate-100">{statusText}</p>
-      </div>
+      {#if inDeploy}
+        <div
+          class="flex h-16 max-w-2xl items-center gap-3 overflow-hidden rounded-lg border
+            border-amber-500/50 bg-slate-900/85 px-4 shadow-lg"
+        >
+          {#if selectedDeployUnit && selectedDeployUnit.count > 1}
+            <span class="text-xs text-slate-300">{selectedDeployUnit.definition.name}: split off</span>
+            <input
+              type="range"
+              min="1"
+              max={selectedDeployUnit.count - 1}
+              bind:value={splitAmount}
+              class="w-28 accent-amber-400"
+              aria-label="split amount"
+            />
+            <span class="w-8 font-mono text-sm text-amber-200">{splitAmount}</span>
+            <button
+              type="button"
+              class="rounded px-3 py-1 text-sm font-semibold {splitArmed ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-amber-200 hover:bg-slate-600'}"
+              onclick={() => (splitArmed = !splitArmed)}
+            >
+              {splitArmed ? 'Click a cell…' : 'Split'}
+            </button>
+          {:else}
+            <p class="text-sm font-medium text-slate-100">
+              Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
+            </p>
+          {/if}
+          <button
+            type="button"
+            class="ml-auto rounded bg-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-600"
+            onclick={resetDeploy}
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            class="rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-500"
+            onclick={beginBattle}
+          >
+            Begin battle ⚔️
+          </button>
+        </div>
+      {:else}
+        <div
+          class="flex h-16 max-w-2xl flex-col justify-center overflow-hidden rounded-lg border
+            border-slate-600/60 bg-slate-900/85 px-5 text-center shadow-lg"
+        >
+          <p class="text-sm font-medium text-slate-100">{statusText}</p>
+        </div>
+      {/if}
     </div>
 
     <!-- Battlefield stage: everything battle-related overlays this box. -->
@@ -442,6 +553,9 @@
           targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
           interactive={isPlayerTurn && !animating}
+          deployMode={inDeploy}
+          deployableKeys={deployableKeys}
+          selectedDeployId={selectedDeployId}
           actionIcons={gridActionIcons}
           originsByTarget={pendingSpell ? new Map() : originsByTarget}
           {previews}
@@ -452,6 +566,8 @@
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
+          ondeploycell={handleDeployCell}
+          ondeployunit={handleDeployUnit}
           onunithover={u => (hovered = u)}
           onunitinspect={inspect}
         />
