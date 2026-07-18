@@ -467,7 +467,9 @@
     <!-- Combat indicator: the current status/prompt above the battlefield.
          Full event history lives in the Battle Log column to the right.
          Fixed height: content changes must never reflow the board below. -->
-    <div class="mb-1 flex justify-center">
+    <!-- z-40: the tilted board viewport's projection overflows upward over this
+         strip; without a stacking context its buttons are unclickable. -->
+    <div class="relative z-40 mb-1 flex justify-center">
       {#if inDeploy}
         <div
           class="flex h-16 max-w-2xl items-center gap-3 overflow-hidden rounded-lg border

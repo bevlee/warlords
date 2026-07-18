@@ -148,3 +148,19 @@ describe('beginCombat', () => {
     expect(beginCombat(deployState()).phase).toBe('combat');
   });
 });
+
+describe('deployMove sequences', () => {
+  it('swaps correctly after the mover already moved once', () => {
+    let s = deployState();
+    const g = playerStacks(s).find(u => u.definition.name === 'Goblin')!;
+    const w = playerStacks(s).find(u => u.definition.name === 'Wolf Rider')!;
+
+    s = deployMove(s, g.id, { col: 2, row: 0 });
+    const s2 = deployMove(s, g.id, w.pos);
+
+    expect(s2.units.find(u => u.id === g.id)!.pos).toEqual(w.pos);
+    expect(s2.units.find(u => u.id === w.id)!.pos).toEqual({ col: 2, row: 0 });
+    expect(cellOccupant(s2, w.pos)).toBe(g.id);
+    expect(cellOccupant(s2, { col: 2, row: 0 })).toBe(w.id);
+  });
+});
