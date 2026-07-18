@@ -250,7 +250,15 @@ describe('skill offers', () => {
       else expect(run.pendingSkills).toBeNull();
       if (run.pendingSkills) expect(run.pendingItems).toBeNull(); // no double-offer battles
       run = applyPick(run, run.pendingDraft![0]);
-      if (run.pendingSkills) run = applySkillPick(run, run.pendingSkills[0], run.army[0].unit.name);
+      if (run.pendingSkills) {
+        // Every offered skill has at least one unit that can still learn it.
+        const skill = run.pendingSkills[0];
+        const learner = run.army.find(
+          s => !(run.unitSkills[s.unit.name] ?? []).includes(skill) && !s.unit.abilities.includes(skill)
+        )!;
+        expect(learner).toBeTruthy();
+        run = applySkillPick(run, skill, learner.unit.name);
+      }
       if (run.pendingItems) run = applyItemPick(run, run.pendingItems[0]);
       expect(run.status).toBe('map');
     }
