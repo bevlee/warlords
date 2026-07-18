@@ -7,6 +7,9 @@
   import { ITEMS, itemBonuses, itemEffectText, type ItemId } from '$lib/gauntlet/items';
   import { UNIT_SKILLS, applyUnitSkills, canLearnSkill, migrateUnitSkills, type SkillId } from '$lib/gauntlet/skills';
   import { skillIconFor, skillGlyph } from '$lib/ui/skillIcons';
+  import { isUnique } from '$lib/engine/abilityCatalog';
+
+  const ROMAN_LVL = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
   import {
     newRun,
     recordBattle,
@@ -285,6 +288,11 @@
               >
                 <Sprite name={slot.unit.name} class="h-9 w-8" />
                 <span class="text-sm font-semibold text-slate-200">{slot.count} × {slot.unit.name}</span>
+                {#if learnable && chosenSkill && !isUnique(chosenSkill)}
+                  <span class="font-mono text-xs text-violet-300">
+                    → {ROMAN_LVL[(run.unitSkills[slot.unit.name]?.[chosenSkill] ?? 0) + 1] ?? ''}
+                  </span>
+                {/if}
               </button>
             {/each}
           </div>

@@ -2,6 +2,7 @@
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import { abilityInfo } from './abilities';
+  import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { skillIconFor, skillGlyph } from './skillIcons';
   import Sprite from './Sprite.svelte';
 
@@ -149,7 +150,7 @@
     {#if unit.definition.abilities.length > 0}
       <div class="flex flex-col gap-1 border-t border-slate-700 pt-1.5">
         {#each unit.definition.abilities as ability (ability)}
-          {@const info = abilityInfo(ability)}
+          {@const info = abilityInfo(ability, abilityLevel(unit.definition, ability))}
           {@const taught = unit.definition.grantedAbilities?.includes(ability) ?? false}
           <div>
             {#if taught}

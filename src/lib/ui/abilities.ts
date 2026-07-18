@@ -105,7 +105,31 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
   },
 };
 
-export function abilityInfo(ability: string): { label: string; description: string } {
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
+
+/** Level-aware label + magnitude text for the leveled abilities
+ *  (engine/abilityCatalog.ts). Ids not listed here render statically. */
+const LEVELED_TEXT: Record<string, { label: string; describe: (level: number) => string }> = {
+  life_drain: {
+    label: 'Lifesteal',
+    describe: l => `Heals ${l * 10}% of the damage this stack deals.`,
+  },
+  defense_reduction: {
+    label: 'Defense reduction',
+    describe: l => `Reduces the target's defense by ${l * 5}%.`,
+  },
+  bravery: { label: 'Bravery', describe: l => `+${l} morale.` },
+  fleet_footwork: { label: 'Fleet footwork', describe: l => `+${l} speed.` },
+};
+
+export function abilityInfo(ability: string, level?: number): { label: string; description: string } {
+  const leveled = LEVELED_TEXT[ability];
+  if (leveled && level && level > 0) {
+    return {
+      label: level > 1 ? `${leveled.label} ${ROMAN[level] ?? level}` : leveled.label,
+      description: leveled.describe(level),
+    };
+  }
   return (
     ABILITY_INFO[ability] ?? {
       label: ability.replaceAll('_', ' '),
