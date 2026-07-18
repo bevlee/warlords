@@ -577,6 +577,27 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       }
     }
 
+    // Double strike: a second melee hit after the retaliation, no second
+    // retaliation. Skipped if either side died in the exchange.
+    if (attacker.definition.abilities.includes('double_strike')) {
+      const striker = s.units.find(u => u.id === actorId);
+      const victim = s.units.find(u => u.id === targetId);
+      if (striker && striker.count > 0 && victim && victim.count > 0) {
+        const { damage: d2, luckEvents: luck2 } = rollHit(s.hero, striker, victim, rng, s.hero.attack);
+        const { killed: k2, remaining: v2 } = applyDamage(victim, d2);
+        const { striker: s2after, victim: v2after, events: hit2Events } =
+          applyOnHitEffects(rng, striker, v2, d2, s.round, s.hero);
+        s = { ...s, units: s.units.map(u => (u.id === targetId ? v2after : u.id === actorId ? s2after : u)) };
+        s.log = [...s.log, ...luck2, { type: 'attack', data: { attackerId: actorId, targetId, damage: d2, killed: k2 } }, ...hit2Events];
+        if (v2after.count === 0) s = handleDeath(s, v2after, rng);
+        const end2 = checkBattleEnd(s);
+        if (end2) {
+          s.log = [...s.log, { type: 'battle_end', data: { result: end2 } }];
+          return { ...s, result: end2 };
+        }
+      }
+    }
+
   } else if (action.type === 'shoot') {
     const targetId = (action as { type: 'shoot'; targetId: string }).targetId;
     const targetIdx = s.units.findIndex(u => u.id === targetId);

@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { modifiedDamage, calculateDamage, canRetaliate } from '../combat';
+import { initBattle, applyAction } from '../battle';
 import { CAVALIER, GRIFFIN } from '../knight';
 import { GORGON, NAGA } from '../wizard';
 import { GOBLIN } from '../barbarian';
-import type { UnitStack } from '../types';
+import type { Hero, UnitDef, UnitStack } from '../types';
 
 function makeStack(overrides: Partial<UnitStack>): UnitStack {
   return {
@@ -187,5 +188,54 @@ describe('luck reporting', () => {
     const withoutSink = calculateDamage(makeStack({ luck: 0 }), defender, 0, sequenceRng([0, 0.01]));
 
     expect(withSink).toBe(withoutSink);
+  });
+});
+
+describe('Double strike', () => {
+  const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] };
+  const DOUBLER: UnitDef = { ...GOBLIN, name: 'Doubler', attack: 5, minDamage: 2, maxDamage: 2, hp: 50, abilities: ['double_strike'] };
+
+  /** Wait until the named unit is current, then melee the lone enemy from an adjacent cell. */
+  function driveMeleeHit(attackerDef: UnitDef, enemyDef: UnitDef, seed = 7) {
+    let s = initBattle([{ unit: attackerDef, count: 5 }], [{ unit: enemyDef, count: 1 }], hero, seed);
+    for (let i = 0; i < 40 && s.units.find(u => u.id === s.currentUnitId)?.definition.name !== attackerDef.name; i++) {
+      s = applyAction(s, { type: 'wait' });
+    }
+    const enemy = s.units.find(u => u.side === 'enemy')!;
+    const adj = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1]]
+      .map(([dc, dr]) => ({ col: enemy.pos.col + dc, row: enemy.pos.row + dr }))
+      .find(p => p.row >= 0 && p.row < s.grid.height && p.col >= 0 && p.col < s.grid.width
+        && !s.grid.cells[p.row][p.col].blocked && !s.grid.cells[p.row][p.col].occupantId)!;
+    const next = applyAction(s, { type: 'attack', targetId: enemy.id, moveTo: adj });
+    return { next, before: s, attackerId: s.units.find(u => u.definition.name === attackerDef.name)!.id };
+  }
+
+  it('logs two attack entries for one melee action', () => {
+    const tanky: UnitDef = { ...GOBLIN, name: 'Tank', hp: 500, defense: 0, minDamage: 1, maxDamage: 1 };
+    const { next, before, attackerId } = driveMeleeHit(DOUBLER, tanky);
+    const newAttacks = next.log.slice(before.log.length).filter(e => e.type === 'attack' && e.data.attackerId === attackerId);
+    expect(newAttacks).toHaveLength(2);
+  });
+
+  it('retaliation happens once, between the two hits', () => {
+    const tanky: UnitDef = { ...GOBLIN, name: 'Tank', hp: 500, defense: 0, minDamage: 1, maxDamage: 1 };
+    const { next, before } = driveMeleeHit(DOUBLER, tanky);
+    const types = next.log.slice(before.log.length).filter(e => ['attack', 'retaliate'].includes(e.type)).map(e => e.type);
+    expect(types).toEqual(['attack', 'retaliate', 'attack']);
+  });
+
+  it('second hit is skipped when the target dies to the first', () => {
+    const frail: UnitDef = { ...GOBLIN, name: 'Frail', hp: 1, defense: 0 };
+    const { next, before, attackerId } = driveMeleeHit(DOUBLER, frail);
+    const entries = next.log.slice(before.log.length);
+    expect(entries.filter(e => e.type === 'attack' && e.data.attackerId === attackerId)).toHaveLength(1);
+    expect(entries.some(e => e.type === 'death')).toBe(true);
+  });
+
+  it('units without the ability strike once', () => {
+    const single: UnitDef = { ...DOUBLER, name: 'Single', abilities: [] };
+    const tanky: UnitDef = { ...GOBLIN, name: 'Tank', hp: 500, defense: 0, minDamage: 1, maxDamage: 1 };
+    const { next, before, attackerId } = driveMeleeHit(single, tanky);
+    expect(next.log.slice(before.log.length).filter(e => e.type === 'attack' && e.data.attackerId === attackerId)).toHaveLength(1);
   });
 });
