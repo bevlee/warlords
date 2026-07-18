@@ -17,6 +17,9 @@ export interface UnitDef {
   /** Subset of `abilities` granted by run skills rather than the base unit —
    *  the UI colors these differently in stat previews. */
   grantedAbilities?: string[];
+  /** Per-ability numeric levels; absent entries use the catalog default
+   *  (see engine/abilityCatalog.ts). */
+  abilityLevels?: Record<string, number>;
 }
 
 export interface UnitStack {
