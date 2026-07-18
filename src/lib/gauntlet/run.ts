@@ -163,8 +163,13 @@ export function applyPick(run: RunState, card: UnitCard): RunState {
   const army = existing
     ? run.army.map(s => (s.unit.name === card.unitName ? { ...s, count: s.count + card.count } : s))
     : [...run.army, { unit, count: card.count }];
-  // Item-offer drafts grant one of each; the draft holds until both are taken.
-  return { ...run, army, pendingDraft: null, status: run.pendingItems ? 'draft' : 'map' };
+  // Offer drafts grant one of each kind; the draft holds until all are taken.
+  return { ...run, army, pendingDraft: null, status: stillDrafting({ ...run, pendingDraft: null }) };
+}
+
+/** 'draft' while any offer (units, items, skills) is unclaimed. */
+function stillDrafting(run: RunState): 'draft' | 'map' {
+  return run.pendingDraft || run.pendingItems || run.pendingSkills ? 'draft' : 'map';
 }
 
 export function applyItemPick(run: RunState, itemId: ItemId): RunState {
@@ -172,7 +177,19 @@ export function applyItemPick(run: RunState, itemId: ItemId): RunState {
     ...run,
     items: [...run.items, itemId],
     pendingItems: null,
-    status: run.pendingDraft ? 'draft' : 'map',
+    status: stillDrafting({ ...run, pendingItems: null }),
+  };
+}
+
+/** Teach `skillId` to a unit type for the rest of the run. */
+export function applySkillPick(run: RunState, skillId: SkillId, unitName: string): RunState {
+  const existing = run.unitSkills[unitName] ?? [];
+  if (existing.includes(skillId)) return run;
+  return {
+    ...run,
+    unitSkills: { ...run.unitSkills, [unitName]: [...existing, skillId] },
+    pendingSkills: null,
+    status: stillDrafting({ ...run, pendingSkills: null }),
   };
 }
 
@@ -215,5 +232,6 @@ export function recordBattle(run: RunState, won: boolean, survivors: ArmySlot[])
     status: 'draft',
     pendingDraft: draftOptions(next),
     pendingItems: next.battlesWon % 3 === 0 ? itemDraftOptions(next) : null,
+    pendingSkills: next.battlesWon % 3 === 2 ? skillDraftOptions(next) : null,
   };
 }

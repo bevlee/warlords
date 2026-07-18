@@ -7,11 +7,13 @@ import {
   draftOptions,
   applyPick,
   applyItemPick,
+  applySkillPick,
   recordBattle,
   survivorsFrom,
   mixSeed,
 } from '../run';
 import { itemDraftOptions } from '../items';
+import { skillDraftOptions } from '../skills';
 import { armyCost, UNIT_COSTS } from '../../engine/recruit';
 import { FACTION_UNITS } from '../../engine/factions';
 import type { UnitStack } from '../../engine/types';
@@ -236,5 +238,36 @@ describe('gauntlet run', () => {
     expect(goblin).toHaveLength(1);
     expect(goblin[0].count).toBe(10); // 4 + 6 merged back
     expect(survivors.find(s => s.unit.name === 'Wolf Rider')!.count).toBe(2); // ally dropped
+  });
+});
+
+describe('skill offers', () => {
+  it('recordBattle offers skills on battles 2, 5, 8 — never colliding with items', () => {
+    let run = newRun('barbarian', 9);
+    for (let i = 1; i <= 8; i++) {
+      run = recordBattle(run, true, run.army);
+      if (i % 3 === 2) expect(run.pendingSkills).toHaveLength(3);
+      else expect(run.pendingSkills).toBeNull();
+      if (run.pendingSkills) expect(run.pendingItems).toBeNull(); // no double-offer battles
+      run = applyPick(run, run.pendingDraft![0]);
+      if (run.pendingSkills) run = applySkillPick(run, run.pendingSkills[0], run.army[0].unit.name);
+      if (run.pendingItems) run = applyItemPick(run, run.pendingItems[0]);
+      expect(run.status).toBe('map');
+    }
+  });
+
+  it('applySkillPick grants the skill and resolves like the item pick', () => {
+    let run = { ...newRun('barbarian', 9), battlesWon: 2 };
+    run = { ...run, status: 'draft' as const, pendingDraft: draftOptions(run), pendingSkills: skillDraftOptions(run) };
+    const skill = run.pendingSkills![0];
+    const unitName = run.army[0].unit.name;
+
+    const afterSkill = applySkillPick(run, skill, unitName);
+    expect(afterSkill.unitSkills[unitName]).toContain(skill);
+    expect(afterSkill.pendingSkills).toBeNull();
+    expect(afterSkill.status).toBe('draft'); // unit card still owed
+
+    const done = applyPick(afterSkill, afterSkill.pendingDraft![0]);
+    expect(done.status).toBe('map');
   });
 });
