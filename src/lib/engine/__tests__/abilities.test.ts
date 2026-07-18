@@ -239,3 +239,50 @@ describe('Double strike', () => {
     expect(next.log.slice(before.log.length).filter(e => e.type === 'attack' && e.data.attackerId === attackerId)).toHaveLength(1);
   });
 });
+
+describe('leveled defense reduction', () => {
+  it('reduces target defense by 5% per level', () => {
+    // level 4 → ×0.8 (was a flat ×0.6 pre-catalog)
+    const attacker = makeStack({ definition: { ...GOBLIN, attack: 10, abilities: ['defense_reduction'], abilityLevels: { defense_reduction: 4 } } });
+    const defender = makeStack({ definition: { ...GOBLIN, defense: 10 }, side: 'enemy' });
+    const plain = makeStack({ definition: { ...GOBLIN, attack: 10 } });
+    // atk 10 vs def 8 (10×0.8) → ×1.10; plain attacker: atk 10 vs def 10 → ×1
+    expect(modifiedDamage(attacker, defender, 0, 10)).toBeCloseTo(10 * attacker.count * 1.10, 5);
+    expect(modifiedDamage(plain, defender, 0, 10)).toBe(10 * plain.count);
+  });
+
+  it('legacy defs without a level keep the old 40% (level 8)', () => {
+    const attacker = makeStack({ definition: { ...GOBLIN, attack: 10, abilities: ['defense_reduction'] } });
+    const defender = makeStack({ definition: { ...GOBLIN, defense: 10 }, side: 'enemy' });
+    // def 10 × 0.6 = 6 → atk 10 vs def 6 → ×1.20
+    expect(modifiedDamage(attacker, defender, 0, 10)).toBeCloseTo(10 * attacker.count * 1.20, 5);
+  });
+});
+
+describe('leveled lifesteal', () => {
+  const hero2: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] };
+
+  function driveHit(attackerDef: UnitDef) {
+    let s = initBattle([{ unit: attackerDef, count: 2 }], [{ unit: { ...GOBLIN, name: 'Tank', hp: 500, defense: 0, minDamage: 0, maxDamage: 0 }, count: 1 }], hero2, 7);
+    for (let i = 0; i < 40 && s.units.find(u => u.id === s.currentUnitId)?.definition.name !== attackerDef.name; i++) {
+      s = applyAction(s, { type: 'wait' });
+    }
+    const enemy = s.units.find(u => u.side === 'enemy')!;
+    // Wound the striker first — the heal only logs when hp actually rises.
+    s = { ...s, units: s.units.map(u => (u.definition.name === attackerDef.name ? { ...u, hp: 1 } : u)) };
+    const adj = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1]]
+      .map(([dc, dr]) => ({ col: enemy.pos.col + dc, row: enemy.pos.row + dr }))
+      .find(p => p.row >= 0 && p.row < s.grid.height && !s.grid.cells[p.row][p.col].blocked && !s.grid.cells[p.row][p.col].occupantId)!;
+    return applyAction(s, { type: 'attack', targetId: enemy.id, moveTo: adj });
+  }
+
+  it('heals 10% per level of damage dealt', () => {
+    const LEECH: UnitDef = { ...GOBLIN, name: 'Leech', hp: 100, attack: 0, minDamage: 10, maxDamage: 10, abilities: ['life_drain'], abilityLevels: { life_drain: 5 } };
+    const next = driveHit(LEECH);
+    const ev = next.log.find(e => e.type === 'status' && e.data.effect === 'life_drain');
+    const atk = next.log.find(e => e.type === 'attack');
+    expect(ev).toBeTruthy();
+    // heal = round(damage × 0.5 / count)
+    expect(ev!.data.heal).toBe(Math.round((atk!.data.damage as number) * 0.5 / 2));
+  });
+});

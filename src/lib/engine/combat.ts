@@ -1,4 +1,5 @@
 import type { UnitStack, Hero } from './types';
+import { abilityLevel, defenseReductionMult } from './abilityCatalog';
 import type { Rng } from './rng';
 import { chebyshevDistance } from './grid';
 
@@ -25,9 +26,10 @@ export function modifiedDamage(
     def = Math.floor(def * 1.3);
   }
 
-  // Behemoth defense reduction: reduces target defense by 40%
-  if (attacker.definition.abilities.includes('defense_reduction')) {
-    def = Math.floor(def * 0.6);
+  // Defense reduction: −5% target defense per level (legacy Behemoth = level 8 = 40%).
+  const drLevel = abilityLevel(attacker.definition, 'defense_reduction');
+  if (drLevel > 0) {
+    def = Math.floor(def * defenseReductionMult(drLevel));
   }
 
   let totalDamage = dmgPerCreature * attacker.count;

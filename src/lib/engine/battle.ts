@@ -5,6 +5,7 @@ import { advanceTurn } from './turnOrder';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat';
 import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors';
 import { mulberry32, type Rng } from './rng';
+import { abilityLevel, lifestealFraction } from './abilityCatalog';
 import {
   applyOffenseBonus,
   applyArmorerBonus,
@@ -85,8 +86,10 @@ function applyOnHitEffects(
   const events: BattleEvent[] = [];
   const abilities = striker.definition.abilities;
 
-  if (abilities.includes('life_drain') && a.count > 0) {
-    const heal = Math.round(damageDealt / a.count);
+  const lsLevel = abilityLevel(striker.definition, 'life_drain');
+  if (lsLevel > 0 && a.count > 0) {
+    // 10%·level of damage dealt, split across the stack (legacy Vampire = level 10 = 100%).
+    const heal = Math.round((damageDealt * lifestealFraction(lsLevel)) / a.count);
     const newHp = Math.min(a.definition.hp, a.hp + heal);
     if (heal > 0 && newHp !== a.hp) {
       a = { ...a, hp: newHp };
@@ -175,8 +178,8 @@ function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, co
     side,
     hasRetaliated: false,
     shotsLeft: slot.unit.shots,
-    // Bravery: the unit carries its own morale into battle, either side.
-    morale: slot.unit.abilities.includes('bravery') ? 1 : 0,
+    // Bravery: the unit carries its own morale into battle, either side; +level.
+    morale: clampProc(abilityLevel(slot.unit, 'bravery')),
     luck: 0,
     atb: 0,
     isDefending: false,
