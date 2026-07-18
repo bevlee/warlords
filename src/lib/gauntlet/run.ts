@@ -4,7 +4,8 @@ import { UNIT_COSTS } from '../engine/recruit';
 import { updateFactionSkills } from '../engine/factionSkills';
 import { mixSeed, mulberry32, type Rng } from '../engine/rng';
 import { itemDraftOptions, type ItemId } from './items';
-import { skillDraftOptions, type SkillId } from './skills';
+import { skillDraftOptions, canLearnSkill, type SkillId, type UnitSkills } from './skills';
+import { addAbilityLevels, isUnique } from '../engine/abilityCatalog';
 
 export { mixSeed };
 
@@ -28,8 +29,8 @@ export interface RunState {
   pendingItems: ItemId[] | null;
   pendingSkills: SkillId[] | null;
   items: ItemId[];
-  /** Unit skills taught this run: unit name → granted ability ids. */
-  unitSkills: Record<string, SkillId[]>;
+  /** Unit skills taught this run: unit name → granted skill levels. */
+  unitSkills: UnitSkills;
   status: 'map' | 'draft' | 'won' | 'lost';
   battlesWon: number;
   startedAt: number;
@@ -181,13 +182,18 @@ export function applyItemPick(run: RunState, itemId: ItemId): RunState {
   };
 }
 
-/** Teach `skillId` to a unit type for the rest of the run. */
+/** Teach `skillId` to a unit type for the rest of the run. Each pick grants
+ *  +1 level; leveled skills stack additively (capped by the ability catalog),
+ *  unique skills are once-only — an invalid pick is a no-op. */
 export function applySkillPick(run: RunState, skillId: SkillId, unitName: string): RunState {
-  const existing = run.unitSkills[unitName] ?? [];
-  if (existing.includes(skillId)) return run;
+  const slot = run.army.find(s => s.unit.name === unitName);
+  if (!slot || !canLearnSkill(slot, run.unitSkills, skillId)) return run;
+  const existing = run.unitSkills[unitName] ?? {};
+  const current = existing[skillId] ?? 0;
+  const next = isUnique(skillId) ? 1 : addAbilityLevels(skillId, current, 1);
   return {
     ...run,
-    unitSkills: { ...run.unitSkills, [unitName]: [...existing, skillId] },
+    unitSkills: { ...run.unitSkills, [unitName]: { ...existing, [skillId]: next } },
     pendingSkills: null,
     status: stillDrafting({ ...run, pendingSkills: null }),
   };

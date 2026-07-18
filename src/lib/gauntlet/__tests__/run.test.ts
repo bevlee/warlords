@@ -13,7 +13,7 @@ import {
   mixSeed,
 } from '../run';
 import { itemDraftOptions } from '../items';
-import { skillDraftOptions } from '../skills';
+import { skillDraftOptions, canLearnSkill } from '../skills';
 import { armyCost, UNIT_COSTS } from '../../engine/recruit';
 import { FACTION_UNITS } from '../../engine/factions';
 import type { UnitStack } from '../../engine/types';
@@ -253,9 +253,7 @@ describe('skill offers', () => {
       if (run.pendingSkills) {
         // Every offered skill has at least one unit that can still learn it.
         const skill = run.pendingSkills[0];
-        const learner = run.army.find(
-          s => !(run.unitSkills[s.unit.name] ?? []).includes(skill) && !s.unit.abilities.includes(skill)
-        )!;
+        const learner = run.army.find(s => canLearnSkill(s, run.unitSkills, skill))!;
         expect(learner).toBeTruthy();
         run = applySkillPick(run, skill, learner.unit.name);
       }
@@ -271,7 +269,7 @@ describe('skill offers', () => {
     const unitName = run.army[0].unit.name;
 
     const afterSkill = applySkillPick(run, skill, unitName);
-    expect(afterSkill.unitSkills[unitName]).toContain(skill);
+    expect(afterSkill.unitSkills[unitName]?.[skill]).toBe(1);
     expect(afterSkill.pendingSkills).toBeNull();
     expect(afterSkill.status).toBe('draft'); // unit card still owed
 

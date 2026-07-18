@@ -5,7 +5,7 @@
   import { FACTION_INFO, FACTION_UNITS } from '$lib/engine/factions';
   import { armyCost } from '$lib/engine/recruit';
   import { ITEMS, itemBonuses, itemEffectText, type ItemId } from '$lib/gauntlet/items';
-  import { UNIT_SKILLS, applyUnitSkills, type SkillId } from '$lib/gauntlet/skills';
+  import { UNIT_SKILLS, applyUnitSkills, canLearnSkill, migrateUnitSkills, type SkillId } from '$lib/gauntlet/skills';
   import { skillIconFor, skillGlyph } from '$lib/ui/skillIcons';
   import {
     newRun,
@@ -55,7 +55,7 @@
           ...saved,
           items: saved.items ?? [],
           pendingItems: saved.pendingItems ?? null,
-          unitSkills: saved.unitSkills ?? {},
+          unitSkills: migrateUnitSkills(saved.unitSkills ?? {}),
           pendingSkills: saved.pendingSkills ?? null,
         }
       : null;
@@ -99,7 +99,7 @@
     if (!run) return false;
     const slot = run.army.find(s => s.unit.name === unitName);
     if (!slot) return false;
-    return !(run.unitSkills[unitName] ?? []).includes(skill) && !slot.unit.abilities.includes(skill);
+    return canLearnSkill(slot, run.unitSkills, skill);
   }
 
   function teachSkill(unitName: string) {
@@ -178,7 +178,7 @@
   {:else if inBattle}
     {#key battleKey}
       <Battle
-        playerArmy={applyUnitSkills(run.army, run.unitSkills)}
+        playerArmy={applyUnitSkills(run.army, run.unitSkills, run.faction)}
         enemyArmy={encounter?.army ?? []}
         hero={debugBoost ? { ...run.hero, attack: run.hero.attack + DEBUG_ATTACK } : run.hero}
         armyBonuses={itemBonuses(run.items)}
@@ -410,19 +410,19 @@
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Army ({armyCost(run.army)} power)</p>
           {#each run.army as slot (slot.unit.name)}
             {@const ts = TIER_STYLE[slot.unit.tier]}
-            {@const taught = run.unitSkills[slot.unit.name] ?? []}
+            {@const taught = Object.entries(run.unitSkills[slot.unit.name] ?? {}).filter(([, lvl]) => lvl) as [SkillId, number][]}
             <div class="flex items-center gap-2 py-0.5">
               <span class="rounded ring-1 {ts.ring}"><Sprite name={slot.unit.name} class="h-7 w-6" /></span>
               <span class="text-xs {ts.text}">{slot.count} × {slot.unit.name}</span>
             </div>
             {#if taught.length > 0}
               <div class="mb-0.5 ml-8 flex flex-wrap gap-1">
-                {#each taught as sk (sk)}
+                {#each taught as [sk, lvl] (sk)}
                   <span
                     class="rounded bg-violet-950/60 px-1 text-[10px] font-medium text-violet-300 ring-1 ring-violet-500/40"
                     title={UNIT_SKILLS[sk].description}
                   >
-                    {skillGlyph(sk)} {UNIT_SKILLS[sk].name}
+                    {skillGlyph(sk)} {UNIT_SKILLS[sk].name}{lvl > 1 ? ` ${lvl}` : ''}
                   </span>
                 {/each}
               </div>
