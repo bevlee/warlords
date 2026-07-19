@@ -38,3 +38,10 @@ export function applyXp(hero: Hero, gained: number): { hero: Hero; levels: numbe
 
   return { hero: { ...hero, xp, level, attack, defense }, levels };
 }
+
+/** Victory rewards in one step: XP (with level-ups) plus gold credited to the
+ *  campaign wallet. Free-play passes goldReward 0 — XP only. */
+export function applyVictory(hero: Hero, xp: number, goldReward: number): { hero: Hero; levels: number } {
+  const { hero: next, levels } = applyXp(hero, xp);
+  return { hero: { ...next, gold: (hero.gold ?? 0) + goldReward }, levels };
+}

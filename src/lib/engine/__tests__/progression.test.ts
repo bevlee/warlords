@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { xpToReach, applyXp, budgetForLevel, maxRecruitTier, recruitBudget } from '../progression';
+import { xpToReach, applyXp, applyVictory, budgetForLevel, maxRecruitTier, recruitBudget } from '../progression';
 import type { Hero } from '../types';
 
 const freshHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [] };
@@ -54,5 +54,25 @@ describe('progression', () => {
     expect(recruitBudget(freshHero)).toBe(300);
     expect(recruitBudget({ ...freshHero, gold: 180 })).toBe(480);
     expect(recruitBudget({ ...freshHero, level: 3, gold: 50 })).toBe(450);
+  });
+});
+
+describe('applyVictory', () => {
+  it('credits gold on top of XP level-ups (campaign win)', () => {
+    const { hero, levels } = applyVictory({ ...freshHero, gold: 20 }, 250, 80);
+    expect(hero.gold).toBe(100);
+    expect(hero.xp).toBe(250);
+    expect(levels).toBeGreaterThanOrEqual(1); // 250 xp crosses level 2
+    expect(hero.level).toBe(1 + levels);
+  });
+
+  it('free-play (goldReward 0) leaves gold untouched', () => {
+    const { hero } = applyVictory({ ...freshHero, gold: 55 }, 40, 0);
+    expect(hero.gold).toBe(55);
+  });
+
+  it('defaults a missing gold field to 0', () => {
+    const { hero } = applyVictory(freshHero, 10, 30);
+    expect(hero.gold).toBe(30);
   });
 });

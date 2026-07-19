@@ -147,7 +147,16 @@
 
   <div class="mb-4 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-4 py-3">
     <div class="flex items-center gap-6">
-      <span class="text-lg font-semibold text-amber-300">🪙 {goldLeft} <span class="text-sm font-normal text-slate-400">/ {budget} gold{#if hero.gold}{' · incl. '}{hero.gold} won{/if}</span></span>
+      <span
+        class="text-lg font-semibold text-amber-300"
+        title={hero.gold ? `${budget - hero.gold} level budget + ${hero.gold} gold won` : undefined}
+      >
+        🪙 {goldLeft}
+        <span class="text-sm font-normal text-slate-400">/ {budget} gold</span>
+        {#if hero.gold}
+          <span class="text-sm font-normal text-emerald-400">(+{hero.gold} won)</span>
+        {/if}
+      </span>
       <span class="text-sm text-slate-300">{slots.length} / {MAX_STACKS} stacks</span>
     </div>
     <div class="flex items-center gap-2">

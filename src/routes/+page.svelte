@@ -4,7 +4,7 @@
   import ArmySetup from '$lib/ui/ArmySetup.svelte';
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
   import { generateEnemyArmy, armyCost } from '$lib/engine/recruit';
-  import { recruitBudget, maxRecruitTier, applyXp } from '$lib/engine/progression';
+  import { recruitBudget, maxRecruitTier, applyVictory } from '$lib/engine/progression';
   import { updateFactionSkills, necromancyBonusSkeletons } from '$lib/engine/factionSkills';
   import { SKELETON } from '$lib/engine/necromancer';
   import { mulberry32 } from '$lib/engine/rng';
@@ -81,10 +81,9 @@
     lastOutcome = result;
     if (result === 'player_wins') {
       const gained = activeEncounter ? activeEncounter.xpReward : armyCost(enemyArmy);
-      const { hero: next, levels } = applyXp(hero, gained);
+      const { hero: next, levels } = applyVictory(hero, gained, activeEncounter?.goldReward ?? 0);
       const bonusSkeletons = (hero.bonusSkeletons ?? 0) + necromancyBonusSkeletons(hero, enemyArmy);
-      const gold = (hero.gold ?? 0) + (activeEncounter?.goldReward ?? 0);
-      hero = updateFactionSkills({ ...next, bonusSkeletons, gold });
+      hero = updateFactionSkills({ ...next, bonusSkeletons });
       lastBattle = { xp: gained, levels };
       void saveHero(hero);
 
