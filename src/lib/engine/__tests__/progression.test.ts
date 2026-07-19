@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { xpToReach, applyXp, budgetForLevel } from '../progression';
+import { xpToReach, applyXp, budgetForLevel, maxRecruitTier, recruitBudget } from '../progression';
 import type { Hero } from '../types';
 
 const freshHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [] };
@@ -41,5 +41,18 @@ describe('progression', () => {
   it('budget grows 50 gold per level', () => {
     expect(budgetForLevel(1)).toBe(300);
     expect(budgetForLevel(3)).toBe(400);
+  });
+
+  it('recruit tier starts at 2 and unlocks one per level, capped at 7', () => {
+    expect(maxRecruitTier(1)).toBe(2);
+    expect(maxRecruitTier(2)).toBe(3);
+    expect(maxRecruitTier(6)).toBe(7);
+    expect(maxRecruitTier(20)).toBe(7);
+  });
+
+  it('recruitBudget adds campaign gold to the level budget', () => {
+    expect(recruitBudget(freshHero)).toBe(300);
+    expect(recruitBudget({ ...freshHero, gold: 180 })).toBe(480);
+    expect(recruitBudget({ ...freshHero, level: 3, gold: 50 })).toBe(450);
   });
 });

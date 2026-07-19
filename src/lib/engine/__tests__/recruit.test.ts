@@ -31,6 +31,17 @@ describe('recruiting', () => {
     }
   });
 
+  it('never fields units above maxTier, keeping the budget invariants', () => {
+    for (const seed of [1, 7, 42, 999]) {
+      const army = generateEnemyArmy(DEFAULT_BUDGET, mulberry32(seed), 2);
+      const cost = armyCost(army);
+
+      for (const slot of army) expect(slot.unit.tier).toBeLessThanOrEqual(2);
+      expect(cost).toBeLessThanOrEqual(DEFAULT_BUDGET);
+      expect(cost).toBeGreaterThanOrEqual(DEFAULT_BUDGET * 0.7);
+    }
+  });
+
   it('is deterministic for the same seed and varies across seeds', () => {
     const a = generateEnemyArmy(DEFAULT_BUDGET, mulberry32(5));
     const b = generateEnemyArmy(DEFAULT_BUDGET, mulberry32(5));

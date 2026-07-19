@@ -75,6 +75,11 @@ persistent wallet that **adds to** the level budget rather than replacing it:
   visibly lands. The result screen keeps its `+N gold` line — now truthful.
 - `handleReset` already rebuilds from `DEFAULT_HERO`, so reset zeroes gold
   for free.
+- Found during verification: `saveHero`'s shallow spread left the nested
+  `factionSkills` `$state` proxy in the record, so every hero save threw an
+  async `DataCloneError` — XP, levels, and (without a fix) gold silently
+  never persisted. `saveHero` now deep-plains via JSON round-trip, matching
+  `saveRun`.
 
 ## 3. Persistent army selection
 

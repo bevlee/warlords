@@ -80,6 +80,7 @@ export interface Hero {
   defense: number;
   statPoints: number;
   factionSkills: FactionSkill[];
+  gold?: number;       // campaign winnings; adds to the level recruiting budget
   mana?: number;       // set by initBattle (5 + 3·level) unless provided
   bonusSkeletons?: number; // Necromancer Necromancy: free Skeletons queued for the hero's next battle
 }
