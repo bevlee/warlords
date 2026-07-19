@@ -480,6 +480,76 @@
       <circle cx="27" cy="24" r="2.1" fill="#fde047" stroke="none" />
       <circle cx="37" cy="24" r="2.1" fill="#fde047" stroke="none" />
       <path d="M27 31 q5 -3 10 0" fill="none" />
+    {:else if name === 'Blood Acolyte'}
+      <path d="M22 40 q10 -10 20 0 l3 36 h-26 z" fill="#7f1d1d" />
+      <path d="M25 76 h14" stroke="#450a0a" stroke-width="3" />
+      <path d="M24 42 q-6 10 -4 20 l5 2" fill="#7f1d1d" />
+      <path d="M40 42 q6 10 4 20 l-5 2" fill="#7f1d1d" />
+      <path d="M22 34 q10 -14 20 0 q-4 6 -10 6 q-6 0 -10 -6z" fill="#991b1b" />
+      <circle cx="32" cy="28" r="8" fill="#e7e5e4" />
+      <circle cx="29" cy="27" r="1.6" fill="#dc2626" stroke="none" />
+      <circle cx="35" cy="27" r="1.6" fill="#dc2626" stroke="none" />
+      <path d="M46 46 l6 -10 l3 3 l-6 10 z" fill="#cbd5e1" />
+    {:else if name === 'Ram Rider'}
+      <path d="M10 60 l-2 16 h7 l2 -13" fill="#a8a29e" />
+      <path d="M44 60 l2 16 h7 l-1 -13" fill="#a8a29e" />
+      <path d="M8 56 q6 -12 26 -11 q16 1 22 8 q4 6 -3 9 q-22 5 -40 0 q-7 -2 -5 -6z" fill="#d6d3d1" />
+      <path d="M50 46 q10 -4 12 5 l-6 1 l4 4 q-7 4 -12 -3z" fill="#d6d3d1" />
+      <path d="M56 42 q6 -6 2 -12 q-6 2 -6 9" fill="#78716c" />
+      <circle cx="56" cy="50" r="1.6" fill="#1c1917" stroke="none" />
+      <circle cx="30" cy="28" r="9" fill="#c9995f" />
+      <path d="M23 34 q7 -6 14 0 l-2 12 q-5 3 -10 0 z" fill="#7c2d12" />
+      <path d="M40 16 l2 26" stroke="#8b5a2b" stroke-width="3" />
+      <path d="M42 16 l-3 -8 l8 3 z" fill="#cbd5e1" />
+      <circle cx="27" cy="27" r="1.7" fill="#fbbf24" stroke="none" />
+      <circle cx="33" cy="27" r="1.7" fill="#fbbf24" stroke="none" />
+    {:else if name === 'Standard Bearer'}
+      <path d="M26 58 l-3 18 h9 l1 -15" fill="#475569" />
+      <path d="M38 58 l3 18 h-9 l-1 -15" fill="#475569" />
+      <path d="M23 40 q9 -8 18 0 l-1 20 h-16 z" fill="#e2e8f0" />
+      <path d="M27 46 h10 v8 h-10 z" fill="#dc2626" stroke="none" />
+      <circle cx="32" cy="30" r="8" fill="#f1c27d" />
+      <path d="M24 27 q8 -8 16 0 l-2 -8 h-12 z" fill="#94a3b8" />
+      <path d="M48 10 l0 52" stroke="#78350f" stroke-width="3" />
+      <path d="M50 13 h13 l-4 5 l4 5 h-13 z" fill="#f59e0b" />
+      <circle cx="29" cy="29" r="1.6" fill="#1c1917" stroke="none" />
+      <circle cx="35" cy="29" r="1.6" fill="#1c1917" stroke="none" />
+    {:else if name === 'Outrider'}
+      <path d="M12 62 l-2 14 h6 l2 -11" fill="#e7e5e4" />
+      <path d="M46 62 l2 14 h6 l-1 -11" fill="#e7e5e4" />
+      <path d="M10 58 q5 -13 27 -12 q17 1 22 9 q4 6 -4 9 q-21 4 -40 0 q-7 -2 -5 -6z" fill="#f5f5f4" />
+      <path d="M52 48 q10 -3 12 6 l-7 1 l4 4 q-8 4 -12 -4z" fill="#f5f5f4" />
+      <path d="M56 44 l-2 -7 l6 5z" fill="#d6d3d1" />
+      <circle cx="58" cy="53" r="1.6" fill="#1c1917" stroke="none" />
+      <circle cx="30" cy="26" r="8" fill="#f1c27d" />
+      <path d="M23 22 l-4 -5 l6 2z" fill="#f1c27d" />
+      <path d="M37 22 l4 -5 l-6 2z" fill="#f1c27d" />
+      <path d="M23 32 q7 -5 14 0 l-2 12 q-5 3 -10 0 z" fill="#166534" />
+      <path d="M42 18 q6 8 0 18" fill="none" stroke="#8b5a2b" />
+      <circle cx="27" cy="25" r="1.6" fill="#1c1917" stroke="none" />
+      <circle cx="33" cy="25" r="1.6" fill="#1c1917" stroke="none" />
+    {:else if name === 'Siege Golem'}
+      <path d="M20 62 l-3 14 h11 l1 -11" fill="#57534e" />
+      <path d="M44 62 l3 14 h-11 l-1 -11" fill="#57534e" />
+      <path d="M16 34 q16 -12 32 0 l3 28 h-38 z" fill="#78716c" />
+      <path d="M20 40 h24 M20 48 h24 M20 56 h24" stroke="#57534e" fill="none" />
+      <path d="M14 36 q-8 8 -4 18 q5 4 10 0 l-2 -14" fill="#a8a29e" />
+      <path d="M50 36 q8 8 4 18 q-5 4 -10 0 l2 -14" fill="#a8a29e" />
+      <path d="M24 22 q8 -8 16 0 l-2 12 h-12 z" fill="#a8a29e" />
+      <circle cx="29" cy="27" r="2" fill="#f59e0b" stroke="none" />
+      <circle cx="37" cy="27" r="2" fill="#f59e0b" stroke="none" />
+    {:else if name === 'Blood Fiend'}
+      <path d="M26 58 l-4 18 h8 l2 -15" fill="#7f1d1d" />
+      <path d="M38 58 l4 18 h-8 l-2 -15" fill="#7f1d1d" />
+      <path d="M24 36 q8 -8 16 0 l2 24 h-20 z" fill="#991b1b" />
+      <path d="M22 38 l-10 -8 l2 12 l8 2z" fill="#7f1d1d" />
+      <path d="M42 38 l10 -8 l-2 12 l-8 2z" fill="#7f1d1d" />
+      <circle cx="32" cy="26" r="9" fill="#b91c1c" />
+      <path d="M26 20 l-3 -7 l6 4z" fill="#b91c1c" />
+      <path d="M38 20 l3 -7 l-6 4z" fill="#b91c1c" />
+      <path d="M28 31 l2 4 l2 -4 M34 31 l2 4 l2 -4" fill="#f8fafc" stroke="#f8fafc" stroke-width="1" />
+      <circle cx="28" cy="25" r="1.8" fill="#fde047" stroke="none" />
+      <circle cx="36" cy="25" r="1.8" fill="#fde047" stroke="none" />
     {:else if name === 'Rock'}
       <path d="M10 70 q-4 -18 12 -26 q14 -8 26 2 q10 8 6 24 q-22 8 -44 0z" fill="#78716c" />
       <path d="M22 46 l6 24 M40 48 l-4 22" stroke="#57534e" stroke-width="1.5" />

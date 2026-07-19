@@ -4,7 +4,7 @@
 // one row per pose — idle / attack / hit / death), frame 128×160 px (2× the 64×80
 // viewBox). Drop a hand-drawn sheet with the same name and layout over any file
 // to replace the placeholder; rerun `npm run sprites` to regenerate the rest.
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -94,10 +94,27 @@ function sheetSvg(name, body) {
 
 const slug = (name) => name.toLowerCase().replace(/\s+/g, '-');
 
+// Default: only write sheets that don't exist yet, so hand-drawn art dropped
+// over a placeholder is never clobbered (uncommitted art is unrecoverable).
+// `npm run sprites -- --all` force-regenerates everything, e.g. after editing
+// a vector standee that already has a placeholder sheet.
+const force = process.argv.includes('--all');
+
 const units = await extractUnits();
 await mkdir(OUT_DIR, { recursive: true });
+let wrote = 0;
+let skipped = 0;
 for (const [name, body] of units) {
+  const out = path.join(OUT_DIR, `${slug(name)}.png`);
+  if (!force && (await access(out).then(() => true, () => false))) {
+    skipped++;
+    continue;
+  }
   const png = await sharp(Buffer.from(sheetSvg(name, body))).png().toBuffer();
-  await writeFile(path.join(OUT_DIR, `${slug(name)}.png`), png);
+  await writeFile(out, png);
+  wrote++;
 }
-console.log(`wrote ${units.size} sheets to ${path.relative(root, OUT_DIR)}`);
+console.log(
+  `wrote ${wrote} sheet${wrote === 1 ? '' : 's'} to ${path.relative(root, OUT_DIR)}` +
+    (skipped ? ` (${skipped} existing kept — use --all to regenerate)` : '')
+);

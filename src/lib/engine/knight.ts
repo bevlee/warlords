@@ -18,6 +18,12 @@ export const KNIGHT_UNITS: UnitDef[] = [
     shots: 0, range: 0, isLarge: false, abilities: ['flying', 'unlimited_retaliation'],
   },
   {
+    name: 'Standard Bearer', tier: 3, speed: 5, initiative: 9, hp: 30,
+    attack: 6, defense: 8, minDamage: 3, maxDamage: 5,
+    shots: 0, range: 0, isLarge: false, abilities: ['bravery'],
+    abilityLevels: { bravery: 2 },
+  },
+  {
     name: 'Swordsman', tier: 4, speed: 5, initiative: 8, hp: 55,
     attack: 10, defense: 12, minDamage: 6, maxDamage: 9,
     shots: 0, range: 0, isLarge: false, abilities: [],
@@ -39,10 +45,12 @@ export const KNIGHT_UNITS: UnitDef[] = [
   },
 ];
 
-export const PEASANT = KNIGHT_UNITS[0];
-export const ARCHER = KNIGHT_UNITS[1];
-export const GRIFFIN = KNIGHT_UNITS[2];
-export const SWORDSMAN = KNIGHT_UNITS[3];
-export const MONK = KNIGHT_UNITS[4];
-export const CAVALIER = KNIGHT_UNITS[5];
-export const CHAMPION = KNIGHT_UNITS[6];
+// Name-based lookups: roster order/size may change (multiple units per tier).
+const byName = (n: string) => KNIGHT_UNITS.find(u => u.name === n)!;
+export const PEASANT = byName('Peasant');
+export const ARCHER = byName('Archer');
+export const GRIFFIN = byName('Griffin');
+export const SWORDSMAN = byName('Swordsman');
+export const MONK = byName('Monk');
+export const CAVALIER = byName('Cavalier');
+export const CHAMPION = byName('Champion');

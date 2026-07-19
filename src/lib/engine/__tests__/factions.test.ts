@@ -6,10 +6,12 @@ import { FACTION_UNITS, FACTION_INFO } from '../factions';
 import { UNIT_COSTS } from '../recruit';
 
 describe('Knight roster', () => {
-  it('has 7 tiers, each with the required fields', () => {
-    expect(KNIGHT_UNITS).toHaveLength(7);
-    KNIGHT_UNITS.forEach((u, i) => {
-      expect(u.tier).toBe(i + 1);
+  it('has 8 units covering all 7 tiers in non-decreasing order', () => {
+    expect(KNIGHT_UNITS).toHaveLength(8);
+    const tiers = KNIGHT_UNITS.map(u => u.tier);
+    expect(new Set(tiers)).toEqual(new Set([1, 2, 3, 4, 5, 6, 7]));
+    expect([...tiers].sort((a, b) => a - b)).toEqual(tiers);
+    KNIGHT_UNITS.forEach(u => {
       expect(u.hp).toBeGreaterThan(0);
       expect(u.minDamage).toBeGreaterThan(0);
       expect(u.maxDamage).toBeGreaterThanOrEqual(u.minDamage);
@@ -25,12 +27,12 @@ describe('Knight roster', () => {
 });
 
 describe('Wizard roster', () => {
-  it('has 7 tiers, each with the required fields', () => {
-    expect(WIZARD_UNITS).toHaveLength(7);
-    WIZARD_UNITS.forEach((u, i) => {
-      expect(u.tier).toBe(i + 1);
-      expect(u.hp).toBeGreaterThan(0);
-    });
+  it('has 8 units covering all 7 tiers in non-decreasing order', () => {
+    expect(WIZARD_UNITS).toHaveLength(8);
+    const tiers = WIZARD_UNITS.map(u => u.tier);
+    expect(new Set(tiers)).toEqual(new Set([1, 2, 3, 4, 5, 6, 7]));
+    expect([...tiers].sort((a, b) => a - b)).toEqual(tiers);
+    WIZARD_UNITS.forEach(u => expect(u.hp).toBeGreaterThan(0));
   });
 
   it('Gorgon has death_stare', () => {

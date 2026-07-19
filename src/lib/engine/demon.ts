@@ -23,6 +23,12 @@ export const DEMON_UNITS: UnitDef[] = [
     shots: 0, range: 0, isLarge: false, abilities: ['gate'],
   },
   {
+    name: 'Blood Fiend', tier: 4, speed: 6, initiative: 10, hp: 55,
+    attack: 10, defense: 8, minDamage: 5, maxDamage: 8,
+    shots: 0, range: 0, isLarge: false, abilities: ['life_drain'],
+    abilityLevels: { life_drain: 5 },
+  },
+  {
     name: 'Pit Fiend', tier: 5, speed: 5, initiative: 9, hp: 80,
     attack: 16, defense: 12, minDamage: 13, maxDamage: 20,
     shots: 0, range: 0, isLarge: false, abilities: ['cast_haste'],
@@ -39,10 +45,12 @@ export const DEMON_UNITS: UnitDef[] = [
   },
 ];
 
-export const IMP = DEMON_UNITS[0];
-export const GOG = DEMON_UNITS[1];
-export const HELL_HOUND = DEMON_UNITS[2];
-export const DEMON = DEMON_UNITS[3];
-export const PIT_FIEND = DEMON_UNITS[4];
-export const EFREET = DEMON_UNITS[5];
-export const DEVIL = DEMON_UNITS[6];
+// Name-based lookups: roster order/size may change (multiple units per tier).
+const byName = (n: string) => DEMON_UNITS.find(u => u.name === n)!;
+export const IMP = byName('Imp');
+export const GOG = byName('Gog');
+export const HELL_HOUND = byName('Hell Hound');
+export const DEMON = byName('Demon');
+export const PIT_FIEND = byName('Pit Fiend');
+export const EFREET = byName('Efreet');
+export const DEVIL = byName('Devil');

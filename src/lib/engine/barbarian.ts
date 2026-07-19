@@ -22,6 +22,12 @@ export const BARBARIAN_UNITS: UnitDef[] = [
     shots: 0, range: 0, isLarge: false, abilities: [],
   },
   {
+    name: 'Ram Rider', tier: 4, speed: 6, initiative: 10, hp: 55,
+    attack: 9, defense: 6, minDamage: 6, maxDamage: 10,
+    shots: 0, range: 0, isLarge: false, abilities: ['defense_reduction'],
+    abilityLevels: { defense_reduction: 4 },
+  },
+  {
     name: 'Cyclops', tier: 5, speed: 6, initiative: 10, hp: 100,
     attack: 15, defense: 10, minDamage: 12, maxDamage: 24,
     shots: 3, range: 8, isLarge: false, abilities: [],
@@ -38,10 +44,12 @@ export const BARBARIAN_UNITS: UnitDef[] = [
   },
 ];
 
-export const GOBLIN = BARBARIAN_UNITS[0];
-export const WOLF_RIDER = BARBARIAN_UNITS[1];
-export const ORC = BARBARIAN_UNITS[2];
-export const OGRE = BARBARIAN_UNITS[3];
-export const CYCLOPS = BARBARIAN_UNITS[4];
-export const THUNDERBIRD = BARBARIAN_UNITS[5];
-export const BEHEMOTH = BARBARIAN_UNITS[6];
+// Name-based lookups: roster order/size may change (multiple units per tier).
+const byName = (n: string) => BARBARIAN_UNITS.find(u => u.name === n)!;
+export const GOBLIN = byName('Goblin');
+export const WOLF_RIDER = byName('Wolf Rider');
+export const ORC = byName('Orc');
+export const OGRE = byName('Ogre');
+export const CYCLOPS = byName('Cyclops');
+export const THUNDERBIRD = byName('Thunderbird');
+export const BEHEMOTH = byName('Behemoth');

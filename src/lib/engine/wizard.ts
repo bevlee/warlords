@@ -28,6 +28,12 @@ export const WIZARD_UNITS: UnitDef[] = [
     shots: 0, range: 0, isLarge: true, abilities: ['no_retaliation'],
   },
   {
+    name: 'Siege Golem', tier: 5, speed: 4, initiative: 7, hp: 110,
+    attack: 12, defense: 12, minDamage: 8, maxDamage: 12,
+    shots: 0, range: 0, isLarge: true, abilities: ['defense_reduction'],
+    abilityLevels: { defense_reduction: 6 },
+  },
+  {
     name: 'Giant', tier: 6, speed: 5, initiative: 8, hp: 200,
     attack: 22, defense: 18, minDamage: 30, maxDamage: 40,
     shots: 0, range: 0, isLarge: true, abilities: [],
@@ -39,10 +45,12 @@ export const WIZARD_UNITS: UnitDef[] = [
   },
 ];
 
-export const GREMLIN = WIZARD_UNITS[0];
-export const STONE_GOLEM = WIZARD_UNITS[1];
-export const MAGE = WIZARD_UNITS[2];
-export const GORGON = WIZARD_UNITS[3];
-export const NAGA = WIZARD_UNITS[4];
-export const GIANT = WIZARD_UNITS[5];
-export const TITAN = WIZARD_UNITS[6];
+// Name-based lookups: roster order/size may change (multiple units per tier).
+const byName = (n: string) => WIZARD_UNITS.find(u => u.name === n)!;
+export const GREMLIN = byName('Gremlin');
+export const STONE_GOLEM = byName('Stone Golem');
+export const MAGE = byName('Mage');
+export const GORGON = byName('Gorgon');
+export const NAGA = byName('Naga');
+export const GIANT = byName('Giant');
+export const TITAN = byName('Titan');

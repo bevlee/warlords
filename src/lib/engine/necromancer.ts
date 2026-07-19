@@ -18,6 +18,12 @@ export const NECROMANCER_UNITS: UnitDef[] = [
     shots: 0, range: 0, isLarge: false, abilities: ['undead', 'flying', 'no_retaliation', 'drain_morale'],
   },
   {
+    name: 'Blood Acolyte', tier: 3, speed: 5, initiative: 9, hp: 28,
+    attack: 7, defense: 6, minDamage: 4, maxDamage: 6,
+    shots: 0, range: 0, isLarge: false, abilities: ['undead', 'life_drain'],
+    abilityLevels: { life_drain: 3 },
+  },
+  {
     name: 'Vampire', tier: 4, speed: 7, initiative: 9, hp: 55,
     attack: 10, defense: 9, minDamage: 5, maxDamage: 8,
     shots: 0, range: 0, isLarge: false, abilities: ['undead', 'flying', 'no_retaliation', 'life_drain'],
@@ -39,10 +45,12 @@ export const NECROMANCER_UNITS: UnitDef[] = [
   },
 ];
 
-export const SKELETON = NECROMANCER_UNITS[0];
-export const ZOMBIE = NECROMANCER_UNITS[1];
-export const GHOST = NECROMANCER_UNITS[2];
-export const VAMPIRE = NECROMANCER_UNITS[3];
-export const LICH = NECROMANCER_UNITS[4];
-export const BLACK_KNIGHT = NECROMANCER_UNITS[5];
-export const BONE_DRAGON = NECROMANCER_UNITS[6];
+// Name-based lookups: roster order/size may change (multiple units per tier).
+const byName = (n: string) => NECROMANCER_UNITS.find(u => u.name === n)!;
+export const SKELETON = byName('Skeleton');
+export const ZOMBIE = byName('Zombie');
+export const GHOST = byName('Ghost');
+export const VAMPIRE = byName('Vampire');
+export const LICH = byName('Lich');
+export const BLACK_KNIGHT = byName('Black Knight');
+export const BONE_DRAGON = byName('Bone Dragon');

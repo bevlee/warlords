@@ -13,6 +13,14 @@ export const RANGER_UNITS: UnitDef[] = [
     shots: 15, range: 10, isLarge: false, abilities: ['no_melee_penalty'],
   },
   {
+    // Speed already includes the innate Fleet Footwork II (+2) — defs carry
+    // their final speed; the ability entry is for display and identity.
+    name: 'Outrider', tier: 2, speed: 8, initiative: 10, hp: 18,
+    attack: 5, defense: 4, minDamage: 2, maxDamage: 4,
+    shots: 0, range: 0, isLarge: false, abilities: ['fleet_footwork'],
+    abilityLevels: { fleet_footwork: 2 },
+  },
+  {
     name: 'Dendroid', tier: 3, speed: 2, initiative: 6, hp: 55,
     attack: 7, defense: 13, minDamage: 6, maxDamage: 10,
     shots: 0, range: 0, isLarge: false, abilities: ['bind'],
@@ -39,10 +47,12 @@ export const RANGER_UNITS: UnitDef[] = [
   },
 ];
 
-export const SPRITE = RANGER_UNITS[0];
-export const WOOD_ELF = RANGER_UNITS[1];
-export const DENDROID = RANGER_UNITS[2];
-export const PEGASUS = RANGER_UNITS[3];
-export const GRAND_ELF = RANGER_UNITS[4];
-export const BATTLE_DWARF = RANGER_UNITS[5];
-export const UNICORN = RANGER_UNITS[6];
+// Name-based lookups: roster order/size may change (multiple units per tier).
+const byName = (n: string) => RANGER_UNITS.find(u => u.name === n)!;
+export const SPRITE = byName('Sprite');
+export const WOOD_ELF = byName('Wood Elf');
+export const DENDROID = byName('Dendroid');
+export const PEGASUS = byName('Pegasus');
+export const GRAND_ELF = byName('Grand Elf');
+export const BATTLE_DWARF = byName('Battle Dwarf');
+export const UNICORN = byName('Unicorn');
