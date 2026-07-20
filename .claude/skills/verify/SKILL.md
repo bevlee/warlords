@@ -5,7 +5,12 @@ description: Build, launch, and drive the Warlords battle UI to verify changes e
 
 # Verifying Warlords
 
-SvelteKit + Vite app; the whole game runs client-side (no backend).
+SvelteKit + Vite app. The game simulation runs client-side, but saves now live
+on the server: `npm run dev` also mounts the save API (`/api/session`,
+`/api/save/:slot`) backed by SQLite at `data/warlords-dev.db`. Delete that file
+for a clean first-run state; the client's session token is in `localStorage`
+under `warlords.session`. Reads of an absent save answer 404 — two of them show
+up as console errors on a first load, which is expected, not a bug.
 
 ## Launch
 
@@ -118,7 +123,9 @@ current node, bosses at 3/7/10) → battle (Continue on the overlay) → draft
 **Every battle opens in a deploy phase** — the turn loop is frozen and the
 status strip is replaced by a banner until you click
 `getByRole('button', { name: 'Begin battle ⚔️' })`. Any driver that waits
-for "Your …" turn text without clicking Begin first will idle forever. Run persists in IndexedDB key `gauntletRun`
-(kv store) — but note each Playwright launch is a fresh profile, so
+for "Your …" turn text without clicking Begin first will idle forever. Run persists server-side under save slot
+`gauntletRun` — each Playwright launch is a fresh profile (new
+`localStorage`, hence a new session token and an empty save set), so
 persistence checks must reload within one browser session. To test late-run
-states, inject a crafted RunState into idb via page.evaluate and reload.
+states, `PUT /api/save/gauntletRun` a crafted RunState with the page's token
+via page.evaluate, then reload.
