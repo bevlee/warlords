@@ -5,13 +5,18 @@ metadata:
   namespace: warlords
   labels:
     app: warlords
-spec: 
+spec:
+  # SQLite on a single RWO volume: exactly one replica, and Recreate so two
+  # pods never overlap on the file during a rollout. Live battles survive the
+  # restart via the action journal (see docs/plans coop plan, rehydration).
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: warlords
   template:
-    metadata: 
+    metadata:
       labels:
         app: warlords
     spec:
@@ -20,4 +25,20 @@ spec:
           image: docker.io/bevdev1/warlords:0.1
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 3000
+          env:
+            - name: DATABASE_PATH
+              value: /data/warlords.db
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: warlords-data
