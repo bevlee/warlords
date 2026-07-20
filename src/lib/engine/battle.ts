@@ -1,10 +1,10 @@
-import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types';
-import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
-import { advanceTurn } from './turnOrder';
-import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat';
-import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors';
-import { mulberry32, type Rng } from './rng';
-import { abilityLevel, lifestealFraction } from './abilityCatalog';
+import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types.ts';
+import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid.ts';
+import { advanceTurn } from './turnOrder.ts';
+import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat.ts';
+import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors.ts';
+import { mulberry32, type Rng } from './rng.ts';
+import { abilityLevel, lifestealFraction } from './abilityCatalog.ts';
 import {
   applyOffenseBonus,
   applyArmorerBonus,
@@ -19,8 +19,8 @@ import {
   getMysticismRegen,
   getTacticsShift,
   maxMana,
-} from './factionSkills';
-import { DEMON_UNITS } from './demon';
+} from './factionSkills.ts';
+import { DEMON_UNITS } from './demon.ts';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
  *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon

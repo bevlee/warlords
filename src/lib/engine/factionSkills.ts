@@ -1,5 +1,5 @@
-import type { ArmySlot, FactionClass, FactionSkill, Hero } from './types';
-import { SKELETON } from './necromancer';
+import type { ArmySlot, FactionClass, FactionSkill, Hero } from './types.ts';
+import { SKELETON } from './necromancer.ts';
 
 /** Each faction gets 3 innate skills that level up with the hero. */
 export const FACTION_SKILL_DEFS: Record<

@@ -6,6 +6,8 @@ import { join, dirname } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { openDb } from './db.ts';
 import { createApi } from './api.ts';
+import { RoomRegistry } from './rooms.ts';
+import { attachWebSocketServer } from './ws.ts';
 
 const DATABASE_PATH = process.env.DATABASE_PATH ?? 'data/warlords.db';
 const PORT = Number(process.env.PORT ?? 3000);
@@ -21,6 +23,8 @@ const { handler } = await import('../build/handler.js');
 const server = createServer((req, res) => {
   api(req, res, () => handler(req, res));
 });
+const rooms = new RoomRegistry(db);
+const wsService = attachWebSocketServer(server, db, rooms);
 
 server.listen(PORT, () => {
   console.log(`warlords listening on :${PORT}, db at ${DATABASE_PATH}`);
@@ -49,9 +53,11 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, () => {
     console.log(`${signal} received, shutting down`);
     clearInterval(backupTimer);
-    server.close(() => {
-      db.close();
-      process.exit(0);
+    void wsService.close().then(() => {
+      server.close(() => {
+        db.close();
+        process.exit(0);
+      });
     });
     setTimeout(() => process.exit(0), 10_000).unref();
   });

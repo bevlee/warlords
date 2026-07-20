@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 // Demon faction — high damage, reckless units
 export const DEMON_UNITS: UnitDef[] = [

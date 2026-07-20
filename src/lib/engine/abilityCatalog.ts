@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 export interface AbilityCatalogEntry {
   kind: 'leveled' | 'unique';

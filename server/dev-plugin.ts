@@ -4,6 +4,8 @@
 import type { Plugin } from 'vite';
 import { openDb } from './db.ts';
 import { createApi } from './api.ts';
+import { RoomRegistry } from './rooms.ts';
+import { attachWebSocketServer } from './ws.ts';
 
 export function warlordsApi(): Plugin {
   return {
@@ -13,6 +15,12 @@ export function warlordsApi(): Plugin {
       if (process.env.VITEST) return;
       const db = openDb(process.env.DATABASE_PATH ?? 'data/warlords-dev.db');
       server.middlewares.use(createApi(db));
+      if (server.httpServer) {
+        const wsService = attachWebSocketServer(server.httpServer, db, new RoomRegistry(db));
+        server.httpServer.once('close', () => {
+          void wsService.close().finally(() => db.close());
+        });
+      }
     },
   };
 }
