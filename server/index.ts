@@ -41,4 +41,18 @@ async function backup(): Promise<void> {
   }
 }
 void backup();
-setInterval(backup, BACKUP_INTERVAL_MS);
+const backupTimer = setInterval(backup, BACKUP_INTERVAL_MS);
+
+// Recreate rollouts SIGTERM this process on every deploy. Drain in-flight
+// requests and close the database cleanly so the next pod opens a settled file.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, () => {
+    console.log(`${signal} received, shutting down`);
+    clearInterval(backupTimer);
+    server.close(() => {
+      db.close();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 10_000).unref();
+  });
+}

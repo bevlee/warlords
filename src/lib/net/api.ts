@@ -16,12 +16,17 @@ let baseUrl = '';
 // spans it so a save issued mid-deploy lands instead of erroring.
 let retryDelays = [500, 2000, 8000];
 let sessionPromise: Promise<Session> | null = null;
+// Set as soon as the session is known, before the fresh-session hook runs.
+// The hook (the idb import shim) saves through this module, so it would
+// otherwise await the session promise it is itself still inside.
+let current: Session | null = null;
 
 /** Test hook: point at an ephemeral server and shrink the retry ladder. */
 export function _resetForTests(base: string, delays: number[]): void {
   baseUrl = base;
   retryDelays = delays;
   sessionPromise = null;
+  current = null;
 }
 
 export function getSession(): Promise<Session> {
@@ -34,7 +39,10 @@ async function initSession(): Promise<Session> {
   if (raw) {
     try {
       const stored = JSON.parse(raw) as Session;
-      if (stored.playerId && stored.token) return stored;
+      if (stored.playerId && stored.token) {
+        current = stored;
+        return stored;
+      }
     } catch {
       // fall through to mint
     }
@@ -43,6 +51,7 @@ async function initSession(): Promise<Session> {
   if (!res.ok) throw new Error(`session mint failed: ${res.status}`);
   const session = (await res.json()) as Session;
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  current = session;
   await onFreshSession(session);
   return session;
 }
@@ -65,7 +74,7 @@ export async function fetchWithRetry(
 ): Promise<Response> {
   const headers = new Headers(init.headers);
   if (auth) {
-    const { token } = await getSession();
+    const { token } = current ?? (await getSession());
     headers.set('Authorization', `Bearer ${token}`);
   }
   let lastError: unknown;
