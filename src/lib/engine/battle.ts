@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types';
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid';
 import { advanceTurn } from './turnOrder';
@@ -166,11 +165,17 @@ export function spellPreview(hero: Hero, spell: SpellId, target: UnitStack): Dam
   return { min: damage, max: damage, killsMin: killed, killsMax: killed };
 }
 
-function slotToStack(slot: ArmySlot, side: 'player' | 'enemy', index: number, colShift = 0): UnitStack {
+function slotToStack(
+  slot: ArmySlot,
+  side: 'player' | 'enemy',
+  index: number,
+  id: string,
+  colShift = 0
+): UnitStack {
   const col = side === 'player' ? 1 + colShift : GRID_W - 2;
   const row = 1 + index * Math.floor((GRID_H - 2) / 6);
   return {
-    id: uuidv4(),
+    id,
     definition: slot.unit,
     count: slot.count,
     hp: slot.unit.hp,
@@ -197,13 +202,15 @@ export function initBattle(
   armyBonuses?: ArmyBonuses
 ): BattleState {
   let grid = createGrid(GRID_W, GRID_H);
+  let nextId = 1;
+  const allocateId = () => `u${nextId++}`;
 
   const moraleBonus = getMoraleBonus(hero);
   const tacticsShift = getTacticsShift(hero);
   const logisticsBonus = getLogisticsBonus(hero);
   const luckBonus = getNatureLuckBonus(hero);
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
-    let stack = slotToStack(slot, 'player', i, tacticsShift);
+    let stack = slotToStack(slot, 'player', i, allocateId(), tacticsShift);
     if (moraleBonus > 0) stack = { ...stack, morale: stack.morale + moraleBonus };
     if (logisticsBonus > 0) stack = { ...stack, speedBonus: logisticsBonus };
     if (luckBonus > 0) stack = { ...stack, luck: stack.luck + luckBonus };
@@ -219,12 +226,14 @@ export function initBattle(
     }
     return stack;
   });
-  const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) => slotToStack(slot, 'enemy', i));
+  const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) =>
+    slotToStack(slot, 'enemy', i, allocateId())
+  );
   // Summoned ally: player-side but AI-driven, fielded one column behind the
   // player line. Hero skill bonuses (morale/logistics/luck/gating) deliberately
   // don't apply — the ally fights under its own banner.
   const allyUnits: UnitStack[] = allyArmy.map((slot, i) => ({
-    ...slotToStack(slot, 'player', i, -1),
+    ...slotToStack(slot, 'player', i, allocateId(), -1),
     isAlly: true,
   }));
 
@@ -232,7 +241,7 @@ export function initBattle(
   // Whole-board ranged strike via the shoot action (no retaliation). attack: 0
   // because the hero's real attack already reaches player damage as heroAttack.
   const heroStack: UnitStack = {
-    id: uuidv4(),
+    id: allocateId(),
     definition: {
       name: 'Hero', tier: 7, speed: 0, initiative: 10, hp: 1,
       attack: 0, defense: hero.defense,
@@ -279,6 +288,7 @@ export function initBattle(
     log: [{ type: 'round_start', data: { round: 1 } }],
     result: 'ongoing',
     seed,
+    nextId,
     // Battles open in deployment; the first actor is already chosen (advance
     // below), but the UI freezes the turn loop until beginCombat flips this.
     phase: 'deploy',
@@ -349,7 +359,7 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
   const fieldStacks = state.units.filter(u => isDeployable(u) && u.count > 0).length;
   if (fieldStacks >= MAX_FIELD_STACKS) return state;
 
-  const id = uuidv4();
+  const id = `u${state.nextId}`;
   const created: UnitStack = {
     id,
     definition: unit.definition,
@@ -370,13 +380,13 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
   const units = state.units
     .map(u => (u.id === unitId ? { ...u, count: u.count - amount } : u))
     .concat(created);
-  return { ...state, units, grid: setOccupant(state.grid, to, id) };
+  return { ...state, units, grid: setOccupant(state.grid, to, id), nextId: state.nextId + 1 };
 }
 
 /** Leave deployment and start the battle. The first actor was already chosen
  *  in initBattle, so this only unfreezes the turn loop. */
 export function beginCombat(state: BattleState): BattleState {
-  return { ...state, phase: 'combat' };
+  return { ...state, phase: 'combat', log: [] };
 }
 
 /** advanceTurn, plus Wizard Mysticism's mana regen whenever a new round starts. */

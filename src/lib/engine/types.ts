@@ -120,6 +120,9 @@ export interface BattleState {
   log: BattleEvent[];
   result: 'ongoing' | 'player_wins' | 'enemy_wins';
   seed: number;
+  /** Next battle-scoped unit id. Keeping allocation in state makes every
+   *  transition replayable and identical across browser/server runtimes. */
+  nextId: number;
   /** 'deploy' = pre-combat troop placement (UI freezes the turn loop);
    *  'combat' = normal battle. Absent on states built before this existed,
    *  treated as 'combat'. */

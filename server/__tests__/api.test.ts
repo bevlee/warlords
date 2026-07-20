@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb } from '../db.ts';
 import { createApi } from '../api.ts';
+import { ENGINE_VERSION } from '../../src/lib/engine/version.ts';
 
 let server: Server;
 let base: string;
@@ -35,6 +36,20 @@ async function mintSession(): Promise<{ playerId: string; token: string }> {
   expect(res.status).toBe(200);
   return res.json();
 }
+
+const soloBattle = {
+  initialState: { seed: 42, log: [], result: 'ongoing', units: [] },
+  actions: [
+    { controller: 'host', action: { type: 'wait' } },
+    { controller: 'ai', action: { type: 'defend' } },
+  ],
+  summary: {
+    rounds: 3,
+    playerCasualties: [{ unitName: 'Goblin', lost: 2 }],
+    enemyCasualties: [{ unitName: 'Wolf Rider', lost: 4 }],
+  },
+  result: 'player_wins',
+};
 
 describe('api', () => {
   it('serves health unauthenticated', async () => {
@@ -116,5 +131,136 @@ describe('api', () => {
       body: '{not json',
     });
     expect(res.status).toBe(400);
+  });
+
+  it('uploads a solo journal and returns it through history and replay detail', async () => {
+    const { token } = await mintSession();
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const uploaded = await fetch(`${base}/api/battles`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify(soloBattle),
+    });
+    expect(uploaded.status).toBe(201);
+    const { id } = (await uploaded.json()) as { id: string };
+    expect(id).toBeTruthy();
+
+    const history = await fetch(`${base}/api/battles`, { headers: auth });
+    expect(history.status).toBe(200);
+    expect(await history.json()).toEqual([
+      expect.objectContaining({
+        id,
+        mode: 'solo',
+        result: 'player_wins',
+        engineVersion: ENGINE_VERSION,
+        summary: soloBattle.summary,
+      }),
+    ]);
+
+    const detail = await fetch(`${base}/api/battles/${id}`, { headers: auth });
+    expect(detail.status).toBe(200);
+    expect(await detail.json()).toEqual(
+      expect.objectContaining({
+        id,
+        mode: 'solo',
+        initialState: soloBattle.initialState,
+        actions: [
+          { seq: 1, ...soloBattle.actions[0] },
+          { seq: 2, ...soloBattle.actions[1] },
+        ],
+        chat: [],
+        engineVersion: ENGINE_VERSION,
+        result: 'player_wins',
+        summary: soloBattle.summary,
+      })
+    );
+  });
+
+  it('lists newest battles first and isolates battle history by player', async () => {
+    const owner = await mintSession();
+    const stranger = await mintSession();
+    const headers = {
+      Authorization: `Bearer ${owner.token}`,
+      'Content-Type': 'application/json',
+    };
+    const first = await fetch(`${base}/api/battles`, {
+      method: 'POST', headers, body: JSON.stringify(soloBattle),
+    });
+    const firstId = ((await first.json()) as { id: string }).id;
+    const second = await fetch(`${base}/api/battles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...soloBattle, result: 'enemy_wins' }),
+    });
+    const secondId = ((await second.json()) as { id: string }).id;
+
+    const owned = await fetch(`${base}/api/battles`, {
+      headers: { Authorization: `Bearer ${owner.token}` },
+    });
+    expect((await owned.json()).map((row: { id: string }) => row.id)).toEqual([secondId, firstId]);
+
+    const hiddenList = await fetch(`${base}/api/battles`, {
+      headers: { Authorization: `Bearer ${stranger.token}` },
+    });
+    expect(await hiddenList.json()).toEqual([]);
+    const hiddenDetail = await fetch(`${base}/api/battles/${firstId}`, {
+      headers: { Authorization: `Bearer ${stranger.token}` },
+    });
+    expect(hiddenDetail.status).toBe(404);
+  });
+
+  it('deduplicates a retried upload by idempotency key', async () => {
+    const { token } = await mintSession();
+    const id = 'a4ab4bd8-680d-4fe1-9ca3-c07b593e8ca4';
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': id,
+    };
+    const first = await fetch(`${base}/api/battles`, {
+      method: 'POST', headers, body: JSON.stringify(soloBattle),
+    });
+    const retry = await fetch(`${base}/api/battles`, {
+      method: 'POST', headers, body: JSON.stringify(soloBattle),
+    });
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ id });
+    const history = await fetch(`${base}/api/battles`, { headers });
+    expect((await history.json()).filter((row: { id: string }) => row.id === id)).toHaveLength(1);
+  });
+
+  it('rejects malformed solo journals', async () => {
+    const { token } = await mintSession();
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const badResult = await fetch(`${base}/api/battles`, {
+      method: 'POST', headers, body: JSON.stringify({ ...soloBattle, result: 'abandoned' }),
+    });
+    expect(badResult.status).toBe(400);
+
+    const dirtySnapshot = await fetch(`${base}/api/battles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...soloBattle, initialState: { ...soloBattle.initialState, log: [{}] } }),
+    });
+    expect(dirtySnapshot.status).toBe(400);
+
+    const badController = await fetch(`${base}/api/battles`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...soloBattle,
+        actions: [{ controller: 'guest', action: { type: 'wait' } }],
+      }),
+    });
+    expect(badController.status).toBe(400);
+
+    const badKey = await fetch(`${base}/api/battles`, {
+      method: 'POST',
+      headers: { ...headers, 'Idempotency-Key': 'not-a-uuid' },
+      body: JSON.stringify(soloBattle),
+    });
+    expect(badKey.status).toBe(400);
   });
 });

@@ -15,6 +15,7 @@
   import type {
     ArmyBonuses,
     ArmySlot,
+    BattleAction,
     BattleState,
     Hero,
     Pos,
@@ -31,6 +32,8 @@
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
+  import { createSoloBattleRecorder } from '$lib/replay/recording';
+  import { postSoloBattle, type SoloController } from '$lib/net/api';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -69,6 +72,7 @@
   // refreshes it.
   // svelte-ignore state_referenced_locally
   let deployBaseline: BattleState = battle;
+  let recorder: ReturnType<typeof createSoloBattleRecorder> | null = null;
 
   // --- Deployment phase ---
   const inDeploy = $derived(battle.phase === 'deploy');
@@ -120,6 +124,7 @@
 
   function beginBattle() {
     battle = beginCombat(battle);
+    recorder = createSoloBattleRecorder($state.snapshot(battle) as BattleState);
     selectDeploy(null);
   }
 
@@ -179,6 +184,15 @@
     doomedIds = new Set();
     battle = result; // ground-truth correction
     animating = false;
+  }
+
+  function takeAction(action: BattleAction, controller: SoloController) {
+    const result = applyAction(battle, action);
+    // Invalid casts are rejected by returning the original state. Do not put a
+    // rejected cause into the replay journal.
+    if (result === battle) return;
+    recorder?.record(controller, action);
+    void revealAction(result);
   }
 
   const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
@@ -323,7 +337,15 @@
   $effect(() => {
     if (battle.result !== 'ongoing' && !resultAnnounced) {
       resultAnnounced = true;
-      onresult?.(battle.result, $state.snapshot(battle).units as UnitStack[]);
+      const finalState = $state.snapshot(battle) as BattleState;
+      onresult?.(battle.result, finalState.units);
+      if (recorder) {
+        const completed = recorder;
+        recorder = null;
+        void postSoloBattle(completed.finish(finalState)).catch(err => {
+          console.error('battle recording upload failed:', err);
+        });
+      }
     }
   });
 
@@ -335,25 +357,23 @@
     const timer = setTimeout(() => {
       // Re-check at fire time: forfeited or still animating while pending.
       if (battle.result !== 'ongoing' || animating) return;
-      revealAction(applyAction(battle, aiTakeTurn(battle, unit.id)));
+      takeAction(aiTakeTurn(battle, unit.id), 'ai');
     }, AI_DELAY_MS);
     return () => clearTimeout(timer);
   });
 
   function attackFrom(targetId: string, origin: Pos) {
     const inPlace = activeUnit && origin.col === activeUnit.pos.col && origin.row === activeUnit.pos.row;
-    revealAction(
-      applyAction(
-        battle,
-        inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin }
-      )
+    takeAction(
+      inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin },
+      'host'
     );
     hovered = null;
   }
 
   function castAt(unit: UnitStack) {
     if (!pendingSpell) return;
-    revealAction(applyAction(battle, { type: 'cast', spell: pendingSpell, targetId: unit.id }));
+    takeAction({ type: 'cast', spell: pendingSpell, targetId: unit.id }, 'host');
     pendingSpell = null;
     hovered = null;
   }
@@ -365,7 +385,7 @@
       return;
     }
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
-    revealAction(applyAction(battle, { type: 'move', to: pos }));
+    takeAction({ type: 'move', to: pos }, 'host');
   }
 
   // The grid resolved an aimed melee: move to the chosen tile and strike.
@@ -387,7 +407,7 @@
 
     const action = actionIcons.get(unit.id);
     if (action === 'shoot') {
-      revealAction(applyAction(battle, { type: 'shoot', targetId: unit.id }));
+      takeAction({ type: 'shoot', targetId: unit.id }, 'host');
       hovered = null;
     } else if (action === 'melee') {
       // Fallback for non-mouse activation (keyboard): nearest origin.
@@ -399,13 +419,13 @@
   function handleWait() {
     if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    revealAction(applyAction(battle, { type: 'wait' }));
+    takeAction({ type: 'wait' }, 'host');
   }
 
   function handleDefend() {
     if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    revealAction(applyAction(battle, { type: 'defend' }));
+    takeAction({ type: 'defend' }, 'host');
   }
 
   function handleForfeit() {
@@ -415,6 +435,9 @@
     activeSteps = [];
     dyingIds = new Set();
     pendingSpell = null;
+    // Forfeit is not an engine BattleAction, so it cannot produce a truthful
+    // cause-only replay. Treat it like an abandoned tab and omit the record.
+    recorder = null;
     battle = { ...battle, result: 'enemy_wins', log: [...battle.log, { type: 'battle_end', data: { result: 'enemy_wins', forfeit: true } }] };
   }
 
@@ -426,6 +449,7 @@
     doomedIds = new Set();
     pendingSpell = null;
     resultAnnounced = false;
+    recorder = null;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
     deployBaseline = battle; // restart re-enters deploy with a fresh layout
     selectDeploy(null);

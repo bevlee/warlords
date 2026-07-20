@@ -13,7 +13,11 @@ import {
   fetchWithRetry,
   _resetForTests,
   _setFreshSessionHook,
+  postSoloBattle,
+  getBattles,
+  getBattle,
 } from '../api';
+import { ENGINE_VERSION } from '../../engine/version';
 
 let server: Server;
 let base: string;
@@ -119,5 +123,26 @@ describe('client api', () => {
     const res = await fetchWithRetry('/x', { method: 'GET' }, false);
     expect(res.status).toBe(500); // last response returned, caller decides
     await new Promise(r => dead.close(r));
+  });
+
+  it('uploads and reads a solo battle journal', async () => {
+    const payload = {
+      initialState: { seed: 9, log: [], result: 'ongoing', units: [] } as any,
+      actions: [{ controller: 'host' as const, action: { type: 'wait' as const } }],
+      summary: { rounds: 2, playerCasualties: [], enemyCasualties: [] },
+      result: 'player_wins' as const,
+    };
+
+    const { id } = await postSoloBattle(payload);
+    expect(await getBattles()).toEqual([
+      expect.objectContaining({ id, mode: 'solo', engineVersion: ENGINE_VERSION }),
+    ]);
+    expect(await getBattle(id)).toEqual(
+      expect.objectContaining({
+        id,
+        initialState: payload.initialState,
+        actions: [{ seq: 1, ...payload.actions[0] }],
+      })
+    );
   });
 });

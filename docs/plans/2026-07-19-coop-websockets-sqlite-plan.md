@@ -5,7 +5,7 @@
 > execute it with superpowers:executing-plans.
 
 **Date:** 2026-07-19 (revised 2026-07-20 after review)
-**Status:** Proposed
+**Status:** In progress — Milestones 1–2 complete
 
 ## Goal
 

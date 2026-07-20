@@ -2,12 +2,55 @@
 // localStorage, retrying fetch wrapper, and typed save calls. UI code never
 // imports this directly — storage.ts/campaignStore.ts keep their signatures.
 
+import type { BattleAction, BattleState } from '$lib/engine/types';
+
 export interface Session {
   playerId: string;
   token: string;
 }
 
 export type SaveSlot = 'hero' | 'campaign' | 'gauntletRun';
+
+export type SoloController = 'host' | 'ai';
+
+export interface RecordedBattleAction {
+  controller: SoloController;
+  action: BattleAction;
+}
+
+export interface BattleCasualty {
+  unitName: string;
+  lost: number;
+}
+
+export interface BattleSummary {
+  rounds: number;
+  playerCasualties: BattleCasualty[];
+  enemyCasualties: BattleCasualty[];
+}
+
+export interface SoloBattleUpload {
+  initialState: BattleState;
+  actions: RecordedBattleAction[];
+  summary: BattleSummary;
+  result: 'player_wins' | 'enemy_wins';
+}
+
+export interface BattleHistoryRow {
+  id: string;
+  mode: 'solo' | 'coop';
+  engineVersion: string;
+  result: 'player_wins' | 'enemy_wins' | 'abandoned' | null;
+  summary: BattleSummary | null;
+  startedAt: number;
+  endedAt: number | null;
+}
+
+export interface BattleDetail extends BattleHistoryRow {
+  initialState: BattleState;
+  actions: Array<RecordedBattleAction & { seq: number }>;
+  chat: Array<{ afterSeq: number; controller: string; text: string; ts: number }>;
+}
 
 const SESSION_KEY = 'warlords.session';
 
@@ -64,8 +107,9 @@ export function _setFreshSessionHook(hook: (s: Session) => Promise<void>): void 
 }
 
 /** fetch with the session token and a retry ladder for network errors and 5xx.
- *  All our verbs are idempotent (GET/PUT/DELETE, POST /api/session mints a
- *  fresh row per call and only the last one is kept), so blanket retry is safe.
+ *  All our calls are idempotent (battle uploads carry an idempotency key;
+ *  session retries mint a fresh row and only the last token is retained), so
+ *  blanket retry is safe.
  *  Returns the last response rather than throwing on persistent 5xx. */
 export async function fetchWithRetry(
   path: string,
@@ -111,4 +155,32 @@ export async function putSave(slot: SaveSlot, data: unknown): Promise<void> {
 export async function deleteSave(slot: SaveSlot): Promise<void> {
   const res = await fetchWithRetry(`/api/save/${slot}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`delete ${slot} failed: ${res.status}`);
+}
+
+export async function postSoloBattle(payload: SoloBattleUpload): Promise<{ id: string }> {
+  // The key makes a retry after a committed-but-lost response return the same
+  // battle instead of inserting a duplicate history row.
+  const idempotencyKey = crypto.randomUUID();
+  const res = await fetchWithRetry('/api/battles', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`record battle failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getBattles(): Promise<BattleHistoryRow[]> {
+  const res = await fetchWithRetry('/api/battles');
+  if (!res.ok) throw new Error(`load battles failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getBattle(id: string): Promise<BattleDetail> {
+  const res = await fetchWithRetry(`/api/battles/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(`load battle failed: ${res.status}`);
+  return res.json();
 }

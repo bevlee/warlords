@@ -42,6 +42,7 @@ function makeState(units: UnitStack[]): BattleState {
     log: [],
     result: 'ongoing',
     seed: 42,
+    nextId: 1,
   };
 }
 
