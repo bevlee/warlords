@@ -209,8 +209,10 @@ describe('/ws', () => {
       await sender.waitFor(message => message.type === 'battle.applied' && message.seq === nextSeq);
     }
     expect(room.state!.result).not.toBe('ongoing');
-    expect((app.db.prepare('SELECT result FROM battles WHERE id = ?').get(room.battleId) as any).result)
-      .toBe(room.state!.result);
+    const persisted = app.db.prepare('SELECT result, summary FROM battles WHERE id = ?').get(room.battleId) as any;
+    expect(persisted.result).toBe(room.state!.result);
+    expect(JSON.parse(persisted.summary)).toMatchObject({ rounds: expect.any(Number) });
+    expect(app.rooms.get(created.code)).toBeUndefined();
     expect((app.db.prepare('SELECT text FROM battle_chat WHERE battle_id = ?').get(room.battleId) as any).text)
       .toBe('hold the line');
   });

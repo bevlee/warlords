@@ -263,7 +263,11 @@ export function attachWebSocketServer(
       type: 'battle.applied', seq: entry.seq, byController: entry.controller,
       action: entry.action, stateHash: entry.stateHash,
     });
-    if (room.state?.result !== 'ongoing') broadcast(room, { type: 'battle.end', result: room.state!.result });
+    if (room.state?.result !== 'ongoing') {
+      broadcast(room, { type: 'battle.end', result: room.state!.result });
+      clearRoomTimers(room);
+      rooms.finish(room.code);
+    }
   }
 
   function prepareDeploy(room: Room): void {

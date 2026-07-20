@@ -17,6 +17,8 @@
     gridHeight: number;
     /** Beat length — flight/flash durations and text delays derive from it. */
     stepMs: number;
+    /** Floater/glow duration after applying the global speed factor. */
+    fxFloatMs: number;
     steps: {
       step: AnimStep;
       pos: Pos;               // anchor cell (target for projectiles)
@@ -26,11 +28,11 @@
     }[];
   }
 
-  let { gridWidth, gridHeight, stepMs, steps }: Props = $props();
+  let { gridWidth, gridHeight, stepMs, fxFloatMs, steps }: Props = $props();
 
   // One-shot FX must outlive the beat that spawned them: Battle.svelte
-  // replaces `steps` every beat, but a floater runs 0.9s (plus flight delay)
-  // against a 200–700ms beat — un-buffered, a kill's damage number vanished
+  // replaces `steps` every beat, but a floater outlives its beat (plus flight
+  // delay) — un-buffered, a kill's damage number vanished
   // the instant the death beat arrived. Buffer incoming steps (keys are
   // unique per beat) and prune each after its full run. An emptied `steps`
   // means sequence teardown or restart — drop everything with it.
@@ -49,8 +51,8 @@
     const incoming = steps.filter(i => !have.has(i.key));
     if (incoming.length === 0) return;
     live = [...untrack(() => live), ...incoming];
-    // Longest run: flight delay (60% of a beat) + 0.9s float + slack.
-    const ttl = Math.round(stepMs * 0.6) + 900 + 200;
+    // Longest run: flight delay (60% of a beat) + scaled float + slack.
+    const ttl = Math.round(stepMs * 0.6) + fxFloatMs + Math.max(50, Math.round(200 * fxFloatMs / 900));
     for (const item of incoming) {
       timers.set(
         item.key,
@@ -69,7 +71,7 @@
 
 <div
   class="fx-layer grid"
-  style="grid-template-columns: repeat({gridWidth}, minmax(0, 1fr)); grid-template-rows: repeat({gridHeight}, minmax(0, 1fr)); --flight-ms: {Math.round(stepMs * 0.6)}ms;"
+  style="grid-template-columns: repeat({gridWidth}, minmax(0, 1fr)); grid-template-rows: repeat({gridHeight}, minmax(0, 1fr)); --flight-ms: {Math.round(stepMs * 0.6)}ms; --float-ms: {fxFloatMs}ms; --impact-ms: {Math.max(60, Math.round(fxFloatMs * 250 / 900))}ms; --kill-lag-ms: {Math.max(35, Math.round(fxFloatMs / 6))}ms;"
 >
   {#each live as { step, pos, fromPos, art, key } (key)}
     <div class="fx-cell" style="grid-column: {pos.col + 1}; grid-row: {pos.row + 1};">
@@ -129,7 +131,7 @@
     font-size: 1rem;
     text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
     white-space: nowrap;
-    animation: float-up 0.9s ease-out forwards;
+    animation: float-up var(--float-ms, 900ms) ease-out forwards;
   }
 
   .fx-damage {
@@ -158,11 +160,11 @@
     top: 55%;
     color: #e2e8f0;
     font-size: 0.85rem;
-    animation-delay: 150ms;
+    animation-delay: var(--kill-lag-ms, 150ms);
     animation-fill-mode: backwards;
   }
   .fx-kills.fx-delayed {
-    animation-delay: calc(var(--flight-ms, 0ms) + 150ms);
+    animation-delay: calc(var(--flight-ms, 0ms) + var(--kill-lag-ms, 150ms));
   }
 
   /* Projectile wrapper is exactly cell-sized (inset: 0), so translate
@@ -215,7 +217,7 @@
     inset: 18%;
     border-radius: 50%;
     background: radial-gradient(ellipse at center, rgb(255 255 255 / 0.9), rgb(251 191 36 / 0.5) 45%, transparent 70%);
-    animation: fx-impact-pop 250ms ease-out;
+    animation: fx-impact-pop var(--impact-ms, 250ms) ease-out;
     animation-delay: var(--flight-ms, 300ms);
     animation-fill-mode: both;
     pointer-events: none;
@@ -282,7 +284,7 @@
     position: absolute;
     inset: 6%;
     border-radius: 50%;
-    animation: fx-glow-pulse 0.9s ease-out forwards;
+    animation: fx-glow-pulse var(--float-ms, 900ms) ease-out forwards;
     pointer-events: none;
   }
 
@@ -311,7 +313,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .fx-text {
-      animation: fade-only 0.9s ease-out forwards;
+      animation: fade-only var(--float-ms, 900ms) ease-out forwards;
     }
     .fx-projectile,
     .fx-impact {
@@ -325,7 +327,7 @@
     }
     .fx-bolt-strike,
     .fx-glow {
-      animation: fade-only 0.9s ease-out forwards;
+      animation: fade-only var(--float-ms, 900ms) ease-out forwards;
     }
     @keyframes fade-only {
       0% { opacity: 0; }

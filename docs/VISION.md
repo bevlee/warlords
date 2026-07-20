@@ -57,8 +57,8 @@ setup loop). What remains is content and meta-game:
 
 Also done: **hero progression** — victories grant XP equal to the defeated
 army's value, levels give +1 attack/defense (mana, strike, and Lightning
-already scale), battle budgets grow 50/level, and the hero persists in
-IndexedDB with a reset option.
+already scale), battle budgets grow 50/level, and the hero persists through
+the SQLite-backed save API with a reset option.
 
 Also done: **Knight and Wizard factions** (7-tier rosters each, picked on
 the army setup screen alongside Barbarian) and **faction skills** —
@@ -83,10 +83,12 @@ cast remain stubs for a future milestone.
 Also done: a **single-player campaign** — 5 chapters of linear encounters
 with procedurally generated enemy armies that scale with hero level, a
 visual campaign map (locked/available/completed nodes) between the
-faction picker and army setup, and IndexedDB-persisted campaign progress
+faction picker and army setup, and server-persisted campaign progress
 alongside the hero record.
 
-1. **Long term** — unit art replacing emoji standees, PvP/economy layers,
-   remaining faction skills without combat effects yet (Tactics, Sorcery's
-   spell-damage hookup, Intelligence, Mysticism), and the deferred Demon
+Also done: **online co-op and combat history** — authenticated room codes,
+dual deployment, server-authoritative turns and AI, reconnect pauses, chat,
+SQLite journals, and engine-version-gated animated replays.
+
+1. **Long term** — deeper PvP/economy layers, accounts, and the deferred Demon
    Gate/Teleport/Haste abilities.

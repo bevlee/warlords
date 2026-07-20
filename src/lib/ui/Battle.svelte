@@ -50,6 +50,13 @@
     localControllerId?: 'host' | 'guest';
     waitingForPeer?: boolean;
     chatMessages?: Array<{ byController: 'host' | 'guest'; text: string }>;
+    replay?: {
+      speedFactor: number;
+      ready: (controls: {
+        applyRemote: (action: BattleAction) => Promise<BattleState>;
+        resync: (state: BattleState) => void;
+      }) => void;
+    };
     online?: {
       deployMove: (unitId: string, to: Pos) => void;
       deploySplit: (unitId: string, amount: number, to: Pos) => void;
@@ -77,6 +84,7 @@
     localControllerId,
     waitingForPeer = false,
     chatMessages = [],
+    replay,
     online,
   }: Props = $props();
 
@@ -180,14 +188,17 @@
   let doomedIds = $state(new Set<string>());
   let revealToken = 0;
 
-  const STEP_DELAY_MS = $derived({ slow: 700, normal: 450, fast: 200 }[battleSpeed]);
+  const speedFactor = $derived(Math.max(0.25, replay?.speedFactor ?? 1));
+  const STEP_DELAY_MS = $derived(Math.round({ slow: 700, normal: 450, fast: 200 }[battleSpeed] / speedFactor));
+  const fxFloatMs = $derived(Math.round(900 * STEP_DELAY_MS / 450));
+  const deathMs = $derived(Math.round(1100 * STEP_DELAY_MS / 450));
 
   // Hold after the last beat so its CSS can finish before teardown unmounts
   // everything: floaters self-buffer inside BattleFx now (they survive beat
   // swaps), but teardown clears that buffer and dyingIds, so the hold must
   // cover the longest tail — the 1.1s death fade, or a ranged floater's
   // flight delay (60% of a beat) plus its 0.9s float.
-  const fxTailMs = $derived(Math.max(1300, 900 + Math.round(STEP_DELAY_MS * 0.6)));
+  const fxTailMs = $derived(Math.max(deathMs + 200, fxFloatMs + Math.round(STEP_DELAY_MS * 0.6) + 200));
 
   async function revealAction(result: BattleState) {
     const token = ++revealToken;
@@ -221,6 +232,7 @@
 
   function takeAction(action: BattleAction, controller: SoloController) {
     if (online) return online.action(action);
+    if (replay) return;
     const result = applyAction(battle, action);
     // Invalid casts are rejected by returning the original state. Do not put a
     // rejected cause into the replay journal.
@@ -234,7 +246,7 @@
     battle.units.find(u => u.isHero && (!online || u.controllerId === localControllerId)) ?? null
   );
   const isPlayerTurn = $derived(
-    battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
+    !replay && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
       (!online || activeUnit.controllerId === localControllerId)
   );
 
@@ -388,7 +400,7 @@
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
-    if (online || battle.result !== 'ongoing' || animating || inDeploy) return;
+    if (online || replay || battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
@@ -466,7 +478,7 @@
   }
 
   function handleForfeit() {
-    if (online) return;
+    if (online || replay) return;
     if (battle.result !== 'ongoing') return;
     revealToken++; // abort any in-flight reveal so it can't clobber the forfeit
     animating = false;
@@ -482,7 +494,8 @@
   let chatText = $state('');
 
   onMount(() => {
-    online?.ready({
+    const ready = online?.ready ?? replay?.ready;
+    ready?.({
       async applyRemote(action) {
         const result = applyAction(battle, action);
         await revealAction(result);
@@ -519,6 +532,7 @@
     if (battle.result === 'player_wins') return 'Victory!';
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
+    if (replay) return `Replay — ${activeUnit.definition.name}s are acting…`;
     if (pendingSpell) {
       const friendly = SPELLS[pendingSpell].friendly;
       return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
@@ -655,6 +669,8 @@
           {dyingIds}
           {doomedIds}
           stepMs={STEP_DELAY_MS}
+          {fxFloatMs}
+          {deathMs}
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
@@ -708,7 +724,7 @@
       </div>
 
       <!-- Settings: cog at the top-left, under the page title. -->
-      <div class="absolute left-1 top-1 z-30 flex flex-col items-start gap-1.5">
+      {#if !replay}<div class="absolute left-1 top-1 z-30 flex flex-col items-start gap-1.5">
         <button
           type="button"
           class="flex h-12 w-12 items-center justify-center rounded-full border border-slate-500
@@ -754,7 +770,7 @@
             </button>
           </div>
         {/if}
-      </div>
+      </div>{/if}
 
     {#if spellbookOpen && isHeroTurn}
       <SpellBook
@@ -767,7 +783,7 @@
       />
     {/if}
 
-    {#if battle.result !== 'ongoing'}
+    {#if battle.result !== 'ongoing' && !replay}
       <div
         class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-lg bg-black/70"
       >

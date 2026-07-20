@@ -2,6 +2,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type Database from 'better-sqlite3';
 import { ENGINE_VERSION } from '../src/lib/engine/version.ts';
+import { pruneBattleHistory } from './retention.ts';
 
 const SLOTS = new Set(['hero', 'campaign', 'gauntletRun']);
 const MAX_BODY = 256 * 1024;
@@ -41,7 +42,7 @@ export function createApi(db: Database.Database) {
       'SELECT b.id, b.mode, b.engine_version, b.result, b.summary, b.started_at, b.ended_at ' +
         'FROM battles b ' +
         'WHERE EXISTS (SELECT 1 FROM json_each(b.player_ids) p WHERE p.value = ?) ' +
-        'ORDER BY b.started_at DESC, b.rowid DESC'
+        'ORDER BY b.started_at DESC, b.rowid DESC LIMIT 200'
     ),
     getBattle: db.prepare(
       'SELECT b.id, b.mode, b.initial_state, b.engine_version, b.result, b.summary, ' +
@@ -149,6 +150,7 @@ export function createApi(db: Database.Database) {
             : send(res, 409, { error: 'battle id conflict' });
         }
         insertSoloBattle(id, playerId, payload, Date.now());
+        pruneBattleHistory(db);
         return send(res, 201, { id });
       }
       if (method === 'GET') {

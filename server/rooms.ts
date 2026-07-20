@@ -5,6 +5,8 @@ import { ENGINE_VERSION } from '../src/lib/engine/version.ts';
 import type { BattleAction, BattleState } from '../src/lib/engine/types.ts';
 import type { ControllerId, RoomPhase } from './protocol.ts';
 import { battleStateHash } from '../src/lib/net/protocol.ts';
+import { summarizeBattle } from '../src/lib/replay/summary.ts';
+import { pruneBattleHistory } from './retention.ts';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const ROOM_RECOVERY_MS = 10 * 60 * 1000;
@@ -29,6 +31,7 @@ export interface Room {
   guest?: RoomMember;
   battleId?: string;
   state?: BattleState;
+  initialState?: BattleState;
   deployState?: BattleState;
   confirmed: Set<'host' | 'guest'>;
   actions: RoomActionEntry[];
@@ -157,6 +160,7 @@ export class RoomRegistry {
     room.phase = 'battle';
     room.battleId = battleId;
     room.state = clone(initialState);
+    room.initialState = clone(initialState);
     room.deployState = undefined;
     room.actions = [];
     room.lastActivity = timestamp;
@@ -188,11 +192,21 @@ export class RoomRegistry {
     const room = this.rooms.get(codeInput.toUpperCase());
     if (!room) return;
     if (room.battleId && room.state?.result === 'ongoing') {
-      this.db.prepare('UPDATE battles SET result = ?, ended_at = ? WHERE id = ?')
-        .run('abandoned', this.now(), room.battleId);
+      const summary = room.initialState ? summarizeBattle(room.initialState, room.state) : null;
+      this.db.prepare('UPDATE battles SET result = ?, summary = ?, ended_at = ? WHERE id = ?')
+        .run('abandoned', summary ? JSON.stringify(summary) : null, this.now(), room.battleId);
     }
     this.db.prepare('DELETE FROM rooms WHERE code = ?').run(room.code);
     this.rooms.delete(room.code);
+    pruneBattleHistory(this.db);
+  }
+
+  finish(codeInput: string): void {
+    const room = this.rooms.get(codeInput.toUpperCase());
+    if (!room || room.state?.result === 'ongoing') return;
+    this.db.prepare('DELETE FROM rooms WHERE code = ?').run(room.code);
+    this.rooms.delete(room.code);
+    pruneBattleHistory(this.db);
   }
 
   appendAction(codeInput: string, controller: ControllerId, action: BattleAction): RoomActionEntry {
@@ -214,8 +228,9 @@ export class RoomRegistry {
       ).run(room.battleId!, entry.seq, controller, JSON.stringify(action));
       this.db.prepare('UPDATE rooms SET last_activity = ? WHERE code = ?').run(timestamp, room.code);
       if (next.result !== 'ongoing') {
-        this.db.prepare('UPDATE battles SET result = ?, ended_at = ? WHERE id = ?')
-          .run(next.result, timestamp, room.battleId!);
+        const summary = room.initialState ? summarizeBattle(room.initialState, next) : null;
+        this.db.prepare('UPDATE battles SET result = ?, summary = ?, ended_at = ? WHERE id = ?')
+          .run(next.result, summary ? JSON.stringify(summary) : null, timestamp, room.battleId!);
       }
     })();
     room.state = next;
@@ -233,15 +248,12 @@ export class RoomRegistry {
         'JOIN battles b ON b.id = r.battle_id WHERE r.phase = ?'
     ).all('battle') as RehydrateRow[];
     for (const row of rows) {
-      if (row.result !== null || row.last_activity < this.now() - this.recoveryMs) {
-        if (row.result === null) {
-          this.db.prepare('UPDATE battles SET result = ?, ended_at = ? WHERE id = ?')
-            .run('abandoned', this.now(), row.battle_id);
-        }
+      if (row.result !== null) {
         this.db.prepare('DELETE FROM rooms WHERE code = ?').run(row.code);
         continue;
       }
-      let state = JSON.parse(row.initial_state) as BattleState;
+      const initialState = JSON.parse(row.initial_state) as BattleState;
+      let state = clone(initialState);
       const actions: RoomActionEntry[] = [];
       const journal = this.db.prepare(
         'SELECT seq, controller, action FROM battle_actions WHERE battle_id = ? ORDER BY seq'
@@ -250,6 +262,13 @@ export class RoomRegistry {
         const action = JSON.parse(saved.action) as BattleAction;
         state = applyAction(state, action);
         actions.push({ seq: saved.seq, controller: saved.controller, action, stateHash: battleStateHash(state) });
+      }
+      if (row.last_activity < this.now() - this.recoveryMs) {
+        const summary = summarizeBattle(initialState, state);
+        this.db.prepare('UPDATE battles SET result = ?, summary = ?, ended_at = ? WHERE id = ?')
+          .run('abandoned', JSON.stringify(summary), this.now(), row.battle_id);
+        this.db.prepare('DELETE FROM rooms WHERE code = ?').run(row.code);
+        continue;
       }
       this.rooms.set(row.code, {
         code: row.code,
@@ -260,6 +279,7 @@ export class RoomRegistry {
           ? { playerId: row.guest_player_id, controllerId: 'guest', loadout: JSON.parse(row.guest_loadout) }
           : undefined,
         state,
+        initialState,
         confirmed: new Set(),
         actions,
         lastActivity: row.last_activity,

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import ArmySetup from '$lib/ui/ArmySetup.svelte';
   import Battle from '$lib/ui/Battle.svelte';
   import { getSession } from '$lib/net/api';
-  import { MultiplayerClient } from '$lib/net/wsClient';
+  import { MultiplayerClient, type ConnectionStatus } from '$lib/net/wsClient';
   import { battleStateHash, type CoopLoadout, type ServerMessage } from '$lib/net/protocol';
   import { budgetForLevel } from '$lib/engine/progression';
   import { updateFactionSkills } from '$lib/engine/factionSkills';
@@ -23,6 +23,8 @@
   let controllerId: 'host' | 'guest' = $state('host');
   let battleState: BattleState | null = $state(null);
   let waiting = $state(false);
+  let connectionStatus: ConnectionStatus = $state('idle');
+  let outcome: 'player_wins' | 'enemy_wins' | 'abandoned' | null = $state(null);
   let error = $state('');
   let chatMessages: Array<{ byController: 'host' | 'guest'; text: string }> = $state([]);
   let controls: {
@@ -37,6 +39,8 @@
     if (saved) hero = updateFactionSkills({ ...saved, factionSkills: saved.factionSkills ?? [] });
   });
 
+  onDestroy(() => client?.stop());
+
   async function chooseArmy(army: ArmySlot[]) {
     loadout = { hero, army };
     screen = 'lobby';
@@ -44,6 +48,7 @@
     const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
     client = new MultiplayerClient(`${scheme}//${location.host}/ws`, session.token);
     client.onMessage(handleMessage);
+    client.onStatus(status => (connectionStatus = status));
     client.start();
   }
 
@@ -68,9 +73,13 @@
       battleState = message.state;
       controls?.resync(message.state);
     } else if (message.type === 'room.waiting') waiting = message.waiting;
+    else if (message.type === 'battle.end') outcome = message.result;
     else if (message.type === 'chat.message') {
       chatMessages = [...chatMessages, { byController: message.byController, text: message.text }];
-    } else if (message.type === 'error') error = message.msg;
+    } else if (message.type === 'error') {
+      error = message.msg;
+      if (message.code === 'room_gone') returnToSetup(false);
+    }
   }
 
   function queueAction(action: BattleAction, expectedHash: string) {
@@ -95,15 +104,38 @@
   function joinRoom() {
     if (loadout && !client?.send({ type: 'room.join', code: joinCode.toUpperCase(), loadout })) error = 'Still connecting…';
   }
+
+  function returnToSetup(clearError = true) {
+    client?.stop();
+    client = null;
+    controls = null;
+    pending.splice(0);
+    loadout = null;
+    roomCode = '';
+    joinCode = '';
+    battleState = null;
+    chatMessages = [];
+    waiting = false;
+    outcome = null;
+    connectionStatus = 'idle';
+    screen = 'setup';
+    if (clearError) error = '';
+  }
 </script>
 
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
   <div class="mb-4 flex items-center gap-4">
     <h1 class="text-2xl font-bold">Warlords — Online co-op</h1>
     <a href="/" class="text-slate-400 hover:text-slate-200">← main game</a>
+    <a href="/history" class="text-violet-400 hover:text-violet-300">Battle history</a>
   </div>
 
   {#if error}<p class="mx-auto mb-4 max-w-xl rounded border border-red-700 bg-red-950 p-3 text-red-200">{error}</p>{/if}
+  {#if connectionStatus === 'lost'}
+    <p class="mx-auto mb-4 max-w-xl rounded border border-amber-700 bg-amber-950 p-3 text-amber-200">
+      Connection lost. Reconnecting automatically…
+    </p>
+  {/if}
 
   {#if screen === 'setup'}
     <ArmySetup
@@ -141,6 +173,8 @@
       waitingForPeer={waiting}
       {chatMessages}
       allowRestart={false}
+      onexit={returnToSetup}
+      exitLabel="Return to co-op"
       online={{
         deployMove: (unitId, to) => void client?.send({ type: 'deploy.move', unitId, to }),
         deploySplit: (unitId, amount, to) => void client?.send({ type: 'deploy.split', unitId, amount, to }),
@@ -150,5 +184,14 @@
         ready: networkReady,
       }}
     />
+    {#if outcome === 'abandoned'}
+      <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/70">
+        <div class="rounded-lg border border-amber-600 bg-slate-900 p-6 text-center shadow-xl">
+          <h2 class="text-2xl font-bold text-amber-300">Battle abandoned</h2>
+          <p class="my-3 text-slate-300">The reconnect window expired. Your campaign save was not changed.</p>
+          <button onclick={() => returnToSetup()} class="rounded bg-emerald-700 px-5 py-2 font-semibold hover:bg-emerald-600">Return to co-op</button>
+        </div>
+      </div>
+    {/if}
   {/if}
 </main>

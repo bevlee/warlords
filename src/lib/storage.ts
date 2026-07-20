@@ -1,4 +1,4 @@
-// Server-side saves (parent plan Part 1): same exported signatures the idb
+// Server-side saves (parent plan Part 1): same exported signatures the former local
 // layer had, bodies now go through the save API. Call sites are unchanged.
 import { getSave, putSave, deleteSave } from './net/api';
 import type { Hero } from './engine/types';

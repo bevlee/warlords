@@ -71,7 +71,29 @@ describe('RoomRegistry', () => {
     const boot = new RoomRegistry(db, () => 1_000_000 + ROOM_RECOVERY_MS + 1);
     expect(boot.get(lobby.code)).toBeUndefined();
     expect(boot.get(room.code)).toBeUndefined();
-    expect((db.prepare('SELECT result FROM battles WHERE id = ?').get(room.battleId) as any).result).toBe('abandoned');
+    const saved = db.prepare('SELECT result, summary FROM battles WHERE id = ?').get(room.battleId) as any;
+    expect(saved.result).toBe('abandoned');
+    expect(JSON.parse(saved.summary)).toMatchObject({ rounds: 1, playerCasualties: [], enemyCasualties: [] });
+    db.close();
+  });
+
+  it('stores a canonical summary and releases a completed room', () => {
+    const { db, rooms } = setup();
+    const room = rooms.create('p1', {});
+    rooms.join(room.code, 'p2', {});
+    const initial = beginCombat(initBattle(
+      [{ unit: GOBLIN, count: 8 }], [{ unit: GOBLIN, count: 3 }], HERO, 17
+    ));
+    rooms.startBattle(room.code, initial);
+    for (let turns = 0; room.state!.result === 'ongoing' && turns < 200; turns++) {
+      const actor = room.state!.units.find(unit => unit.id === room.state!.currentUnitId)!;
+      rooms.appendAction(room.code, actor.side === 'player' ? 'host' : 'ai', aiTakeTurn(room.state!, actor.id));
+    }
+    expect(room.state!.result).not.toBe('ongoing');
+    const saved = db.prepare('SELECT summary FROM battles WHERE id = ?').get(room.battleId) as { summary: string };
+    expect(JSON.parse(saved.summary)).toMatchObject({ rounds: expect.any(Number) });
+    rooms.finish(room.code);
+    expect(rooms.get(room.code)).toBeUndefined();
     db.close();
   });
 });

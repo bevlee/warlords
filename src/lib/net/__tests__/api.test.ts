@@ -12,7 +12,6 @@ import {
   deleteSave,
   fetchWithRetry,
   _resetForTests,
-  _setFreshSessionHook,
   postSoloBattle,
   getBattles,
   getBattle,
@@ -64,22 +63,6 @@ describe('client api', () => {
     _resetForTests(base, [10, 20, 40]); // new module state, same localStorage
     const second = await getSession();
     expect(second).toEqual(first);
-  });
-
-  it('lets the fresh-session hook use the save API without deadlocking', async () => {
-    // The idb import shim runs as this hook and uploads via putSave, which
-    // needs the very session still being minted. Regression: awaiting
-    // getSession() from inside the hook must not wait on its own promise.
-    _setFreshSessionHook(async () => {
-      await putSave('campaign', { chapter: 5, imported: true });
-    });
-    try {
-      const session = await getSession();
-      expect(session.token).toBeTruthy();
-      expect(await getSave('campaign')).toEqual({ chapter: 5, imported: true });
-    } finally {
-      _setFreshSessionHook(async () => {});
-    }
   });
 
   it('round-trips saves and returns null for missing', async () => {

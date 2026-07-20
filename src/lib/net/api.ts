@@ -3,6 +3,9 @@
 // imports this directly — storage.ts/campaignStore.ts keep their signatures.
 
 import type { BattleAction, BattleState } from '$lib/engine/types';
+import type { BattleCasualty, BattleSummary } from '$lib/replay/summary';
+
+export type { BattleCasualty, BattleSummary } from '$lib/replay/summary';
 
 export interface Session {
   playerId: string;
@@ -14,24 +17,13 @@ export type SaveSlot = 'hero' | 'campaign' | 'gauntletRun';
 export type SoloController = 'host' | 'ai';
 
 export interface RecordedBattleAction {
-  controller: SoloController;
+  controller: 'host' | 'guest' | 'ai';
   action: BattleAction;
-}
-
-export interface BattleCasualty {
-  unitName: string;
-  lost: number;
-}
-
-export interface BattleSummary {
-  rounds: number;
-  playerCasualties: BattleCasualty[];
-  enemyCasualties: BattleCasualty[];
 }
 
 export interface SoloBattleUpload {
   initialState: BattleState;
-  actions: RecordedBattleAction[];
+  actions: Array<{ controller: SoloController; action: BattleAction }>;
   summary: BattleSummary;
   result: 'player_wins' | 'enemy_wins';
 }
@@ -59,9 +51,6 @@ let baseUrl = '';
 // spans it so a save issued mid-deploy lands instead of erroring.
 let retryDelays = [500, 2000, 8000];
 let sessionPromise: Promise<Session> | null = null;
-// Set as soon as the session is known, before the fresh-session hook runs.
-// The hook (the idb import shim) saves through this module, so it would
-// otherwise await the session promise it is itself still inside.
 let current: Session | null = null;
 
 /** Test hook: point at an ephemeral server and shrink the retry ladder. */
@@ -95,15 +84,7 @@ async function initSession(): Promise<Session> {
   const session = (await res.json()) as Session;
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   current = session;
-  await onFreshSession(session);
   return session;
-}
-
-// Replaced by the IndexedDB import shim (idbMigrate.ts); kept as a seam so the
-// shim can be dropped in one place when it retires.
-let onFreshSession: (s: Session) => Promise<void> = async () => {};
-export function _setFreshSessionHook(hook: (s: Session) => Promise<void>): void {
-  onFreshSession = hook;
 }
 
 /** fetch with the session token and a retry ladder for network errors and 5xx.
@@ -142,8 +123,7 @@ export async function getSave<T>(slot: SaveSlot): Promise<T | null> {
 }
 
 export async function putSave(slot: SaveSlot, data: unknown): Promise<void> {
-  // JSON round-trip also flattens state proxies (same reason the idb layer
-  // spread/serialized before writing).
+  // JSON round-trip also flattens Svelte state proxies before writing.
   const res = await fetchWithRetry(`/api/save/${slot}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
