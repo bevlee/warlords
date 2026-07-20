@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 // Ranger faction — fast, mobile, ranged/nature units
 export const RANGER_UNITS: UnitDef[] = [

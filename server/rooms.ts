@@ -1,9 +1,10 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { applyAction } from '../src/lib/engine/battle.ts';
 import { ENGINE_VERSION } from '../src/lib/engine/version.ts';
 import type { BattleAction, BattleState } from '../src/lib/engine/types.ts';
 import type { ControllerId, RoomPhase } from './protocol.ts';
+import { battleStateHash } from '../src/lib/net/protocol.ts';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const ROOM_RECOVERY_MS = 10 * 60 * 1000;
@@ -28,6 +29,8 @@ export interface Room {
   guest?: RoomMember;
   battleId?: string;
   state?: BattleState;
+  deployState?: BattleState;
+  confirmed: Set<'host' | 'guest'>;
   actions: RoomActionEntry[];
   lastActivity: number;
 }
@@ -68,6 +71,7 @@ export class RoomRegistry {
       phase: 'lobby',
       host: { playerId: hostPlayerId, controllerId: 'host', loadout },
       actions: [],
+      confirmed: new Set(),
       lastActivity: timestamp,
     };
     this.db.prepare(
@@ -105,11 +109,32 @@ export class RoomRegistry {
     );
   }
 
+  setDeploy(codeInput: string, state: BattleState): Room {
+    const room = this.rooms.get(codeInput.toUpperCase());
+    if (!room?.guest || room.phase !== 'lobby') throw new RoomError('invalid_phase', 'room is not ready to deploy');
+    room.phase = 'deploy';
+    room.deployState = state;
+    room.confirmed = new Set();
+    room.lastActivity = this.now();
+    this.db.prepare('UPDATE rooms SET phase = ?, last_activity = ? WHERE code = ?')
+      .run('deploy', room.lastActivity, room.code);
+    return room;
+  }
+
+  updateDeploy(codeInput: string, state: BattleState): Room {
+    const room = this.rooms.get(codeInput.toUpperCase());
+    if (!room?.deployState || room.phase !== 'deploy') throw new RoomError('invalid_phase', 'room is not deploying');
+    room.deployState = state;
+    room.lastActivity = this.now();
+    this.db.prepare('UPDATE rooms SET last_activity = ? WHERE code = ?').run(room.lastActivity, room.code);
+    return room;
+  }
+
   startBattle(codeInput: string, initialState: BattleState): Room {
     const room = this.rooms.get(codeInput.toUpperCase());
     if (!room) throw new RoomError('room_gone', 'room does not exist');
     if (!room.guest) throw new RoomError('waiting_for_guest', 'room needs a guest');
-    if (room.phase !== 'lobby') throw new RoomError('battle_started', 'battle has already started');
+    if (room.phase !== 'lobby' && room.phase !== 'deploy') throw new RoomError('battle_started', 'battle has already started');
     if (initialState.log.length !== 0) throw new RoomError('invalid_snapshot', 'initial battle log must be empty');
     const battleId = randomUUID();
     const timestamp = this.now();
@@ -132,9 +157,42 @@ export class RoomRegistry {
     room.phase = 'battle';
     room.battleId = battleId;
     room.state = clone(initialState);
+    room.deployState = undefined;
     room.actions = [];
     room.lastActivity = timestamp;
     return room;
+  }
+
+  appendChat(codeInput: string, controller: 'host' | 'guest', text: string) {
+    const room = this.rooms.get(codeInput.toUpperCase());
+    if (!room?.battleId) throw new RoomError('battle_not_started', 'room has no live battle');
+    const trimmed = text.trim().slice(0, 300);
+    if (!trimmed) throw new RoomError('empty_chat', 'chat message is empty');
+    const message = { afterSeq: room.actions.length, controller, text: trimmed, ts: this.now() };
+    this.db.prepare(
+      'INSERT INTO battle_chat (battle_id, after_seq, controller, text, ts) VALUES (?, ?, ?, ?, ?)'
+    ).run(room.battleId, message.afterSeq, controller, trimmed, message.ts);
+    return message;
+  }
+
+  chat(codeInput: string): Array<{ afterSeq: number; controller: 'host' | 'guest'; text: string; ts: number }> {
+    const room = this.rooms.get(codeInput.toUpperCase());
+    if (!room?.battleId) return [];
+    const rows = this.db.prepare(
+      'SELECT after_seq, controller, text, ts FROM battle_chat WHERE battle_id = ? ORDER BY after_seq, ts'
+    ).all(room.battleId) as Array<{ after_seq: number; controller: 'host' | 'guest'; text: string; ts: number }>;
+    return rows.map(row => ({ afterSeq: row.after_seq, controller: row.controller, text: row.text, ts: row.ts }));
+  }
+
+  abandon(codeInput: string): void {
+    const room = this.rooms.get(codeInput.toUpperCase());
+    if (!room) return;
+    if (room.battleId && room.state?.result === 'ongoing') {
+      this.db.prepare('UPDATE battles SET result = ?, ended_at = ? WHERE id = ?')
+        .run('abandoned', this.now(), room.battleId);
+    }
+    this.db.prepare('DELETE FROM rooms WHERE code = ?').run(room.code);
+    this.rooms.delete(room.code);
   }
 
   appendAction(codeInput: string, controller: ControllerId, action: BattleAction): RoomActionEntry {
@@ -147,7 +205,7 @@ export class RoomRegistry {
       seq: room.actions.length + 1,
       controller,
       action: clone(action),
-      stateHash: stateHash(next),
+      stateHash: battleStateHash(next),
     };
     const timestamp = this.now();
     this.db.transaction(() => {
@@ -191,7 +249,7 @@ export class RoomRegistry {
       for (const saved of journal) {
         const action = JSON.parse(saved.action) as BattleAction;
         state = applyAction(state, action);
-        actions.push({ seq: saved.seq, controller: saved.controller, action, stateHash: stateHash(state) });
+        actions.push({ seq: saved.seq, controller: saved.controller, action, stateHash: battleStateHash(state) });
       }
       this.rooms.set(row.code, {
         code: row.code,
@@ -202,6 +260,7 @@ export class RoomRegistry {
           ? { playerId: row.guest_player_id, controllerId: 'guest', loadout: JSON.parse(row.guest_loadout) }
           : undefined,
         state,
+        confirmed: new Set(),
         actions,
         lastActivity: row.last_activity,
       });
@@ -219,10 +278,6 @@ interface RehydrateRow {
   last_activity: number;
   initial_state: string;
   result: string | null;
-}
-
-export function stateHash(state: BattleState): string {
-  return createHash('sha256').update(JSON.stringify(state)).digest('hex').slice(0, 16);
 }
 
 function roomCode(): string {

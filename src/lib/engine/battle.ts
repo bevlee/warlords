@@ -27,7 +27,8 @@ import { DEMON_UNITS } from './demon.ts';
  *  Fire Magic scale specific attack shapes. All are hero-wide, so they're applied
  *  here rather than inside calculateDamage (which only knows per-unit abilities). */
 function withHeroBonus(
-  hero: Hero,
+  attackerHero: Hero,
+  defenderHero: Hero,
   attacker: UnitStack,
   defender: UnitStack,
   damage: number,
@@ -35,12 +36,12 @@ function withHeroBonus(
 ): number {
   let d = damage;
   if (attacker.side === 'player') {
-    d = applyOffenseBonus(d, hero);
-    if (ranged) d = applyArcheryBonus(d, hero);
-    if (attacker.definition.abilities.includes('area_shot')) d = applyDeathMagicBonus(d, hero);
-    if (attacker.definition.abilities.includes('burn')) d = applyFireMagicBonus(d, hero);
+    d = applyOffenseBonus(d, attackerHero);
+    if (ranged) d = applyArcheryBonus(d, attackerHero);
+    if (attacker.definition.abilities.includes('area_shot')) d = applyDeathMagicBonus(d, attackerHero);
+    if (attacker.definition.abilities.includes('burn')) d = applyFireMagicBonus(d, attackerHero);
   }
-  if (defender.side === 'player') d = applyArmorerBonus(d, hero);
+  if (defender.side === 'player') d = applyArmorerBonus(d, defenderHero);
   return d;
 }
 
@@ -48,7 +49,7 @@ function withHeroBonus(
  *  Emitted as its own entry ahead of the attack so the UI plays it as an
  *  earlier beat — the flash reads as the cause of the damage that follows. */
 function rollHit(
-  hero: Hero,
+  state: BattleState,
   attacker: UnitStack,
   defender: UnitStack,
   rng: Rng,
@@ -56,9 +57,11 @@ function rollHit(
   ranged = false
 ): { damage: number; luckEvents: BattleEvent[] } {
   const sink: LuckSink = { luck: null };
+  const attackerHero = heroFor(state, attacker);
+  const defenderHero = heroFor(state, defender);
   const raw = calculateDamage(attacker, defender, heroAttack, rng, sink);
   return {
-    damage: withHeroBonus(hero, attacker, defender, raw, ranged),
+    damage: withHeroBonus(attackerHero, defenderHero, attacker, defender, raw, ranged),
     luckEvents: sink.luck
       ? [{ type: 'luck', data: { unitId: attacker.id, kind: sink.luck } }]
       : [],
@@ -130,7 +133,10 @@ function applyOnHitEffects(
  */
 function handleDeath(s: BattleState, dead: UnitStack, rng: Rng): BattleState {
   const next: BattleState = { ...s, log: [...s.log, { type: 'death', data: { unitId: dead.id } }] };
-  const gatingChance = dead.side === 'player' && !dead.isAlly ? getGatingChance(next.hero) : 0;
+  const hasOwnHero = !!(dead.controllerId && next.heroes?.[dead.controllerId]);
+  const gatingChance = dead.side === 'player' && (!dead.isAlly || hasOwnHero)
+    ? getGatingChance(heroFor(next, dead))
+    : 0;
   if (gatingChance > 0 && DEMON_UNITS.some(u => u.name === dead.definition.name) && rng() < gatingChance) {
     const revived: UnitStack = { ...dead, count: 1, hp: dead.definition.hp };
     return {
@@ -145,6 +151,26 @@ function handleDeath(s: BattleState, dead: UnitStack, rng: Rng): BattleState {
 
 const GRID_W = 12;
 const GRID_H = 10;
+
+export interface BattleInitOptions {
+  controllers?: { player: string; ally: string; enemy: string };
+  allyHero?: Hero;
+}
+
+export function heroFor(state: BattleState, unit: UnitStack): Hero {
+  return unit.controllerId ? (state.heroes?.[unit.controllerId] ?? state.hero) : state.hero;
+}
+
+function updateHeroFor(state: BattleState, unit: UnitStack, update: (hero: Hero) => Hero): BattleState {
+  const id = unit.controllerId;
+  if (!id || !state.heroes?.[id]) return { ...state, hero: update(state.hero) };
+  const hero = update(state.heroes[id]);
+  return {
+    ...state,
+    hero: id === 'host' ? hero : state.hero,
+    heroes: { ...state.heroes, [id]: hero },
+  };
+}
 
 export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
   lightning: { cost: 3, friendly: false },
@@ -170,7 +196,8 @@ function slotToStack(
   side: 'player' | 'enemy',
   index: number,
   id: string,
-  colShift = 0
+  colShift = 0,
+  controllerId?: string
 ): UnitStack {
   const col = side === 'player' ? 1 + colShift : GRID_W - 2;
   const row = 1 + index * Math.floor((GRID_H - 2) / 6);
@@ -188,6 +215,7 @@ function slotToStack(
     luck: 0,
     atb: 0,
     isDefending: false,
+    ...(controllerId ? { controllerId } : {}),
   };
 }
 
@@ -199,7 +227,8 @@ export function initBattle(
   hero: Hero,
   seed = Date.now(),
   allyArmy: ArmySlot[] = [],
-  armyBonuses?: ArmyBonuses
+  armyBonuses?: ArmyBonuses,
+  options: BattleInitOptions = {}
 ): BattleState {
   let grid = createGrid(GRID_W, GRID_H);
   let nextId = 1;
@@ -210,7 +239,7 @@ export function initBattle(
   const logisticsBonus = getLogisticsBonus(hero);
   const luckBonus = getNatureLuckBonus(hero);
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
-    let stack = slotToStack(slot, 'player', i, allocateId(), tacticsShift);
+    let stack = slotToStack(slot, 'player', i, allocateId(), tacticsShift, options.controllers?.player);
     if (moraleBonus > 0) stack = { ...stack, morale: stack.morale + moraleBonus };
     if (logisticsBonus > 0) stack = { ...stack, speedBonus: logisticsBonus };
     if (luckBonus > 0) stack = { ...stack, luck: stack.luck + luckBonus };
@@ -227,15 +256,26 @@ export function initBattle(
     return stack;
   });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) =>
-    slotToStack(slot, 'enemy', i, allocateId())
+    slotToStack(slot, 'enemy', i, allocateId(), 0, options.controllers?.enemy)
   );
   // Summoned ally: player-side but AI-driven, fielded one column behind the
   // player line. Hero skill bonuses (morale/logistics/luck/gating) deliberately
   // don't apply — the ally fights under its own banner.
-  const allyUnits: UnitStack[] = allyArmy.map((slot, i) => ({
-    ...slotToStack(slot, 'player', i, allocateId(), -1),
-    isAlly: true,
-  }));
+  const allyUnits: UnitStack[] = allyArmy.map((slot, i) => {
+    let stack: UnitStack = {
+      ...slotToStack(slot, 'player', i, allocateId(), -1, options.controllers?.ally),
+      isAlly: true,
+    };
+    if (options.allyHero) {
+      const allyMorale = getMoraleBonus(options.allyHero);
+      const allyLogistics = getLogisticsBonus(options.allyHero);
+      const allyLuck = getNatureLuckBonus(options.allyHero);
+      if (allyMorale > 0) stack = { ...stack, morale: stack.morale + allyMorale };
+      if (allyLogistics > 0) stack = { ...stack, speedBonus: allyLogistics };
+      if (allyLuck > 0) stack = { ...stack, luck: stack.luck + allyLuck };
+    }
+    return stack;
+  });
 
   // The hero fights too: off-grid on the flank, ATB-scheduled, untargetable.
   // Whole-board ranged strike via the shoot action (no retaliation). attack: 0
@@ -259,11 +299,29 @@ export function initBattle(
     atb: 0,
     isDefending: false,
     isHero: true,
+    ...(options.controllers?.player ? { controllerId: options.controllers.player } : {}),
   };
+
+  const allyHeroStack: UnitStack | null = options.allyHero
+    ? {
+        ...heroStack,
+        id: allocateId(),
+        definition: {
+          ...heroStack.definition,
+          defense: options.allyHero.defense,
+          minDamage: 2 + 3 * options.allyHero.level,
+          maxDamage: 5 + 6 * options.allyHero.level,
+        },
+        pos: { col: -3, row: Math.floor(GRID_H / 2) },
+        isAlly: true,
+        controllerId: options.controllers?.ally,
+      }
+    : null;
 
   // LordsWM-style start: every stack gets a seeded random 0–10% head start.
   const rng = mulberry32(seed);
-  const allUnits = [...playerUnits, ...allyUnits, ...enemyUnits, heroStack].map(u => ({ ...u, atb: rng() * 0.1 }));
+  const allUnits = [...playerUnits, ...allyUnits, ...enemyUnits, heroStack, ...(allyHeroStack ? [allyHeroStack] : [])]
+    .map(u => ({ ...u, atb: rng() * 0.1 }));
 
   grid = placeUnits(grid, allUnits);
 
@@ -282,6 +340,14 @@ export function initBattle(
     grid,
     units: allUnits,
     hero: { ...hero, mana: hero.mana ?? maxMana(hero) },
+    ...(options.controllers ? {
+      heroes: {
+        [options.controllers.player]: { ...hero, mana: hero.mana ?? maxMana(hero) },
+        ...(options.allyHero ? {
+          [options.controllers.ally]: { ...options.allyHero, mana: options.allyHero.mana ?? maxMana(options.allyHero) },
+        } : {}),
+      },
+    } : {}),
     round: 1,
     battleTime: 0,
     currentUnitId: null,
@@ -314,23 +380,25 @@ export function isInDeployZone(pos: Pos, tacticsShift: number): boolean {
 }
 
 /** Whether a stack is one the player may reposition during deployment. */
-function isDeployable(u: UnitStack | undefined): u is UnitStack {
-  return !!u && u.side === 'player' && !u.isHero && !u.isAlly;
+function isDeployable(u: UnitStack | undefined, controllerId?: string): u is UnitStack {
+  if (!u || u.side !== 'player' || u.isHero) return false;
+  return controllerId ? u.controllerId === controllerId : !u.isAlly;
 }
 
 /** Move one of the player's stacks to `to` during deployment. Empty in-zone
  *  cell → move; another of the player's stacks → swap. Any other target
  *  (out of zone, obstacle, enemy, hero) is a no-op returning the same state. */
-export function deployMove(state: BattleState, unitId: string, to: Pos): BattleState {
+export function deployMove(state: BattleState, unitId: string, to: Pos, controllerId?: string): BattleState {
   const unit = state.units.find(u => u.id === unitId);
-  if (!isDeployable(unit)) return state;
-  if (!isInDeployZone(to, getTacticsShift(state.hero))) return state;
-  const cell = state.grid.cells[to.row][to.col];
+  if (!isDeployable(unit, controllerId)) return state;
+  if (!isInDeployZone(to, getTacticsShift(heroFor(state, unit)))) return state;
+  const cell = state.grid.cells[to.row]?.[to.col];
+  if (!cell) return state;
   if (cell.blocked) return state;
   if (cell.occupantId === unitId) return state;
 
   const occupant = cell.occupantId ? state.units.find(u => u.id === cell.occupantId) : undefined;
-  if (cell.occupantId && !isDeployable(occupant)) return state; // can't displace enemies/hero
+  if (cell.occupantId && !isDeployable(occupant, controllerId)) return state; // can't displace enemies/hero
 
   const from = unit.pos;
   if (occupant) {
@@ -349,14 +417,15 @@ export function deployMove(state: BattleState, unitId: string, to: Pos): BattleS
  *  empty in-zone cell `to`. No-op if amount is out of (0, count), `to` isn't an
  *  empty in-zone cell, or the field-stack cap is reached. Battle-scoped —
  *  survivorsFrom merges same-unit stacks back into the persistent army. */
-export function splitStack(state: BattleState, unitId: string, amount: number, to: Pos): BattleState {
+export function splitStack(state: BattleState, unitId: string, amount: number, to: Pos, controllerId?: string): BattleState {
   const unit = state.units.find(u => u.id === unitId);
-  if (!isDeployable(unit)) return state;
+  if (!isDeployable(unit, controllerId)) return state;
   if (!Number.isInteger(amount) || amount < 1 || amount >= unit.count) return state;
-  if (!isInDeployZone(to, getTacticsShift(state.hero))) return state;
-  const cell = state.grid.cells[to.row][to.col];
+  if (!isInDeployZone(to, getTacticsShift(heroFor(state, unit)))) return state;
+  const cell = state.grid.cells[to.row]?.[to.col];
+  if (!cell) return state;
   if (cell.blocked || cell.occupantId) return state;
-  const fieldStacks = state.units.filter(u => isDeployable(u) && u.count > 0).length;
+  const fieldStacks = state.units.filter(u => isDeployable(u, controllerId) && u.count > 0).length;
   if (fieldStacks >= MAX_FIELD_STACKS) return state;
 
   const id = `u${state.nextId}`;
@@ -373,6 +442,8 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
     luck: unit.luck,
     atb: 0,
     isDefending: false,
+    ...(unit.isAlly ? { isAlly: true } : {}),
+    ...(unit.controllerId ? { controllerId: unit.controllerId } : {}),
     ...(unit.attackBuff !== undefined ? { attackBuff: unit.attackBuff } : {}),
     ...(unit.defenseBuff !== undefined ? { defenseBuff: unit.defenseBuff } : {}),
     ...(unit.initiativeBonus !== undefined ? { initiativeBonus: unit.initiativeBonus } : {}),
@@ -393,6 +464,14 @@ export function beginCombat(state: BattleState): BattleState {
 function advance(state: BattleState): BattleState {
   const next = advanceTurn(state);
   if (next.round > state.round) {
+    if (next.heroes) {
+      const heroes = Object.fromEntries(Object.entries(next.heroes).map(([id, hero]) => {
+        const regen = getMysticismRegen(hero);
+        return [id, regen > 0 ? { ...hero, mana: (hero.mana ?? 0) + regen } : hero];
+      }));
+      const hostId = next.units.find(unit => unit.isHero && !unit.isAlly)?.controllerId;
+      return { ...next, heroes, hero: hostId ? heroes[hostId] : next.hero };
+    }
     const regen = getMysticismRegen(next.hero);
     if (regen > 0) return { ...next, hero: { ...next.hero, mana: (next.hero.mana ?? 0) + regen } };
   }
@@ -417,6 +496,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   const actorIdx = s.units.findIndex(u => u.id === actorId);
   if (actorIdx < 0) return s;
   let actor = s.units[actorIdx];
+  let actorHero = heroFor(s, actor);
 
   // A finished turn re-enters the scale at 0; wait re-enters at 0.5 (half cycle).
   const reenter = (st: BattleState, atb: number): BattleState => ({
@@ -472,7 +552,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     if (
       !actor.isHero ||
       !spell ||
-      (s.hero.mana ?? 0) < spell.cost ||
+      (actorHero.mana ?? 0) < spell.cost ||
       !target ||
       target.count === 0 ||
       target.isHero ||
@@ -495,7 +575,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     const target = s.units[targetIdx];
 
     if (action.spell === 'lightning') {
-      const damage = Math.round(lightningDamage(s.hero.level) * getSorceryMultiplier(s.hero));
+      const damage = Math.round(lightningDamage(actorHero.level) * getSorceryMultiplier(actorHero));
       const { killed, remaining } = applyDamage(target, damage);
       s = { ...s, units: s.units.map((u, i) => (i === targetIdx ? remaining : u)) };
       s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id, damage, killed } }];
@@ -511,7 +591,8 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       s.log = [...s.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id } }];
     }
 
-    s = { ...s, hero: { ...s.hero, mana: (s.hero.mana ?? 0) - spell.cost } };
+    s = updateHeroFor(s, actor, hero => ({ ...hero, mana: (hero.mana ?? 0) - spell.cost }));
+    actorHero = heroFor(s, actor);
 
   } else if (action.type === 'defend') {
     const newUnits = s.units.map((u, i) => (i === actorIdx ? { ...u, isDefending: true } : u));
@@ -547,10 +628,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       s.log = [...s.log, { type: 'move', data: { unitId: actorId, from: attacker.lastMovedFrom, to: action.moveTo } }];
     }
 
-    const { damage, luckEvents } = rollHit(s.hero, attacker, target, rng, s.hero.attack);
+    const { damage, luckEvents } = rollHit(s, attacker, target, rng, heroFor(s, attacker).attack);
     const { killed, remaining: hitTarget } = applyDamage(target, damage);
     const { striker: attackerAfterHit, victim: remaining, events: hitEvents } =
-      applyOnHitEffects(rng, attacker, hitTarget, damage, s.round, s.hero);
+      applyOnHitEffects(rng, attacker, hitTarget, damage, s.round, heroFor(s, attacker));
 
     s = {
       ...s,
@@ -575,10 +656,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
 
     // Retaliation (only on regular attack, not on ranged)
     if (canRetaliate(remaining, attackerAfterHit)) {
-      const { damage: retDamage, luckEvents: retLuckEvents } = rollHit(s.hero, remaining, attackerAfterHit, rng, 0);
+      const { damage: retDamage, luckEvents: retLuckEvents } = rollHit(s, remaining, attackerAfterHit, rng, 0);
       const { killed: retKilled, remaining: hitAttacker } = applyDamage(attackerAfterHit, retDamage);
       const { striker: retaliatorAfterHit, victim: retActor, events: retEvents } =
-        applyOnHitEffects(rng, remaining, hitAttacker, retDamage, s.round, s.hero);
+        applyOnHitEffects(rng, remaining, hitAttacker, retDamage, s.round, heroFor(s, remaining));
       const updatedUnits = s.units.map(u => {
         if (u.id === targetId) return { ...retaliatorAfterHit, hasRetaliated: true };
         if (u.id === actorId) return retActor;
@@ -597,10 +678,10 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       const striker = s.units.find(u => u.id === actorId);
       const victim = s.units.find(u => u.id === targetId);
       if (striker && striker.count > 0 && victim && victim.count > 0) {
-        const { damage: d2, luckEvents: luck2 } = rollHit(s.hero, striker, victim, rng, s.hero.attack);
+        const { damage: d2, luckEvents: luck2 } = rollHit(s, striker, victim, rng, heroFor(s, striker).attack);
         const { killed: k2, remaining: v2 } = applyDamage(victim, d2);
         const { striker: s2after, victim: v2after, events: hit2Events } =
-          applyOnHitEffects(rng, striker, v2, d2, s.round, s.hero);
+          applyOnHitEffects(rng, striker, v2, d2, s.round, heroFor(s, striker));
         s = { ...s, units: s.units.map(u => (u.id === targetId ? v2after : u.id === actorId ? s2after : u)) };
         s.log = [...s.log, ...luck2, { type: 'attack', data: { attackerId: actorId, targetId, damage: d2, killed: k2 } }, ...hit2Events];
         if (v2after.count === 0) s = handleDeath(s, v2after, rng);
@@ -628,7 +709,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     let currentTarget = target;
     let firstShotDamage = 0;
     for (let shot = 0; shot < shotCount && currentTarget.count > 0; shot++) {
-      const { damage: fullDamage, luckEvents } = rollHit(s.hero, actor, currentTarget, rng, s.hero.attack, true);
+      const { damage: fullDamage, luckEvents } = rollHit(s, actor, currentTarget, rng, actorHero.attack, true);
       const shotDamage = farShot ? Math.max(1, Math.round(fullDamage / 2)) : fullDamage;
       if (shot === 0) firstShotDamage = shotDamage;
       const { killed, remaining } = applyDamage(currentTarget, shotDamage);

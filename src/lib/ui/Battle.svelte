@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, splitStack, beginCombat } from '$lib/engine/battle';
+  import { onMount } from 'svelte';
+  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, splitStack, beginCombat, heroFor } from '$lib/engine/battle';
   import { getTacticsShift } from '$lib/engine/factionSkills';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
@@ -45,6 +46,21 @@
     exitLabel?: string;
     armyBonuses?: ArmyBonuses;
     items?: ItemId[];
+    initialState?: BattleState;
+    localControllerId?: 'host' | 'guest';
+    waitingForPeer?: boolean;
+    chatMessages?: Array<{ byController: 'host' | 'guest'; text: string }>;
+    online?: {
+      deployMove: (unitId: string, to: Pos) => void;
+      deploySplit: (unitId: string, amount: number, to: Pos) => void;
+      confirmDeploy: () => void;
+      action: (action: BattleAction) => void;
+      chat: (text: string) => void;
+      ready: (controls: {
+        applyRemote: (action: BattleAction) => Promise<BattleState>;
+        resync: (state: BattleState) => void;
+      }) => void;
+    };
   }
 
   let {
@@ -57,6 +73,11 @@
     exitLabel = 'Change army',
     armyBonuses,
     items = [],
+    initialState,
+    localControllerId,
+    waitingForPeer = false,
+    chatMessages = [],
+    online,
   }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
@@ -66,7 +87,7 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
+  let battle: BattleState = $state(initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
   // The pristine deploy layout, for the Reset button. Deploy ops are pure
   // (they return new states), so this reference stays untouched. Restart
   // refreshes it.
@@ -76,7 +97,10 @@
 
   // --- Deployment phase ---
   const inDeploy = $derived(battle.phase === 'deploy');
-  const tacticsShift = $derived(getTacticsShift(battle.hero));
+  const deployHero = $derived(
+    (online && localControllerId ? battle.heroes?.[localControllerId] : undefined) ?? battle.hero
+  );
+  const tacticsShift = $derived(getTacticsShift(deployHero));
   let selectedDeployId = $state<string | null>(null);
   let splitArmed = $state(false); // next empty-cell click splits rather than moves
   let splitAmount = $state(1);
@@ -105,7 +129,7 @@
   }
 
   function handleDeployUnit(unit: UnitStack) {
-    if (unit.side !== 'player' || unit.isHero || unit.isAlly) return;
+    if (unit.side !== 'player' || unit.isHero || (online ? unit.controllerId !== localControllerId : unit.isAlly)) return;
     if (selectedDeployId === unit.id) return selectDeploy(null); // click again to deselect
     if (selectedDeployId && !splitArmed) {
       battle = deployMove(battle, selectedDeployId, unit.pos); // swap
@@ -116,6 +140,11 @@
 
   function handleDeployCell(pos: Pos) {
     if (!selectedDeployId) return;
+    if (online) {
+      if (splitArmed) online.deploySplit(selectedDeployId, splitAmount, pos);
+      else online.deployMove(selectedDeployId, pos);
+      return selectDeploy(null);
+    }
     battle = splitArmed
       ? splitStack(battle, selectedDeployId, splitAmount, pos)
       : deployMove(battle, selectedDeployId, pos);
@@ -123,6 +152,10 @@
   }
 
   function beginBattle() {
+    if (online) {
+      online.confirmDeploy();
+      return selectDeploy(null);
+    }
     battle = beginCombat(battle);
     recorder = createSoloBattleRecorder($state.snapshot(battle) as BattleState);
     selectDeploy(null);
@@ -187,6 +220,7 @@
   }
 
   function takeAction(action: BattleAction, controller: SoloController) {
+    if (online) return online.action(action);
     const result = applyAction(battle, action);
     // Invalid casts are rejected by returning the original state. Do not put a
     // rejected cause into the replay journal.
@@ -196,9 +230,12 @@
   }
 
   const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
-  const heroUnit = $derived(battle.units.find(u => u.isHero) ?? null);
+  const heroUnit = $derived(
+    battle.units.find(u => u.isHero && (!online || u.controllerId === localControllerId)) ?? null
+  );
   const isPlayerTurn = $derived(
-    battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player'
+    battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
+      (!online || activeUnit.controllerId === localControllerId)
   );
 
   const reachableKeys = $derived(
@@ -275,14 +312,14 @@
     if (pendingSpell) {
       for (const id of spellTargetIds ?? []) {
         const target = battle.units.find(u => u.id === id);
-        const p = target && spellPreview(battle.hero, pendingSpell, target);
+        const p = target && activeUnit && spellPreview(heroFor(battle, activeUnit), pendingSpell, target);
         if (p) map.set(id, p);
       }
       return map;
     }
     for (const id of actionIcons.keys()) {
       const target = battle.units.find(u => u.id === id);
-      if (target) map.set(id, damagePreview(activeUnit, target, hero.attack, actionIcons.get(id) === 'shoot'));
+      if (target) map.set(id, damagePreview(activeUnit, target, heroFor(battle, activeUnit).attack, actionIcons.get(id) === 'shoot'));
     }
     return map;
   });
@@ -339,7 +376,7 @@
       resultAnnounced = true;
       const finalState = $state.snapshot(battle) as BattleState;
       onresult?.(battle.result, finalState.units);
-      if (recorder) {
+      if (recorder && !online) {
         const completed = recorder;
         recorder = null;
         void postSoloBattle(completed.finish(finalState)).catch(err => {
@@ -351,7 +388,7 @@
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
-    if (battle.result !== 'ongoing' || animating || inDeploy) return;
+    if (online || battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
@@ -429,6 +466,7 @@
   }
 
   function handleForfeit() {
+    if (online) return;
     if (battle.result !== 'ongoing') return;
     revealToken++; // abort any in-flight reveal so it can't clobber the forfeit
     animating = false;
@@ -440,6 +478,26 @@
     recorder = null;
     battle = { ...battle, result: 'enemy_wins', log: [...battle.log, { type: 'battle_end', data: { result: 'enemy_wins', forfeit: true } }] };
   }
+
+  let chatText = $state('');
+
+  onMount(() => {
+    online?.ready({
+      async applyRemote(action) {
+        const result = applyAction(battle, action);
+        await revealAction(result);
+        return $state.snapshot(battle) as BattleState;
+      },
+      resync(state) {
+        revealToken++;
+        animating = false;
+        activeSteps = [];
+        dyingIds = new Set();
+        doomedIds = new Set();
+        battle = state;
+      },
+    });
+  });
 
   function restart() {
     revealToken++; // abort any in-flight reveal so it can't clobber the new battle
@@ -529,19 +587,19 @@
               Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
             </p>
           {/if}
-          <button
-            type="button"
-            class="ml-auto rounded bg-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-600"
-            onclick={resetDeploy}
-          >
-            Reset
-          </button>
+          {#if !online}
+            <button
+              type="button"
+              class="ml-auto rounded bg-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-600"
+              onclick={resetDeploy}
+            >Reset</button>
+          {/if}
           <button
             type="button"
             class="rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-500"
             onclick={beginBattle}
           >
-            Begin battle ⚔️
+            {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
           </button>
         </div>
       {:else}
@@ -700,7 +758,7 @@
 
     {#if spellbookOpen && isHeroTurn}
       <SpellBook
-        hero={battle.hero}
+        hero={activeUnit ? heroFor(battle, activeUnit) : battle.hero}
         onpick={spell => {
           pendingSpell = spell;
           spellbookOpen = false;
@@ -751,7 +809,7 @@
       <div class="h-60 min-w-0 flex-[3]">
         <UnitInfo
           unit={infoUnit}
-          hero={battle.hero}
+          hero={infoUnit ? heroFor(battle, infoUnit) : battle.hero}
           pinned={!!selectedUnit}
           onunpin={() => (selectedId = null)}
         />
@@ -769,6 +827,30 @@
     </div>
   </div>
 </div>
+
+{#if online}
+  <div class="mx-auto mt-3 flex max-w-4xl gap-3 rounded border border-slate-700 bg-slate-800 p-3">
+    <div class="max-h-24 flex-1 overflow-y-auto text-sm text-slate-300">
+      {#each chatMessages as message}
+        <p><span class={message.byController === 'host' ? 'text-sky-300' : 'text-emerald-300'}>{message.byController}:</span> {message.text}</p>
+      {/each}
+    </div>
+    <form class="flex gap-2" onsubmit={event => {
+      event.preventDefault();
+      if (!chatText.trim()) return;
+      online.chat(chatText);
+      chatText = '';
+    }}>
+      <input bind:value={chatText} maxlength="300" placeholder="Team chat" class="rounded bg-slate-900 px-3 py-1 text-sm" />
+      <button class="rounded bg-emerald-700 px-3 py-1 text-sm">Send</button>
+    </form>
+  </div>
+  {#if waitingForPeer}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <p class="rounded border border-amber-500 bg-slate-900 px-6 py-4 text-lg text-amber-200">Waiting for the other player to reconnect…</p>
+    </div>
+  {/if}
+{/if}
 
 <style>
   .hero-shadow {

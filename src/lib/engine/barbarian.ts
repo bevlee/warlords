@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 export const BARBARIAN_UNITS: UnitDef[] = [
   {

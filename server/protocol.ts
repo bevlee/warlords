@@ -1,5 +1,6 @@
 export type {
   ClientMessage,
+  CoopLoadout,
   ControllerId,
   RoomPhase,
   RoomPlayer,

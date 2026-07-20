@@ -1,6 +1,6 @@
-import type { ArmySlot } from './types';
-import type { Rng } from './rng';
-import { BARBARIAN_UNITS, GOBLIN } from './barbarian';
+import type { ArmySlot } from './types.ts';
+import type { Rng } from './rng.ts';
+import { BARBARIAN_UNITS, GOBLIN } from './barbarian.ts';
 
 /** Gold price per creature, by unit name. */
 export const UNIT_COSTS: Record<string, number> = {
