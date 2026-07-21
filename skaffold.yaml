@@ -16,4 +16,5 @@ manifests:
     - k8s/deployment.yaml
     - k8s/ingress.yaml
     - k8s/namespace.yaml
+    - k8s/pvc.yaml
     - k8s/service.yaml

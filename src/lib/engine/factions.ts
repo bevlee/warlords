@@ -1,10 +1,10 @@
-import type { FactionClass, UnitDef } from './types';
-import { BARBARIAN_UNITS } from './barbarian';
-import { KNIGHT_UNITS } from './knight';
-import { WIZARD_UNITS } from './wizard';
-import { NECROMANCER_UNITS } from './necromancer';
-import { RANGER_UNITS } from './ranger';
-import { DEMON_UNITS } from './demon';
+import type { FactionClass, UnitDef } from './types.ts';
+import { BARBARIAN_UNITS } from './barbarian.ts';
+import { KNIGHT_UNITS } from './knight.ts';
+import { WIZARD_UNITS } from './wizard.ts';
+import { NECROMANCER_UNITS } from './necromancer.ts';
+import { RANGER_UNITS } from './ranger.ts';
+import { DEMON_UNITS } from './demon.ts';
 
 export const FACTION_UNITS: Record<FactionClass, UnitDef[]> = {
   barbarian: BARBARIAN_UNITS,

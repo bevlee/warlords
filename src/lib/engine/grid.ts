@@ -1,4 +1,4 @@
-import type { Grid, Cell, Pos, UnitStack } from './types';
+import type { Grid, Cell, Pos, UnitStack } from './types.ts';
 
 export function createGrid(width: number, height: number): Grid {
   const cells: Cell[][] = [];

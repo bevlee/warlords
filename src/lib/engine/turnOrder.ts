@@ -1,4 +1,4 @@
-import type { BattleState, UnitStack } from './types';
+import type { BattleState, UnitStack } from './types.ts';
 
 /** ATB fill rate in scale-units per round; initiative 10 = one turn per round.
  *  Floored at 1 so a stacked penalty can never freeze a unit entirely. */

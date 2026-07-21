@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 // Necromancer faction — undead army, cheap chaff, self-replenishing
 export const NECROMANCER_UNITS: UnitDef[] = [

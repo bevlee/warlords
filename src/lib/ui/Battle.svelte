@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, splitStack, beginCombat } from '$lib/engine/battle';
+  import { onMount } from 'svelte';
+  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, splitStack, beginCombat, heroFor } from '$lib/engine/battle';
   import { getTacticsShift } from '$lib/engine/factionSkills';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
@@ -15,6 +16,7 @@
   import type {
     ArmyBonuses,
     ArmySlot,
+    BattleAction,
     BattleState,
     Hero,
     Pos,
@@ -31,6 +33,8 @@
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
+  import { createSoloBattleRecorder } from '$lib/replay/recording';
+  import { postSoloBattle, type SoloController } from '$lib/net/api';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -42,6 +46,28 @@
     exitLabel?: string;
     armyBonuses?: ArmyBonuses;
     items?: ItemId[];
+    initialState?: BattleState;
+    localControllerId?: 'host' | 'guest';
+    waitingForPeer?: boolean;
+    chatMessages?: Array<{ byController: 'host' | 'guest'; text: string }>;
+    replay?: {
+      speedFactor: number;
+      ready: (controls: {
+        applyRemote: (action: BattleAction) => Promise<BattleState>;
+        resync: (state: BattleState) => void;
+      }) => void;
+    };
+    online?: {
+      deployMove: (unitId: string, to: Pos) => void;
+      deploySplit: (unitId: string, amount: number, to: Pos) => void;
+      confirmDeploy: () => void;
+      action: (action: BattleAction) => void;
+      chat: (text: string) => void;
+      ready: (controls: {
+        applyRemote: (action: BattleAction) => Promise<BattleState>;
+        resync: (state: BattleState) => void;
+      }) => void;
+    };
   }
 
   let {
@@ -54,6 +80,12 @@
     exitLabel = 'Change army',
     armyBonuses,
     items = [],
+    initialState,
+    localControllerId,
+    waitingForPeer = false,
+    chatMessages = [],
+    replay,
+    online,
   }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
@@ -63,16 +95,20 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  let battle: BattleState = $state(initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
+  let battle: BattleState = $state(initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
   // The pristine deploy layout, for the Reset button. Deploy ops are pure
   // (they return new states), so this reference stays untouched. Restart
   // refreshes it.
   // svelte-ignore state_referenced_locally
   let deployBaseline: BattleState = battle;
+  let recorder: ReturnType<typeof createSoloBattleRecorder> | null = null;
 
   // --- Deployment phase ---
   const inDeploy = $derived(battle.phase === 'deploy');
-  const tacticsShift = $derived(getTacticsShift(battle.hero));
+  const deployHero = $derived(
+    (online && localControllerId ? battle.heroes?.[localControllerId] : undefined) ?? battle.hero
+  );
+  const tacticsShift = $derived(getTacticsShift(deployHero));
   let selectedDeployId = $state<string | null>(null);
   let splitArmed = $state(false); // next empty-cell click splits rather than moves
   let splitAmount = $state(1);
@@ -101,7 +137,7 @@
   }
 
   function handleDeployUnit(unit: UnitStack) {
-    if (unit.side !== 'player' || unit.isHero || unit.isAlly) return;
+    if (unit.side !== 'player' || unit.isHero || (online ? unit.controllerId !== localControllerId : unit.isAlly)) return;
     if (selectedDeployId === unit.id) return selectDeploy(null); // click again to deselect
     if (selectedDeployId && !splitArmed) {
       battle = deployMove(battle, selectedDeployId, unit.pos); // swap
@@ -112,6 +148,11 @@
 
   function handleDeployCell(pos: Pos) {
     if (!selectedDeployId) return;
+    if (online) {
+      if (splitArmed) online.deploySplit(selectedDeployId, splitAmount, pos);
+      else online.deployMove(selectedDeployId, pos);
+      return selectDeploy(null);
+    }
     battle = splitArmed
       ? splitStack(battle, selectedDeployId, splitAmount, pos)
       : deployMove(battle, selectedDeployId, pos);
@@ -119,7 +160,12 @@
   }
 
   function beginBattle() {
+    if (online) {
+      online.confirmDeploy();
+      return selectDeploy(null);
+    }
     battle = beginCombat(battle);
+    recorder = createSoloBattleRecorder($state.snapshot(battle) as BattleState);
     selectDeploy(null);
   }
 
@@ -142,14 +188,17 @@
   let doomedIds = $state(new Set<string>());
   let revealToken = 0;
 
-  const STEP_DELAY_MS = $derived({ slow: 700, normal: 450, fast: 200 }[battleSpeed]);
+  const speedFactor = $derived(Math.max(0.25, replay?.speedFactor ?? 1));
+  const STEP_DELAY_MS = $derived(Math.round({ slow: 700, normal: 450, fast: 200 }[battleSpeed] / speedFactor));
+  const fxFloatMs = $derived(Math.round(900 * STEP_DELAY_MS / 450));
+  const deathMs = $derived(Math.round(1100 * STEP_DELAY_MS / 450));
 
   // Hold after the last beat so its CSS can finish before teardown unmounts
   // everything: floaters self-buffer inside BattleFx now (they survive beat
   // swaps), but teardown clears that buffer and dyingIds, so the hold must
   // cover the longest tail — the 1.1s death fade, or a ranged floater's
   // flight delay (60% of a beat) plus its 0.9s float.
-  const fxTailMs = $derived(Math.max(1300, 900 + Math.round(STEP_DELAY_MS * 0.6)));
+  const fxTailMs = $derived(Math.max(deathMs + 200, fxFloatMs + Math.round(STEP_DELAY_MS * 0.6) + 200));
 
   async function revealAction(result: BattleState) {
     const token = ++revealToken;
@@ -181,10 +230,24 @@
     animating = false;
   }
 
+  function takeAction(action: BattleAction, controller: SoloController) {
+    if (online) return online.action(action);
+    if (replay) return;
+    const result = applyAction(battle, action);
+    // Invalid casts are rejected by returning the original state. Do not put a
+    // rejected cause into the replay journal.
+    if (result === battle) return;
+    recorder?.record(controller, action);
+    void revealAction(result);
+  }
+
   const activeUnit = $derived(battle.units.find(u => u.id === battle.currentUnitId) ?? null);
-  const heroUnit = $derived(battle.units.find(u => u.isHero) ?? null);
+  const heroUnit = $derived(
+    battle.units.find(u => u.isHero && (!online || u.controllerId === localControllerId)) ?? null
+  );
   const isPlayerTurn = $derived(
-    battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player'
+    !replay && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
+      (!online || activeUnit.controllerId === localControllerId)
   );
 
   const reachableKeys = $derived(
@@ -261,14 +324,14 @@
     if (pendingSpell) {
       for (const id of spellTargetIds ?? []) {
         const target = battle.units.find(u => u.id === id);
-        const p = target && spellPreview(battle.hero, pendingSpell, target);
+        const p = target && activeUnit && spellPreview(heroFor(battle, activeUnit), pendingSpell, target);
         if (p) map.set(id, p);
       }
       return map;
     }
     for (const id of actionIcons.keys()) {
       const target = battle.units.find(u => u.id === id);
-      if (target) map.set(id, damagePreview(activeUnit, target, hero.attack, actionIcons.get(id) === 'shoot'));
+      if (target) map.set(id, damagePreview(activeUnit, target, heroFor(battle, activeUnit).attack, actionIcons.get(id) === 'shoot'));
     }
     return map;
   });
@@ -323,37 +386,43 @@
   $effect(() => {
     if (battle.result !== 'ongoing' && !resultAnnounced) {
       resultAnnounced = true;
-      onresult?.(battle.result, $state.snapshot(battle).units as UnitStack[]);
+      const finalState = $state.snapshot(battle) as BattleState;
+      onresult?.(battle.result, finalState.units);
+      if (recorder && !online) {
+        const completed = recorder;
+        recorder = null;
+        void postSoloBattle(completed.finish(finalState)).catch(err => {
+          console.error('battle recording upload failed:', err);
+        });
+      }
     }
   });
 
   // Enemy turns play automatically, one action at a time, so the player can follow.
   $effect(() => {
-    if (battle.result !== 'ongoing' || animating || inDeploy) return;
+    if (online || replay || battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || unit.side !== 'enemy') return;
     const timer = setTimeout(() => {
       // Re-check at fire time: forfeited or still animating while pending.
       if (battle.result !== 'ongoing' || animating) return;
-      revealAction(applyAction(battle, aiTakeTurn(battle, unit.id)));
+      takeAction(aiTakeTurn(battle, unit.id), 'ai');
     }, AI_DELAY_MS);
     return () => clearTimeout(timer);
   });
 
   function attackFrom(targetId: string, origin: Pos) {
     const inPlace = activeUnit && origin.col === activeUnit.pos.col && origin.row === activeUnit.pos.row;
-    revealAction(
-      applyAction(
-        battle,
-        inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin }
-      )
+    takeAction(
+      inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin },
+      'host'
     );
     hovered = null;
   }
 
   function castAt(unit: UnitStack) {
     if (!pendingSpell) return;
-    revealAction(applyAction(battle, { type: 'cast', spell: pendingSpell, targetId: unit.id }));
+    takeAction({ type: 'cast', spell: pendingSpell, targetId: unit.id }, 'host');
     pendingSpell = null;
     hovered = null;
   }
@@ -365,7 +434,7 @@
       return;
     }
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
-    revealAction(applyAction(battle, { type: 'move', to: pos }));
+    takeAction({ type: 'move', to: pos }, 'host');
   }
 
   // The grid resolved an aimed melee: move to the chosen tile and strike.
@@ -387,7 +456,7 @@
 
     const action = actionIcons.get(unit.id);
     if (action === 'shoot') {
-      revealAction(applyAction(battle, { type: 'shoot', targetId: unit.id }));
+      takeAction({ type: 'shoot', targetId: unit.id }, 'host');
       hovered = null;
     } else if (action === 'melee') {
       // Fallback for non-mouse activation (keyboard): nearest origin.
@@ -399,24 +468,49 @@
   function handleWait() {
     if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    revealAction(applyAction(battle, { type: 'wait' }));
+    takeAction({ type: 'wait' }, 'host');
   }
 
   function handleDefend() {
     if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    revealAction(applyAction(battle, { type: 'defend' }));
+    takeAction({ type: 'defend' }, 'host');
   }
 
   function handleForfeit() {
+    if (online || replay) return;
     if (battle.result !== 'ongoing') return;
     revealToken++; // abort any in-flight reveal so it can't clobber the forfeit
     animating = false;
     activeSteps = [];
     dyingIds = new Set();
     pendingSpell = null;
+    // Forfeit is not an engine BattleAction, so it cannot produce a truthful
+    // cause-only replay. Treat it like an abandoned tab and omit the record.
+    recorder = null;
     battle = { ...battle, result: 'enemy_wins', log: [...battle.log, { type: 'battle_end', data: { result: 'enemy_wins', forfeit: true } }] };
   }
+
+  let chatText = $state('');
+
+  onMount(() => {
+    const ready = online?.ready ?? replay?.ready;
+    ready?.({
+      async applyRemote(action) {
+        const result = applyAction(battle, action);
+        await revealAction(result);
+        return $state.snapshot(battle) as BattleState;
+      },
+      resync(state) {
+        revealToken++;
+        animating = false;
+        activeSteps = [];
+        dyingIds = new Set();
+        doomedIds = new Set();
+        battle = state;
+      },
+    });
+  });
 
   function restart() {
     revealToken++; // abort any in-flight reveal so it can't clobber the new battle
@@ -426,6 +520,7 @@
     doomedIds = new Set();
     pendingSpell = null;
     resultAnnounced = false;
+    recorder = null;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
     deployBaseline = battle; // restart re-enters deploy with a fresh layout
     selectDeploy(null);
@@ -437,6 +532,7 @@
     if (battle.result === 'player_wins') return 'Victory!';
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
+    if (replay) return `Replay — ${activeUnit.definition.name}s are acting…`;
     if (pendingSpell) {
       const friendly = SPELLS[pendingSpell].friendly;
       return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
@@ -505,19 +601,19 @@
               Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
             </p>
           {/if}
-          <button
-            type="button"
-            class="ml-auto rounded bg-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-600"
-            onclick={resetDeploy}
-          >
-            Reset
-          </button>
+          {#if !online}
+            <button
+              type="button"
+              class="ml-auto rounded bg-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-600"
+              onclick={resetDeploy}
+            >Reset</button>
+          {/if}
           <button
             type="button"
             class="rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-500"
             onclick={beginBattle}
           >
-            Begin battle ⚔️
+            {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
           </button>
         </div>
       {:else}
@@ -573,6 +669,8 @@
           {dyingIds}
           {doomedIds}
           stepMs={STEP_DELAY_MS}
+          {fxFloatMs}
+          {deathMs}
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
@@ -626,7 +724,7 @@
       </div>
 
       <!-- Settings: cog at the top-left, under the page title. -->
-      <div class="absolute left-1 top-1 z-30 flex flex-col items-start gap-1.5">
+      {#if !replay}<div class="absolute left-1 top-1 z-30 flex flex-col items-start gap-1.5">
         <button
           type="button"
           class="flex h-12 w-12 items-center justify-center rounded-full border border-slate-500
@@ -672,11 +770,11 @@
             </button>
           </div>
         {/if}
-      </div>
+      </div>{/if}
 
     {#if spellbookOpen && isHeroTurn}
       <SpellBook
-        hero={battle.hero}
+        hero={activeUnit ? heroFor(battle, activeUnit) : battle.hero}
         onpick={spell => {
           pendingSpell = spell;
           spellbookOpen = false;
@@ -685,7 +783,7 @@
       />
     {/if}
 
-    {#if battle.result !== 'ongoing'}
+    {#if battle.result !== 'ongoing' && !replay}
       <div
         class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-lg bg-black/70"
       >
@@ -727,7 +825,7 @@
       <div class="h-60 min-w-0 flex-[3]">
         <UnitInfo
           unit={infoUnit}
-          hero={battle.hero}
+          hero={infoUnit ? heroFor(battle, infoUnit) : battle.hero}
           pinned={!!selectedUnit}
           onunpin={() => (selectedId = null)}
         />
@@ -745,6 +843,30 @@
     </div>
   </div>
 </div>
+
+{#if online}
+  <div class="mx-auto mt-3 flex max-w-4xl gap-3 rounded border border-slate-700 bg-slate-800 p-3">
+    <div class="max-h-24 flex-1 overflow-y-auto text-sm text-slate-300">
+      {#each chatMessages as message}
+        <p><span class={message.byController === 'host' ? 'text-sky-300' : 'text-emerald-300'}>{message.byController}:</span> {message.text}</p>
+      {/each}
+    </div>
+    <form class="flex gap-2" onsubmit={event => {
+      event.preventDefault();
+      if (!chatText.trim()) return;
+      online.chat(chatText);
+      chatText = '';
+    }}>
+      <input bind:value={chatText} maxlength="300" placeholder="Team chat" class="rounded bg-slate-900 px-3 py-1 text-sm" />
+      <button class="rounded bg-emerald-700 px-3 py-1 text-sm">Send</button>
+    </form>
+  </div>
+  {#if waitingForPeer}
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <p class="rounded border border-amber-500 bg-slate-900 px-6 py-4 text-lg text-amber-200">Waiting for the other player to reconnect…</p>
+    </div>
+  {/if}
+{/if}
 
 <style>
   .hero-shadow {

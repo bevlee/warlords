@@ -1,7 +1,7 @@
-import type { UnitStack, Hero } from './types';
-import { abilityLevel, defenseReductionMult } from './abilityCatalog';
-import type { Rng } from './rng';
-import { chebyshevDistance } from './grid';
+import type { UnitStack, Hero } from './types.ts';
+import { abilityLevel, defenseReductionMult } from './abilityCatalog.ts';
+import type { Rng } from './rng.ts';
+import { chebyshevDistance } from './grid.ts';
 
 /**
  * HoMM3-style damage formula.

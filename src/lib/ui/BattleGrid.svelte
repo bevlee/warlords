@@ -27,6 +27,8 @@
     /** Die later in this reveal batch — kept mounted at count 0 until then. */
     doomedIds: Set<string>;
     stepMs: number;
+    fxFloatMs: number;
+    deathMs: number;
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
     onmeleeaim: (targetId: string, origin: Pos) => void;
@@ -54,6 +56,8 @@
     dyingIds,
     doomedIds,
     stepMs,
+    fxFloatMs,
+    deathMs,
     oncellclick,
     onunitclick,
     onmeleeaim,
@@ -236,7 +240,7 @@
 <div class="board-viewport">
   <div
     class="board grid rounded-md border border-indigo-300/20 bg-slate-800/60 p-0.5"
-    style="grid-template-columns: repeat({battleState.grid.width}, minmax(0, 1fr)); --tilt: {TILT_DEG}deg;"
+    style="grid-template-columns: repeat({battleState.grid.width}, minmax(0, 1fr)); --tilt: {TILT_DEG}deg; --death-ms: {deathMs}ms;"
   >
     {#each battleState.grid.cells as row (row[0].row)}
       {#each row as cell (cellKey(cell.col, cell.row))}
@@ -311,6 +315,7 @@
     gridWidth={battleState.grid.width}
     gridHeight={battleState.grid.height}
     {stepMs}
+    {fxFloatMs}
     steps={activeSteps
       .filter(({ step }) => step.kind !== 'move' && step.kind !== 'strike' && step.kind !== 'recoil')
       .map(({ unitId, step }): { step: AnimStep; pos: Pos; fromPos?: Pos; art?: 'arrow' | 'bolt'; key: string } | null => {
@@ -472,7 +477,7 @@
      and the ghost lingers; duration must stay inside Battle.svelte's
      fxTailMs hold or the stack unmounts mid-fade. */
   .token-standing.dying {
-    transition: opacity 1.1s ease-out, transform 1.1s ease-out;
+    transition: opacity var(--death-ms, 1100ms) ease-out, transform var(--death-ms, 1100ms) ease-out;
     opacity: 0;
     transform: rotateX(calc(-1 * var(--tilt))) translateY(15%);
   }

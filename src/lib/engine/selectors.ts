@@ -1,6 +1,6 @@
-import type { BattleState, Grid, Pos, UnitStack } from './types';
-import { getNeighbours, chebyshevDistance } from './grid';
-import { modifiedDamage, applyDamage } from './combat';
+import type { BattleState, Grid, Pos, UnitStack } from './types.ts';
+import { getNeighbours, chebyshevDistance } from './grid.ts';
+import { modifiedDamage, applyDamage } from './combat.ts';
 
 /** Movement range for this turn: base speed, plus Logistics, minus any active slow (Zombie slow_on_hit). */
 export function effectiveSpeed(unit: UnitStack): number {
