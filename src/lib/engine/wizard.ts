@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 // Wizard faction — fragile but powerful ranged/magic units
 export const WIZARD_UNITS: UnitDef[] = [

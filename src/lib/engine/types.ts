@@ -37,6 +37,7 @@ export interface UnitStack {
   isDefending: boolean; // defensive stance until the start of its own next turn
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
   isAlly?: boolean;    // summoned ally stack: fights on the player side, AI-controlled
+  controllerId?: string; // authoritative owner in co-op; absent uses legacy side/isAlly derivation
   attackBuff?: number;  // battle-long spell bonus to attack
   defenseBuff?: number; // battle-long spell bonus to defense
   initiativeBonus?: number; // battle-long flat bonus to ATB fill rate (gauntlet items)
@@ -115,12 +116,17 @@ export interface BattleState {
   grid: Grid;
   units: UnitStack[];
   hero: Hero;
+  /** Co-op heroes keyed by controller id. `hero` remains the host/solo fallback. */
+  heroes?: Record<string, Hero>;
   round: number;
   battleTime: number;  // in rounds; a baseline init-10 stack acts once per round
   currentUnitId: string | null;
   log: BattleEvent[];
   result: 'ongoing' | 'player_wins' | 'enemy_wins';
   seed: number;
+  /** Next battle-scoped unit id. Keeping allocation in state makes every
+   *  transition replayable and identical across browser/server runtimes. */
+  nextId: number;
   /** 'deploy' = pre-combat troop placement (UI freezes the turn loop);
    *  'combat' = normal battle. Absent on states built before this existed,
    *  treated as 'combat'. */

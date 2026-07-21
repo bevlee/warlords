@@ -1,6 +1,6 @@
-import type { BattleAction, BattleState } from './types';
-import { findPath, chebyshevDistance } from './grid';
-import { canShootTarget, effectiveSpeed, getMeleeApproaches, isShootingBlocked } from './selectors';
+import type { BattleAction, BattleState } from './types.ts';
+import { findPath, chebyshevDistance } from './grid.ts';
+import { canShootTarget, effectiveSpeed, getMeleeApproaches, isShootingBlocked } from './selectors.ts';
 
 export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);

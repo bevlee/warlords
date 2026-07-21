@@ -10,6 +10,7 @@ export * from './turnOrder';
 export * from './ai';
 export * from './selectors';
 export * from './battle';
+export * from './version';
 export * from './recruit';
 export * from './progression';
 export * from './factionSkills';

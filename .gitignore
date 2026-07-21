@@ -27,6 +27,7 @@ vite.config.ts.timestamp-*
 
 # Git worktrees
 .worktrees
+/data
 
 # Image generation scratch (intermediates; pipeline lives in scripts/imagegen)
 /tmp

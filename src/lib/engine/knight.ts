@@ -1,4 +1,4 @@
-import type { UnitDef } from './types';
+import type { UnitDef } from './types.ts';
 
 // Knight faction — defensive, balanced units, strong against undead
 export const KNIGHT_UNITS: UnitDef[] = [

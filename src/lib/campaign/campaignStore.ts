@@ -1,9 +1,5 @@
-import { openDB, type IDBPDatabase } from 'idb';
+import { getSave, putSave, deleteSave } from '../net/api';
 import { ENCOUNTERS, type Encounter } from './encounters';
-
-const DB_NAME = 'warlords';
-const STORE = 'kv';
-const CAMPAIGN_KEY = 'campaign';
 
 export interface CampaignState {
   chapter: number;   // 1–5
@@ -14,28 +10,20 @@ export interface CampaignState {
 
 export type NodeStatus = 'locked' | 'available' | 'completed';
 
-function db(): Promise<IDBPDatabase> {
-  return openDB(DB_NAME, 1, {
-    upgrade(d) {
-      d.createObjectStore(STORE);
-    },
-  });
-}
-
 export function newCampaign(heroSaveId = 'default'): CampaignState {
   return { chapter: 1, encounter: 0, completed: false, heroSaveId };
 }
 
 export async function loadCampaign(): Promise<CampaignState | null> {
-  return (await (await db()).get(STORE, CAMPAIGN_KEY)) ?? null;
+  return getSave<CampaignState>('campaign');
 }
 
 export async function saveCampaign(state: CampaignState): Promise<void> {
-  await (await db()).put(STORE, { ...state }, CAMPAIGN_KEY);
+  await putSave('campaign', state);
 }
 
 export async function resetCampaign(): Promise<void> {
-  await (await db()).delete(STORE, CAMPAIGN_KEY);
+  await deleteSave('campaign');
 }
 
 export function encountersInChapter(chapter: number): Encounter[] {

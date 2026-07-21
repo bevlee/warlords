@@ -1,4 +1,4 @@
-import type { Hero } from './types';
+import type { Hero } from './types.ts';
 
 /** Cumulative XP required to reach a level: 100·L·(L−1). */
 export function xpToReach(level: number): number {

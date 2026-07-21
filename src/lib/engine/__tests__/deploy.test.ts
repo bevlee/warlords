@@ -8,6 +8,7 @@ import {
   DEPLOY_COLS,
   MAX_FIELD_STACKS,
 } from '../battle';
+import { ENGINE_VERSION } from '../version';
 import { GOBLIN, WOLF_RIDER } from '../barbarian';
 import type { BattleState, Hero, Pos } from '../types';
 
@@ -46,6 +47,15 @@ describe('isInDeployZone', () => {
 describe('initBattle deploy phase', () => {
   it('starts in the deploy phase', () => {
     expect(deployState().phase).toBe('deploy');
+  });
+
+  it('uses deterministic battle-scoped stack ids', () => {
+    const first = deployState();
+    const second = deployState();
+
+    expect(first).toEqual(second);
+    expect(first.units.map(u => u.id)).toEqual(['u1', 'u2', 'u3', 'u4']);
+    expect(first.nextId).toBe(5);
   });
 });
 
@@ -109,6 +119,17 @@ describe('splitStack', () => {
     expect(created.count).toBe(4);
     expect(created.hp).toBe(GOBLIN.hp);
     expect(cellOccupant(next, to)).toBe(created.id);
+    expect(created.id).toBe('u5');
+    expect(next.nextId).toBe(6);
+  });
+
+  it('mints the same id for the same split sequence', () => {
+    const split = (state: BattleState) => {
+      const goblins = playerStacks(state).find(u => u.definition.name === 'Goblin')!;
+      return splitStack(state, goblins.id, 2, { col: 2, row: 7 });
+    };
+
+    expect(split(deployState())).toEqual(split(deployState()));
   });
 
   it('rejects an amount at or above the stack size, or below 1', () => {
@@ -144,8 +165,16 @@ describe('splitStack', () => {
 });
 
 describe('beginCombat', () => {
-  it('flips the phase to combat', () => {
-    expect(beginCombat(deployState()).phase).toBe('combat');
+  it('flips the phase and starts the replay journal from an empty log', () => {
+    const combat = beginCombat(deployState());
+    expect(combat.phase).toBe('combat');
+    expect(combat.log).toEqual([]);
+  });
+});
+
+describe('engine version', () => {
+  it('exports a stable non-empty replay compatibility stamp', () => {
+    expect(ENGINE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 
