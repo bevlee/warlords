@@ -54,7 +54,10 @@ export function attachWebSocketServer(
 
   const onUpgrade = (request: IncomingMessage, socket: Socket, head: Buffer) => {
     const url = new URL(request.url ?? '/', 'http://localhost');
-    if (url.pathname !== '/ws') return socket.destroy();
+    // Other services can share this HTTP server's upgrade event. In local
+    // development Vite uses its own WebSocket for HMR, so only claim /ws and
+    // leave every other upgrade untouched for the owning listener.
+    if (url.pathname !== '/ws') return;
     wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request));
   };
   server.on('upgrade', onUpgrade);

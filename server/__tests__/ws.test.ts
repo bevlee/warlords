@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 import { openDb } from '../db.ts';
 import { RoomRegistry } from '../rooms.ts';
 import { attachWebSocketServer } from '../ws.ts';
@@ -90,6 +90,40 @@ async function hello(client: Client, token: string, lastSeq?: number) {
 }
 
 describe('/ws', () => {
+  it('leaves websocket upgrades for other paths to their owning service', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'warlords-ws-shared-'));
+    dirs.push(dir);
+    const db = openDb(join(dir, 'test.db'));
+    const rooms = new RoomRegistry(db);
+    const server = createServer((_req, res) => (res.statusCode = 404, res.end()));
+    const otherWss = new WebSocketServer({ noServer: true });
+    server.on('upgrade', (request, socket, head) => {
+      const url = new URL(request.url ?? '/', 'http://localhost');
+      if (url.pathname === '/hmr') {
+        otherWss.handleUpgrade(request, socket, head, ws => otherWss.emit('connection', ws, request));
+      }
+    });
+    const service = attachWebSocketServer(server, db, rooms, { heartbeatMs: 10_000 });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    cleanups.push(async () => {
+      await service.close();
+      for (const socket of otherWss.clients) socket.terminate();
+      await new Promise<void>(resolve => otherWss.close(() => resolve()));
+      await new Promise<void>(resolve => server.close(() => resolve()));
+      db.close();
+    });
+
+    const client = new WebSocket(`ws://127.0.0.1:${(server.address() as { port: number }).port}/hmr`);
+    await new Promise<void>((resolve, reject) => {
+      client.once('open', resolve);
+      client.once('error', reject);
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(client.readyState).toBe(WebSocket.OPEN);
+    client.close();
+  });
+
   it('authenticates two clients, creates/joins a room, and supersedes an older session', async () => {
     const app = await runtime();
     const host = new Client(app.url);
