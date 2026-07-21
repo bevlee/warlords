@@ -154,6 +154,22 @@ describe('/ws', () => {
     });
   });
 
+  it('rejects malformed messages at the transport boundary', async () => {
+    const app = await runtime();
+    const client = new Client(app.url);
+    await client.open();
+
+    client.socket.send('{not json');
+    expect(await client.waitFor(message => message.type === 'error')).toMatchObject({
+      type: 'error', code: 'bad_json',
+    });
+
+    client.socket.send(JSON.stringify({ type: 'room.join', code: 12345, loadout: {} }));
+    expect(await client.waitFor(message => message.type === 'error')).toMatchObject({
+      type: 'error', code: 'invalid_message',
+    });
+  });
+
   it('rejects malformed loadouts and canonicalizes client unit stats', async () => {
     const app = await runtime();
     const client = new Client(app.url);

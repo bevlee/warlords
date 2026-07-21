@@ -82,7 +82,7 @@ export class MultiplayerClient {
   }
 
   send(message: ClientMessage): boolean {
-    if (!this.socket || this.socket.readyState !== 1) return false;
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
     this.socket.send(JSON.stringify(message));
     return true;
   }
@@ -166,14 +166,16 @@ export class MultiplayerClient {
   }
 
   private readonly onVisibility = () => {
-    if (document.visibilityState !== 'visible' || this.stopped || this.socket?.readyState === 1) return;
+    if (document.visibilityState !== 'visible' || this.stopped || this.socket?.readyState === WebSocket.OPEN) return;
     if (this.reconnectTimer) this.clearTimer(this.reconnectTimer);
     this.reconnectTimer = null;
     this.connect();
   };
 
   private readonly heartbeat = () => {
-    if (this.statusValue !== 'connected' || !this.socket || this.socket.readyState !== 1) return;
+    // The browser API cannot send native WebSocket ping frames, so the client
+    // and server exchange protocol-level JSON ping/pong messages instead.
+    if (this.statusValue !== 'connected' || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     if (this.awaitingPong) {
       this.socket.close();
       return;

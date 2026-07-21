@@ -24,7 +24,6 @@
     <header class="mb-6 flex flex-wrap items-center gap-4">
       <h1 class="text-3xl font-bold">Battle history</h1>
       <a href="/" class="text-slate-400 hover:text-slate-200">← main game</a>
-      <a href="/coop" class="text-emerald-400 hover:text-emerald-300">Online co-op</a>
     </header>
 
     {#if loading}

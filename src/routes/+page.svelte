@@ -162,7 +162,6 @@
   <div class="mb-4 flex items-center gap-4">
     <h1 class="text-2xl font-bold">Warlords</h1>
     <a href="/gauntlet" class="text-lg text-amber-400 hover:text-amber-300">🏰 Gauntlet mode →</a>
-    <a href="/coop" class="text-lg text-emerald-400 hover:text-emerald-300">🤝 Online co-op →</a>
     <a href="/history" class="text-lg text-violet-400 hover:text-violet-300">🎬 Battle history →</a>
   </div>
   {#if screen === 'setup'}

@@ -86,9 +86,11 @@ visual campaign map (locked/available/completed nodes) between the
 faction picker and army setup, and server-persisted campaign progress
 alongside the hero record.
 
-Also done: **online co-op and combat history** — authenticated room codes,
-dual deployment, server-authoritative turns and AI, reconnect pauses, chat,
-SQLite journals, and engine-version-gated animated replays.
+Also done: **experimental online co-op and combat history** — authenticated
+room codes, dual deployment, server-authoritative turns and AI, reconnect
+pauses, chat, SQLite journals, and engine-version-gated animated replays.
+The standalone `/coop` route stays out of player navigation until gauntlet or
+events integration defines how shared battles affect both players' runs.
 
 1. **Long term** — deeper PvP/economy layers, accounts, and the deferred Demon
    Gate/Teleport/Haste abilities.

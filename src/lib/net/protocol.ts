@@ -42,13 +42,26 @@ export type ServerMessage =
   | { type: 'ping' }
   | { type: 'pong' };
 
-/** Small deterministic cross-runtime state hash used as a lockstep canary. */
+/** Small deterministic cross-runtime state hash used as a lockstep canary.
+ *  Object keys are sorted recursively so snapshots loaded from JSON hash the
+ *  same as incrementally-created states regardless of insertion order. */
 export function battleStateHash(state: BattleState): string {
-  const text = JSON.stringify(state);
+  const text = canonicalJson(state);
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     hash ^= text.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
 }

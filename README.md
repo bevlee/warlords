@@ -1,8 +1,8 @@
 # Warlords
 
 Warlords is a browser strategy game inspired by LordsWM and Heroes of Might and Magic. It includes
-deterministic tactical combat, six factions, a campaign, an endless gauntlet, two-player co-op
-against server-driven AI, persisted battle history, and animated replays.
+deterministic tactical combat, six factions, a campaign, an endless gauntlet, experimental
+two-player co-op against server-driven AI, persisted battle history, and animated replays.
 
 ## Local development
 
@@ -41,7 +41,9 @@ Battle history is available at `/history`. Replays re-simulate the journal throu
 engine and are enabled only when the recording's engine version matches the running build. History
 is capped at 200 safely-prunable battles per player.
 
-Co-op is a standalone skirmish: it does not mutate campaign or gauntlet saves.
+Co-op is an experimental standalone skirmish available directly at `/coop`; it is intentionally
+not linked from the player-facing navigation until it is integrated with gauntlet/events. It does
+not mutate campaign or gauntlet saves.
 
 ## Deployment
 

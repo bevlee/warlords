@@ -125,10 +125,14 @@
 
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
   <div class="mb-4 flex items-center gap-4">
-    <h1 class="text-2xl font-bold">Warlords — Online co-op</h1>
+    <h1 class="text-2xl font-bold">Warlords — Experimental co-op</h1>
     <a href="/" class="text-slate-400 hover:text-slate-200">← main game</a>
     <a href="/history" class="text-violet-400 hover:text-violet-300">Battle history</a>
   </div>
+
+  <p class="mx-auto mb-4 max-w-xl rounded border border-amber-700 bg-amber-950 p-3 text-amber-200">
+    Experimental standalone skirmish. This mode is available by direct URL for testing and does not affect campaign or gauntlet progress.
+  </p>
 
   {#if error}<p class="mx-auto mb-4 max-w-xl rounded border border-red-700 bg-red-950 p-3 text-red-200">{error}</p>{/if}
   {#if connectionStatus === 'lost'}
