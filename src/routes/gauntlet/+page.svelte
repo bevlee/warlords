@@ -50,19 +50,35 @@
   const DEBUG_ATTACK = 99;
   let debugBoost = $state(false);
 
+  let loadError = $state(false);
+
   onMount(async () => {
-    const saved = await loadRun<RunState>();
-    // Saves from before the items feature lack these fields.
-    run = saved
-      ? {
-          ...saved,
-          items: saved.items ?? [],
-          pendingItems: saved.pendingItems ?? null,
-          unitSkills: migrateUnitSkills(saved.unitSkills ?? {}),
-          pendingSkills: saved.pendingSkills ?? null,
-        }
-      : null;
-    loaded = true;
+    try {
+      // Race the save fetch against a ceiling so a hung/unreachable service
+      // can't leave the page pinned on "Loading…" forever.
+      const saved = await Promise.race([
+        loadRun<RunState>(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('load timed out')), 15000)),
+      ]);
+      // Saves from before the items feature lack these fields.
+      run = saved
+        ? {
+            ...saved,
+            items: saved.items ?? [],
+            pendingItems: saved.pendingItems ?? null,
+            unitSkills: migrateUnitSkills(saved.unitSkills ?? {}),
+            pendingSkills: saved.pendingSkills ?? null,
+          }
+        : null;
+    } catch (err) {
+      // A save-service hiccup must not wedge the page on "Loading…" forever.
+      // Surface a retry instead of an infinite spinner; the run is untouched
+      // on the server, so a reload picks it back up once the service recovers.
+      console.error('Failed to load gauntlet run', err);
+      loadError = true;
+    } finally {
+      loaded = true;
+    }
   });
 
   function begin(faction: FactionClass) {
@@ -154,6 +170,20 @@
 
   {#if !loaded}
     <p class="text-slate-400">Loading…</p>
+  {:else if loadError}
+    <div class="mx-auto mt-10 max-w-md rounded-lg border border-slate-700 bg-slate-800/60 p-6 text-center">
+      <p class="text-lg font-semibold text-red-300">Couldn't reach your saved run</p>
+      <p class="mt-2 text-sm text-slate-400">
+        The save service didn't respond. Your run is safe on the server — try again in a moment.
+      </p>
+      <button
+        type="button"
+        class="mt-5 rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
+        onclick={() => location.reload()}
+      >
+        Retry
+      </button>
+    </div>
   {:else if !run}
     <!-- Run setup: pick a faction -->
     <div class="mx-auto max-w-5xl">
