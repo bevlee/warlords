@@ -1,35 +1,66 @@
 <script lang="ts">
   import { FACTION_UNITS, FACTION_INFO } from '$lib/engine/factions';
   import { UNIT_COSTS, MAX_STACKS, armyCost } from '$lib/engine/recruit';
-  import { xpToReach } from '$lib/engine/progression';
+  import { xpToReach, maxRecruitTier } from '$lib/engine/progression';
   import { maxMana } from '$lib/engine/factionSkills';
   import { abilityInfo } from './abilities';
   import Sprite from './Sprite.svelte';
+  import type { SavedArmy } from '$lib/storage';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
   interface Props {
     hero: Hero;
     budget: number;
     lastBattle: { xp: number; levels: number } | null;
+    initialCounts?: SavedArmy | null;
     onstart: (army: ArmySlot[]) => void;
     onreset: () => void;
     onclass: (cls: FactionClass) => void;
+    onclear?: () => void;
   }
 
-  let { hero, budget, lastBattle, onstart, onreset, onclass }: Props = $props();
+  let { hero, budget, lastBattle, initialCounts = null, onstart, onreset, onclass, onclear }: Props = $props();
 
   const xpFloor = $derived(xpToReach(hero.level));
   const xpCeil = $derived(xpToReach(hero.level + 1));
   const xpPct = $derived(Math.round(((hero.xp - xpFloor) / (xpCeil - xpFloor)) * 100));
 
   const units = $derived(FACTION_UNITS[hero.class]);
+  const maxTier = $derived(maxRecruitTier(hero.level));
 
-  let counts: Record<string, number> = $state({});
+  // Seed from the saved selection, dropping anything the hero can no longer
+  // field: units from another faction, locked tiers, counts beyond the budget.
+  function seedCounts(): Record<string, number> {
+    const seeded = Object.fromEntries(units.map(u => [u.name, 0]));
+    if (!initialCounts) return seeded;
+    let left = budget;
+    for (const u of units) {
+      if (u.tier > maxTier) continue;
+      const n = Math.min(initialCounts[u.name] ?? 0, Math.floor(left / UNIT_COSTS[u.name]));
+      if (n > 0) {
+        seeded[u.name] = n;
+        left -= n * UNIT_COSTS[u.name];
+      }
+    }
+    return seeded;
+  }
+
+  let counts: Record<string, number> = $state(seedCounts());
 
   // Switching faction shows a different roster, so any prior picks no longer apply.
+  // svelte-ignore state_referenced_locally -- the initial class is the baseline for change detection
+  let prevClass = hero.class;
   $effect(() => {
-    counts = Object.fromEntries(units.map(u => [u.name, 0]));
+    if (hero.class !== prevClass) {
+      prevClass = hero.class;
+      counts = Object.fromEntries(units.map(u => [u.name, 0]));
+    }
   });
+
+  function clearAll() {
+    counts = Object.fromEntries(units.map(u => [u.name, 0]));
+    onclear?.();
+  }
 
   const slots = $derived(
     units.filter(u => counts[u.name] > 0).map(u => ({ unit: u, count: counts[u.name] }))
@@ -41,7 +72,13 @@
     return Math.floor(goldLeft / UNIT_COSTS[name]);
   }
 
+  function isLocked(tier: number): boolean {
+    return tier > maxTier;
+  }
+
   function canAdd(name: string): boolean {
+    const unit = units.find(u => u.name === name);
+    if (!unit || isLocked(unit.tier)) return false;
     if (UNIT_COSTS[name] > goldLeft) return false;
     return counts[name] > 0 || slots.length < MAX_STACKS;
   }
@@ -110,31 +147,56 @@
 
   <div class="mb-4 flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-4 py-3">
     <div class="flex items-center gap-6">
-      <span class="text-lg font-semibold text-amber-300">🪙 {goldLeft} <span class="text-sm font-normal text-slate-400">/ {budget} gold</span></span>
+      <span
+        class="text-lg font-semibold text-amber-300"
+        title={hero.gold ? `${budget - hero.gold} level budget + ${hero.gold} gold won` : undefined}
+      >
+        🪙 {goldLeft}
+        <span class="text-sm font-normal text-slate-400">/ {budget} gold</span>
+        {#if hero.gold}
+          <span class="text-sm font-normal text-emerald-400">(+{hero.gold} won)</span>
+        {/if}
+      </span>
       <span class="text-sm text-slate-300">{slots.length} / {MAX_STACKS} stacks</span>
     </div>
-    <button
-      type="button"
-      class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500
-        disabled:cursor-not-allowed disabled:opacity-40"
-      disabled={slots.length === 0}
-      onclick={() => onstart(slots)}
-    >
-      Start battle ⚔️
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="rounded px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-slate-200
+          disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={slots.length === 0}
+        onclick={clearAll}
+      >
+        Clear
+      </button>
+      <button
+        type="button"
+        class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500
+          disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={slots.length === 0}
+        onclick={() => onstart(slots)}
+      >
+        Start battle ⚔️
+      </button>
+    </div>
   </div>
 
   <div class="overflow-hidden rounded-lg border border-slate-700">
     {#each units as unit (unit.name)}
       {@const n = counts[unit.name]}
+      {@const locked = isLocked(unit.tier)}
       <div
         class="flex items-center gap-3 border-b border-slate-700/60 bg-slate-800 px-4 py-2 last:border-b-0
-          {n > 0 ? 'bg-slate-700/60' : ''}"
+          {n > 0 ? 'bg-slate-700/60' : ''} {locked ? 'opacity-50' : ''}"
       >
-        <Sprite name={unit.name} class="h-11 w-9 shrink-0" />
+        <Sprite name={unit.name} class="h-11 w-9 shrink-0 {locked ? 'grayscale' : ''}" />
         <div class="w-32">
           <p class="text-sm font-semibold text-slate-100">{unit.name}</p>
-          <p class="font-mono text-[10px] text-amber-300">🪙 {UNIT_COSTS[unit.name]} each</p>
+          {#if locked}
+            <p class="font-mono text-[10px] text-slate-400">🔒 Unlocks at level {unit.tier - 1}</p>
+          {:else}
+            <p class="font-mono text-[10px] text-amber-300">🪙 {UNIT_COSTS[unit.name]} each</p>
+          {/if}
         </div>
         <div class="flex-1">
           <p class="font-mono text-[11px] leading-tight text-slate-400">
@@ -153,6 +215,9 @@
             </div>
           {/if}
         </div>
+        {#if locked}
+          <span class="pr-1 text-lg" aria-label="{unit.name} locked">🔒</span>
+        {:else}
         <div class="flex items-center gap-1">
           <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
             disabled={n === 0} onclick={() => remove(unit.name, 5)} aria-label="remove 5 {unit.name}">‹5</button>
@@ -164,6 +229,7 @@
           <button type="button" class="h-7 w-7 rounded bg-slate-600 text-slate-100 hover:bg-slate-500 disabled:opacity-30"
             disabled={!canAdd(unit.name)} onclick={() => add(unit.name, 5)} aria-label="add 5 {unit.name}">5›</button>
         </div>
+        {/if}
       </div>
     {/each}
   </div>

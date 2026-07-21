@@ -15,6 +15,22 @@ export async function resetHero(): Promise<void> {
   await deleteSave('hero');
 }
 
+/** Last army the player fielded, as unit name → count. Names only: unit stats
+ *  always come from the current roster, never from a stale save. */
+export type SavedArmy = Record<string, number>;
+
+export async function loadArmy(): Promise<SavedArmy | null> {
+  return getSave<SavedArmy>('army');
+}
+
+export async function saveArmy(counts: SavedArmy): Promise<void> {
+  await putSave('army', counts);
+}
+
+export async function clearArmy(): Promise<void> {
+  await deleteSave('army');
+}
+
 export async function loadRun<T>(): Promise<T | null> {
   return getSave<T>('gauntletRun');
 }

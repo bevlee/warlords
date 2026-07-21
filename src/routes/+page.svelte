@@ -4,11 +4,11 @@
   import ArmySetup from '$lib/ui/ArmySetup.svelte';
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
   import { generateEnemyArmy, armyCost } from '$lib/engine/recruit';
-  import { budgetForLevel, applyXp } from '$lib/engine/progression';
+  import { recruitBudget, maxRecruitTier, applyVictory } from '$lib/engine/progression';
   import { updateFactionSkills, necromancyBonusSkeletons } from '$lib/engine/factionSkills';
   import { SKELETON } from '$lib/engine/necromancer';
   import { mulberry32 } from '$lib/engine/rng';
-  import { loadHero, saveHero, resetHero } from '$lib/storage';
+  import { loadHero, saveHero, resetHero, loadArmy, saveArmy, clearArmy, type SavedArmy } from '$lib/storage';
   import {
     loadCampaign,
     saveCampaign,
@@ -21,7 +21,7 @@
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
   const DEFAULT_HERO: Hero = updateFactionSkills({
-    class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [],
+    class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [], gold: 0,
   });
 
   let hero: Hero = $state({ ...DEFAULT_HERO });
@@ -33,15 +33,17 @@
   let lastOutcome: 'player_wins' | 'enemy_wins' | null = $state(null);
   let playerArmy: ArmySlot[] = $state([]);
   let enemyArmy: ArmySlot[] = $state([]);
+  let savedCounts: SavedArmy | null = $state(null);
   let battleKey = $state(0);
 
-  const budget = $derived(budgetForLevel(hero.level));
+  const budget = $derived(recruitBudget(hero));
 
   onMount(async () => {
     const saved = await loadHero();
-    // Migrate heroes persisted before faction skills existed.
+    // Migrate heroes persisted before faction skills / gold existed.
     if (saved) {
-      hero = updateFactionSkills({ ...saved, factionSkills: saved.factionSkills ?? [] });
+      hero = updateFactionSkills({ ...saved, factionSkills: saved.factionSkills ?? [], gold: saved.gold ?? 0 });
+      savedCounts = await loadArmy();
       // Returning player: resume (or backfill) their campaign and skip straight to the map.
       campaign = (await loadCampaign()) ?? newCampaign();
       void saveCampaign(campaign);
@@ -55,6 +57,9 @@
   }
 
   function startBattle(army: ArmySlot[]) {
+    // Remember the picks so the next setup screen starts from them.
+    savedCounts = Object.fromEntries(army.map(s => [s.unit.name, s.count]));
+    void saveArmy(savedCounts);
     playerArmy = hero.bonusSkeletons
       ? [...army, { unit: SKELETON, count: hero.bonusSkeletons }]
       : army;
@@ -64,7 +69,7 @@
     }
     enemyArmy = activeEncounter
       ? generateCampaignArmy(activeEncounter, hero.level)
-      : generateEnemyArmy(budget, mulberry32(Date.now() % 2 ** 31));
+      : generateEnemyArmy(budget, mulberry32(Date.now() % 2 ** 31), maxRecruitTier(hero.level));
     battleKey += 1;
     lastBattle = null;
     lastReward = null;
@@ -76,7 +81,7 @@
     lastOutcome = result;
     if (result === 'player_wins') {
       const gained = activeEncounter ? activeEncounter.xpReward : armyCost(enemyArmy);
-      const { hero: next, levels } = applyXp(hero, gained);
+      const { hero: next, levels } = applyVictory(hero, gained, activeEncounter?.goldReward ?? 0);
       const bonusSkeletons = (hero.bonusSkeletons ?? 0) + necromancyBonusSkeletons(hero, enemyArmy);
       hero = updateFactionSkills({ ...next, bonusSkeletons });
       lastBattle = { xp: gained, levels };
@@ -135,9 +140,16 @@
     lastOutcome = null;
     campaign = null;
     activeEncounter = null;
+    savedCounts = null;
     screen = 'setup';
     await resetHero();
     await resetCampaign();
+    await clearArmy();
+  }
+
+  function handleArmyClear() {
+    savedCounts = null;
+    void clearArmy();
   }
 
   function backToSetup() {
@@ -154,7 +166,7 @@
     <a href="/history" class="text-lg text-violet-400 hover:text-violet-300">🎬 Battle history →</a>
   </div>
   {#if screen === 'setup'}
-    <ArmySetup {hero} {budget} {lastBattle} onstart={startBattle} onreset={handleReset} onclass={handleClass} />
+    <ArmySetup {hero} {budget} {lastBattle} initialCounts={savedCounts} onstart={startBattle} onreset={handleReset} onclass={handleClass} onclear={handleArmyClear} />
   {:else if screen === 'campaign' && campaign}
     <CampaignMap {hero} {campaign} onselect={selectEncounter} onback={backToSetup} />
   {:else if screen === 'result'}

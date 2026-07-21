@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3';
 import { ENGINE_VERSION } from '../src/lib/engine/version.ts';
 import { pruneBattleHistory } from './retention.ts';
 
-const SLOTS = new Set(['hero', 'campaign', 'gauntletRun']);
+const SLOTS = new Set(['hero', 'army', 'campaign', 'gauntletRun']);
 const MAX_BODY = 256 * 1024;
 const ACTION_TYPES = new Set(['move', 'attack', 'shoot', 'defend', 'cast', 'wait']);
 

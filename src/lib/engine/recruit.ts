@@ -70,13 +70,15 @@ export function armyCost(slots: ArmySlot[]): number {
  * Seeded enemy roster: 3–5 stack picks spending random shares of the budget,
  * then a goblin top-up so at least ~70% of the gold is always fielded.
  * Duplicate picks merge, so the result stays within MAX_STACKS.
+ * `maxTier` mirrors the player's own recruiting cap so practice fights stay fair.
  */
-export function generateEnemyArmy(budget: number, rng: Rng): ArmySlot[] {
+export function generateEnemyArmy(budget: number, rng: Rng, maxTier = 7): ArmySlot[] {
+  const roster = BARBARIAN_UNITS.filter(u => u.tier <= maxTier);
   const slots: ArmySlot[] = [];
   let remaining = budget;
 
   const addTo = (name: string, count: number) => {
-    const unit = BARBARIAN_UNITS.find(u => u.name === name)!;
+    const unit = roster.find(u => u.name === name)!;
     const existing = slots.find(s => s.unit.name === name);
     if (existing) existing.count += count;
     else slots.push({ unit, count });
@@ -85,7 +87,7 @@ export function generateEnemyArmy(budget: number, rng: Rng): ArmySlot[] {
 
   const picks = 3 + Math.floor(rng() * 3); // 3–5
   for (let i = 0; i < picks; i++) {
-    const affordable = BARBARIAN_UNITS.filter(u => UNIT_COSTS[u.name] <= remaining);
+    const affordable = roster.filter(u => UNIT_COSTS[u.name] <= remaining);
     if (affordable.length === 0) break;
     const unit = affordable[Math.floor(rng() * affordable.length)];
     const cost = UNIT_COSTS[unit.name];

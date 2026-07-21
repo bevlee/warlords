@@ -107,6 +107,19 @@ describe('api', () => {
     expect(other.status).toBe(404);
   });
 
+  it('round-trips the persisted army selection', async () => {
+    const { token } = await mintSession();
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const army = { Goblin: 12, Ogre: 3 };
+
+    expect((await fetch(`${base}/api/save/army`, {
+      method: 'PUT', headers: auth, body: JSON.stringify(army),
+    })).status).toBe(204);
+    const saved = await fetch(`${base}/api/save/army`, { headers: auth });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual(army);
+  });
+
   it('rejects missing or bad tokens', async () => {
     expect((await fetch(`${base}/api/save/hero`)).status).toBe(401);
     const bad = await fetch(`${base}/api/save/hero`, {

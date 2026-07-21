@@ -5,7 +5,7 @@ CREATE TABLE players (
 );
 
 -- Same key/value shape the idb layer used, but per-player and typed by slot.
--- slot: 'hero' | 'campaign' | 'gauntletRun'
+-- slot: 'hero' | 'army' | 'campaign' | 'gauntletRun'
 CREATE TABLE saves (
   player_id  TEXT NOT NULL REFERENCES players(id),
   slot       TEXT NOT NULL,
