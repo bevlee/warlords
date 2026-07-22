@@ -5,6 +5,7 @@
   import { maxMana } from '$lib/engine/factionSkills';
   import { abilityInfo } from './abilities';
   import Sprite from './Sprite.svelte';
+  import { heroSpriteName } from './sprites';
   import type { SavedArmy } from '$lib/storage';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
@@ -99,7 +100,7 @@
     aria-label="Hero — level {hero.level}, {hero.xp} XP"
   >
     <div class="flex items-center gap-3">
-      <Sprite name="Hero" class="h-12 w-10" />
+      <Sprite name={heroSpriteName(hero.class)} class="h-12 w-10" />
       <div>
         <p class="text-sm font-semibold text-amber-200">
           Level {hero.level} {FACTION_INFO[hero.class].name}

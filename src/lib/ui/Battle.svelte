@@ -31,6 +31,7 @@
   import ArtifactStrip from './ArtifactStrip.svelte';
   import type { ItemId } from '$lib/gauntlet/items';
   import Sprite from './Sprite.svelte';
+  import { heroSpriteName } from './sprites';
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
@@ -672,7 +673,7 @@
           type="button"
           class="hero-standee relative flex w-20 shrink-0 flex-col items-center justify-end self-center pb-2 transition
             {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
-          aria-label="Hero — level {hero.level}"
+          aria-label="Hero — level {deployHero.level}"
           onmouseenter={() => (hovered = heroUnit)}
           onmouseleave={() => (hovered = null)}
           oncontextmenu={e => {
@@ -684,7 +685,7 @@
           {#if heroUnit.id === battle.currentUnitId}
             <span class="hero-arc" aria-hidden="true"></span>
           {/if}
-          <Sprite name="Hero" class="relative h-24 w-20" />
+          <Sprite name={heroSpriteName(deployHero.class)} class="relative h-24 w-20" />
         </button>
       {/if}
       <div class="min-w-0 flex-1">

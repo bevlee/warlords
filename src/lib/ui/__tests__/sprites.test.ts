@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { unitSlug, sheetFor, POSE_ROW, POSES, FRAMES } from '../sprites';
-import { FACTION_UNITS } from '$lib/engine/factions';
+import { unitSlug, sheetFor, heroSpriteName, POSE_ROW, POSES, FRAMES } from '../sprites';
+import { FACTION_INFO, FACTION_UNITS } from '$lib/engine/factions';
 
 describe('unitSlug', () => {
   it('lowercases and dashes multi-word names', () => {
@@ -20,8 +20,16 @@ describe('sheetFor', () => {
   });
 
   it('resolves the non-roster battlefield sprites', () => {
-    expect(sheetFor('Hero')).toBeTruthy();
     expect(sheetFor('Rock')).toBeTruthy();
+  });
+
+  it('resolves a distinct hero spritesheet for every faction', () => {
+    const heroSheets = Object.keys(FACTION_INFO).map((faction) =>
+      sheetFor(heroSpriteName(faction as keyof typeof FACTION_INFO))
+    );
+
+    expect(heroSheets.every(Boolean)).toBe(true);
+    expect(new Set(heroSheets).size).toBe(Object.keys(FACTION_INFO).length);
   });
 
   it('returns undefined for unknown names', () => {

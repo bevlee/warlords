@@ -1,6 +1,8 @@
 // Spritesheet lookup for unit standees. Sheets live in src/lib/assets/units/
 // as <slug>.png — 4 frames per row, one row per pose.
 
+import type { FactionClass } from '$lib/engine/types';
+
 export const POSES = ['idle', 'attack', 'hit', 'death'] as const;
 export type Pose = (typeof POSES)[number];
 
@@ -18,6 +20,11 @@ const sheets = import.meta.glob('../assets/units/*.png', {
 
 export function unitSlug(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-');
+}
+
+/** Stable sprite lookup name for a faction's hero sheet. */
+export function heroSpriteName(faction: FactionClass): string {
+  return `Hero ${faction}`;
 }
 
 const bySlug = new Map(

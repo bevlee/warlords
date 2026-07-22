@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Battle from '$lib/ui/Battle.svelte';
   import Sprite from '$lib/ui/Sprite.svelte';
+  import { heroSpriteName } from '$lib/ui/sprites';
   import { FACTION_INFO, FACTION_UNITS } from '$lib/engine/factions';
   import { armyCost } from '$lib/engine/recruit';
   import { ITEMS, itemBonuses, itemEffectText, type ItemId } from '$lib/gauntlet/items';
@@ -195,14 +196,13 @@
       </p>
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {#each Object.entries(FACTION_INFO) as [id, info] (id)}
-          {@const t7 = FACTION_UNITS[id as FactionClass].find(u => u.tier === 7)!}
           <button
             type="button"
             class="flex flex-col items-center gap-3 rounded-xl border-2 border-slate-700 bg-slate-800 p-7
               text-center transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-slate-700"
             onclick={() => begin(id as FactionClass)}
           >
-            <Sprite name={t7.name} class="h-28 w-24" />
+            <Sprite name={heroSpriteName(id as FactionClass)} animate class="h-28 w-24" />
             <span class="text-xl font-bold text-amber-200">{info.name}</span>
             <span class="text-sm leading-snug text-slate-400">{info.description}</span>
           </button>

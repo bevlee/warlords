@@ -1,6 +1,7 @@
 <script lang="ts">
   import { FACTION_INFO } from '$lib/engine/factions';
   import Sprite from './Sprite.svelte';
+  import { heroSpriteName } from './sprites';
   import { encountersInChapter, nodeStatus, totalChapters, type CampaignState, type NodeStatus } from '$lib/campaign/campaignStore';
   import { CHAPTER_TITLES, type Encounter } from '$lib/campaign/encounters';
   import type { Hero } from '$lib/engine/types';
@@ -26,7 +27,7 @@
 <div class="mx-auto max-w-4xl">
   <div class="mb-4 flex items-center justify-between gap-4 rounded-lg border border-slate-700 bg-slate-800 px-4 py-3">
     <div class="flex items-center gap-3">
-      <Sprite name="Hero" class="h-12 w-10" />
+      <Sprite name={heroSpriteName(hero.class)} class="h-12 w-10" />
       <div>
         <p class="text-sm font-semibold text-amber-200">Level {hero.level} {FACTION_INFO[hero.class].name}</p>
         <p class="text-xs text-slate-400">
