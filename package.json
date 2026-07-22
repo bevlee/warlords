@@ -13,7 +13,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.server.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"start": "node --experimental-strip-types server/index.ts"
+		"start": "node --experimental-transform-types server/index.ts"
 	},
 	"devDependencies": {
 		"@sveltejs/kit": "^2.63.0",

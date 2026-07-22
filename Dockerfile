@@ -28,5 +28,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
 EXPOSE 3000
-# Node 26 strips types natively; server/ runs without a build step.
-CMD ["node", "server/index.ts"]
+# Run the .ts sources directly, no build step. transform-types (not plain
+# strip-only) because server/ and the shared src/lib code use TS syntax that
+# needs real transformation — e.g. constructor parameter properties, which
+# strip-only rejects with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX.
+CMD ["node", "--experimental-transform-types", "server/index.ts"]
