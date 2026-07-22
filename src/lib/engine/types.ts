@@ -26,6 +26,7 @@ export interface UnitStack {
   id: string;
   definition: UnitDef;
   count: number;
+  startCount: number;  // count at battle start; resurrection (life_drain) ceiling
   hp: number;          // HP of the top creature only
   pos: Pos;
   side: 'player' | 'enemy';

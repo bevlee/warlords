@@ -14,6 +14,7 @@ function makeStack(
     id: `${side}-${def.name}-${pos.col}-${pos.row}`,
     definition: def,
     count: 5,
+    startCount: 5,
     hp: def.hp,
     pos,
     side,

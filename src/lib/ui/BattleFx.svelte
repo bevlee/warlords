@@ -102,6 +102,13 @@
         {/if}
       {:else if step.kind === 'buff'}
         <span class="fx-text fx-buff" class:fx-delayed={step.delayed}>+{step.value} {step.label}</span>
+      {:else if step.kind === 'heal'}
+        {#if step.revived > 0}
+          <span class="fx-text fx-revive">+{step.revived} 🩸</span>
+        {/if}
+        {#if step.topHp > 0}
+          <span class="fx-text fx-heal-hp" class:fx-below={step.revived > 0}>+{step.topHp}</span>
+        {/if}
       {:else if step.kind === 'status'}
         <span class="fx-text fx-status">{step.icon}</span>
       {/if}
@@ -140,6 +147,20 @@
 
   .fx-buff {
     color: #4ade80;
+  }
+
+  /* Lifesteal floaters: green for revived creatures (stack increase), red for
+     the lead creature's partial HP gain. When both show, the HP sits below. */
+  .fx-revive {
+    color: #4ade80;
+  }
+  .fx-heal-hp {
+    color: #f87171;
+  }
+  .fx-heal-hp.fx-below {
+    top: 55%;
+    animation-delay: var(--kill-lag-ms, 150ms);
+    animation-fill-mode: backwards;
   }
 
   .fx-status {

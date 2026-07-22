@@ -22,6 +22,7 @@ function makeStack(overrides: Partial<UnitStack>): UnitStack {
     id: 'test-' + Math.random(),
     definition: GOBLIN,
     count: 10,
+    startCount: 10,
     hp: GOBLIN.hp,
     pos: { col: 0, row: 0 },
     side: 'player',

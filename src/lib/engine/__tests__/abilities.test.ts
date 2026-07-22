@@ -11,6 +11,7 @@ function makeStack(overrides: Partial<UnitStack>): UnitStack {
     id: 'test-' + Math.random(),
     definition: GOBLIN,
     count: 10,
+    startCount: 10,
     hp: GOBLIN.hp,
     pos: { col: 0, row: 0 },
     side: 'player',
@@ -282,7 +283,31 @@ describe('leveled lifesteal', () => {
     const ev = next.log.find(e => e.type === 'status' && e.data.effect === 'life_drain');
     const atk = next.log.find(e => e.type === 'attack');
     expect(ev).toBeTruthy();
-    // heal = round(damage × 0.5 / count)
-    expect(ev!.data.heal).toBe(Math.round((atk!.data.damage as number) * 0.5 / 2));
+    // heal = round(damage × 0.5) for the whole stack (not divided by count)
+    expect(ev!.data.heal).toBe(Math.round((atk!.data.damage as number) * 0.5));
+  });
+
+  it('revives fallen creatures up to the starting stack count', () => {
+    // 100% lifesteal, big single-hit damage. Starts at 2 creatures; knock it
+    // down to 1 wounded creature, then a hit that heals more than one
+    // creature's worth revives the fallen one.
+    const VAMP: UnitDef = { ...GOBLIN, name: 'Vamp', hp: 30, attack: 0, minDamage: 60, maxDamage: 60, abilities: ['life_drain'], abilityLevels: { life_drain: 10 } };
+    let s = initBattle([{ unit: VAMP, count: 2 }], [{ unit: { ...GOBLIN, name: 'Tank', hp: 500, defense: 0, minDamage: 0, maxDamage: 0 }, count: 1 }], hero2, 7);
+    for (let i = 0; i < 40 && s.units.find(u => u.id === s.currentUnitId)?.definition.name !== 'Vamp'; i++) {
+      s = applyAction(s, { type: 'wait' });
+    }
+    const enemy = s.units.find(u => u.side === 'enemy')!;
+    // Knock the vamp down to a single wounded creature (count 1, hp 5).
+    s = { ...s, units: s.units.map(u => (u.definition.name === 'Vamp' ? { ...u, count: 1, hp: 5 } : u)) };
+    const adj = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1]]
+      .map(([dc, dr]) => ({ col: enemy.pos.col + dc, row: enemy.pos.row + dr }))
+      .find(p => p.row >= 0 && p.row < s.grid.height && !s.grid.cells[p.row][p.col].blocked && !s.grid.cells[p.row][p.col].occupantId)!;
+    const next = applyAction(s, { type: 'attack', targetId: enemy.id, moveTo: adj });
+    const vamp = next.units.find(u => u.definition.name === 'Vamp')!;
+    // Damage 60 at 100% lifesteal fills the wounded creature (5->30) and
+    // revives the second, but never past startCount = 2.
+    expect(vamp.count).toBe(2);
+    const ev = next.log.find(e => e.type === 'status' && e.data.effect === 'life_drain');
+    expect(ev!.data.revived).toBe(1);
   });
 });

@@ -133,6 +133,7 @@
       id: `draft-${unit.name}`,
       definition: unit,
       count,
+      startCount: count,
       hp: unit.hp,
       pos: { col: 0, row: 0 },
       side: 'player',

@@ -16,6 +16,9 @@ const STATUS_ICON: Partial<Record<string, string>> = {
 export type AnimStep =
   | { unitId: string; kind: 'damage'; value: number; delayed?: boolean; kills?: number }
   | { unitId: string; kind: 'buff'; value: number; label: string; delayed?: boolean }
+  // Lifesteal floater: `revived` creatures brought back (green +N) and `topHp`
+  // the lead creature's partial health gain (red +M). Either can be 0.
+  | { unitId: string; kind: 'heal'; topHp: number; revived: number }
   | { unitId: string; kind: 'death' }
   | { unitId: string; kind: 'status'; icon: string }
   | { unitId: string; kind: 'move'; from: Pos; to: Pos }
@@ -95,7 +98,13 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
     case 'status': {
       const { unitId, effect } = entry.data as { unitId: string; effect: string };
       const icon = STATUS_ICON[effect];
-      return icon ? [{ unitId, kind: 'status', icon }] : [];
+      const base: AnimStep[] = icon ? [{ unitId, kind: 'status', icon }] : [];
+      // Lifesteal also floats the numbers: green revived count + red partial HP.
+      if (effect === 'life_drain') {
+        const { revived = 0, topHp = 0 } = entry.data as { revived?: number; topHp?: number };
+        if (revived > 0 || topHp > 0) base.push({ unitId, kind: 'heal', revived, topHp });
+      }
+      return base;
     }
     // Morale resolves after the stack's turn, so these arrive as their own log
     // entry and animate on their own beat — no extra sequencing needed.

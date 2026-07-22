@@ -131,6 +131,36 @@ export function applyDamage(defender: UnitStack, damage: number): DamageResult {
   };
 }
 
+export interface HealResult {
+  stack: UnitStack;
+  healed: number;   // HP actually restored (after clamping to startCount)
+  revived: number;  // creatures brought back (newCount - oldCount)
+}
+
+/**
+ * Heal a stack's HP pool as the mirror of applyDamage: fill the top creature,
+ * then revive whole creatures below it, never past the count the stack started
+ * the battle with (startCount). `heal` is the requested amount; the returned
+ * `healed` is what was actually restored after clamping.
+ */
+export function applyHeal(stack: UnitStack, heal: number): HealResult {
+  if (stack.count <= 0 || heal <= 0) return { stack, healed: 0, revived: 0 };
+
+  const fullHp = stack.definition.hp;
+  const currentTotal = (stack.count - 1) * fullHp + stack.hp;
+  const maxTotal = stack.startCount * fullHp;
+  const newTotal = Math.min(maxTotal, currentTotal + heal);
+
+  const newCount = Math.min(stack.startCount, Math.ceil(newTotal / fullHp));
+  const newHp = newTotal - (newCount - 1) * fullHp;
+
+  return {
+    stack: { ...stack, count: newCount, hp: newHp },
+    healed: newTotal - currentTotal,
+    revived: newCount - stack.count,
+  };
+}
+
 /**
  * Whether `defender` can retaliate against `attacker`'s hit.
  * Two independent abilities gate this: the defender's own `no_retaliation`
