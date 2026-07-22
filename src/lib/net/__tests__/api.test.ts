@@ -73,6 +73,23 @@ describe('client api', () => {
     expect(await getSave('hero')).toBeNull();
   });
 
+  it('re-mints and retries when the stored token is rejected (401)', async () => {
+    // A stale token from a DB the server no longer knows about (e.g. the dev
+    // db was reset). The client must self-heal rather than 401 forever.
+    store.set('warlords.session', JSON.stringify({ playerId: 'ghost', token: 'stale-token-not-in-db' }));
+    _resetForTests(base, [10, 20, 40]); // module reads the stale token from localStorage
+
+    expect(await getSave('hero')).toBeNull(); // recovers to a fresh session, no save yet
+
+    const stored = JSON.parse(store.get('warlords.session')!);
+    expect(stored.token).not.toBe('stale-token-not-in-db'); // stale token replaced
+    expect(stored.playerId).toBeTruthy();
+
+    // The healed session works for writes too.
+    await putSave('hero', { class: 'wizard', level: 3 });
+    expect(await getSave('hero')).toEqual({ class: 'wizard', level: 3 });
+  });
+
   it('retries on 5xx and then succeeds', async () => {
     let calls = 0;
     const flaky = createServer((req, res) => {

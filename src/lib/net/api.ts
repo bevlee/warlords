@@ -87,25 +87,42 @@ async function initSession(): Promise<Session> {
   return session;
 }
 
+/** Drop the current session so the next authed call mints a fresh one. Used
+ *  when the server rejects our token (401) — e.g. the dev db was reset, leaving
+ *  a stale token in localStorage. */
+function resetSession(): void {
+  current = null;
+  sessionPromise = null;
+  localStorage.removeItem(SESSION_KEY);
+}
+
 /** fetch with the session token and a retry ladder for network errors and 5xx.
  *  All our calls are idempotent (battle uploads carry an idempotency key;
  *  session retries mint a fresh row and only the last token is retained), so
- *  blanket retry is safe.
+ *  blanket retry is safe. A 401 means our token is stale (server doesn't know
+ *  it): drop the session, mint a fresh one, and retry the request once.
  *  Returns the last response rather than throwing on persistent 5xx. */
 export async function fetchWithRetry(
   path: string,
   init: RequestInit = {},
   auth = true
 ): Promise<Response> {
-  const headers = new Headers(init.headers);
-  if (auth) {
-    const { token } = current ?? (await getSession());
-    headers.set('Authorization', `Bearer ${token}`);
-  }
   let lastError: unknown;
+  let reauthed = false;
   for (let attempt = 0; ; attempt++) {
+    // Rebuilt each attempt so a re-minted session's token is picked up.
+    const headers = new Headers(init.headers);
+    if (auth) {
+      const { token } = current ?? (await getSession());
+      headers.set('Authorization', `Bearer ${token}`);
+    }
     try {
       const res = await fetch(baseUrl + path, { ...init, headers });
+      if (res.status === 401 && auth && !reauthed) {
+        reauthed = true;
+        resetSession();
+        continue; // retry immediately with a fresh session
+      }
       if (res.status < 500 || attempt >= retryDelays.length) return res;
     } catch (err) {
       lastError = err;
