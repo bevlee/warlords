@@ -55,6 +55,12 @@ export function chebyshevDistance(a: Pos, b: Pos): number {
   return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row));
 }
 
+/** Number of cardinal tile steps between two cells, matching getNeighbours
+ * and normal battlefield movement geometry. */
+export function manhattanDistance(a: Pos, b: Pos): number {
+  return Math.abs(a.col - b.col) + Math.abs(a.row - b.row);
+}
+
 export function isInRange(from: Pos, to: Pos, range: number): boolean {
   return chebyshevDistance(from, to) <= range;
 }

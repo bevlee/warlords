@@ -117,9 +117,13 @@ describe('isBeyondRange', () => {
     const orc = makeStack(ORC, { col: 0, row: 0 }, 'player'); // range 7
     const atRange = makeStack(GOBLIN, { col: 7, row: 0 }, 'enemy');
     const pastRange = makeStack(GOBLIN, { col: 8, row: 0 }, 'enemy');
+    const diagonalAtRange = makeStack(GOBLIN, { col: 4, row: 3 }, 'enemy');
+    const diagonalPastRange = makeStack(GOBLIN, { col: 4, row: 4 }, 'enemy');
 
     expect(isBeyondRange(orc, atRange)).toBe(false);
     expect(isBeyondRange(orc, pastRange)).toBe(true);
+    expect(isBeyondRange(orc, diagonalAtRange)).toBe(false);
+    expect(isBeyondRange(orc, diagonalPastRange)).toBe(true);
   });
 });
 

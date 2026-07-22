@@ -4,7 +4,7 @@ import { beginCombat, deployMove, initBattle, splitStack } from '../src/lib/engi
 import { FACTION_UNITS } from '../src/lib/engine/factions.ts';
 import { updateFactionSkills } from '../src/lib/engine/factionSkills.ts';
 import { budgetForLevel, xpToReach } from '../src/lib/engine/progression.ts';
-import { armyCost, MAX_STACKS } from '../src/lib/engine/recruit.ts';
+import { armyCost, MAX_STACKS, mergeArmySlots } from '../src/lib/engine/recruit.ts';
 import { canShootTarget, getAttackOrigins, getReachableCells, isShootingBlocked } from '../src/lib/engine/selectors.ts';
 import type { BattleAction, BattleState } from '../src/lib/engine/types.ts';
 import type {
@@ -253,8 +253,10 @@ export class RoomOrchestrator {
     const host = parseLoadout(room.host.loadout);
     const guest = parseLoadout(room.guest?.loadout);
     if (!host || !guest) throw new RoomError('invalid_loadout', 'both players need a hero and army');
-    const enemyArmy = [...host.army, ...guest.army]
-      .map(slot => ({ ...slot, count: Math.max(1, Math.ceil(slot.count * 0.75)) }));
+    const enemyArmy = mergeArmySlots(
+      [...host.army, ...guest.army]
+        .map(slot => ({ ...slot, count: Math.max(1, Math.ceil(slot.count * 0.75)) }))
+    );
     const deploy = initBattle(
       host.army,
       enemyArmy,

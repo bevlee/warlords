@@ -1,5 +1,5 @@
 import type { BattleState, Grid, Pos, UnitStack } from './types.ts';
-import { getNeighbours, chebyshevDistance } from './grid.ts';
+import { getNeighbours, chebyshevDistance, manhattanDistance } from './grid.ts';
 import { modifiedDamage, applyDamage } from './combat.ts';
 
 /** Movement range for this turn: base speed, plus Logistics, minus any active slow (Zombie slow_on_hit). */
@@ -60,9 +60,11 @@ export function canShootTarget(unit: UnitStack, target: UnitStack): boolean {
   return canShoot(unit) && !target.isHero;
 }
 
-/** LordsWM far-shot rule: past `range` cells a shot deals half damage. */
+/** LordsWM far-shot rule: past `range` cardinal tile steps a shot deals half
+ * damage. This follows the same sideways/vertical geometry as movement rather
+ * than treating every cell in a square as equally near. */
 export function isBeyondRange(unit: UnitStack, target: UnitStack): boolean {
-  return chebyshevDistance(unit.pos, target.pos) > unit.definition.range;
+  return manhattanDistance(unit.pos, target.pos) > unit.definition.range;
 }
 
 /** Cells within a shooter's full-damage range, own cell excluded; empty for melee units. */
@@ -73,7 +75,7 @@ export function getRangeCells(grid: Grid, unit: UnitStack): Pos[] {
   for (const row of grid.cells) {
     for (const cell of row) {
       if (cell.col === unit.pos.col && cell.row === unit.pos.row) continue;
-      if (chebyshevDistance(unit.pos, cell) <= range) cells.push({ col: cell.col, row: cell.row });
+      if (manhattanDistance(unit.pos, cell) <= range) cells.push({ col: cell.col, row: cell.row });
     }
   }
   return cells;

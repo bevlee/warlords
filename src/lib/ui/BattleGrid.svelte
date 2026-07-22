@@ -10,7 +10,8 @@
   interface Props {
     state: BattleState;
     reachableKeys: Set<string>;
-    rangeKeys: Set<string>;
+    movementRangeKeys: Set<string>;
+    shootingRangeKeys: Set<string>;
     targetIds: Set<string>;
     activeId: string | null;
     interactive: boolean;
@@ -19,6 +20,7 @@
     deployableKeys?: Set<string>;
     selectedDeployId?: string | null;
     actionIcons: Map<string, 'melee' | 'shoot' | 'spell'>;
+    penalizedShotIds: Set<string>;
     originsByTarget: Map<string, Pos[]>;
     previews: Map<string, DamagePreview>;
     hoveredId: string | null;
@@ -42,7 +44,8 @@
   let {
     state: battleState,
     reachableKeys,
-    rangeKeys,
+    movementRangeKeys,
+    shootingRangeKeys,
     targetIds,
     activeId,
     interactive,
@@ -50,6 +53,7 @@
     deployableKeys = new Set<string>(),
     selectedDeployId = null,
     actionIcons,
+    penalizedShotIds,
     originsByTarget,
     previews,
     hoveredId,
@@ -133,6 +137,23 @@
   }
   const SWORD_CURSOR = emojiCursor('⚔️');
   const BOW_CURSOR = emojiCursor('🏹');
+  // There is no broken-bow Unicode glyph, so draw one in the same warm,
+  // illustrated vein as the normal bow cursor: a split wooden stave, loose
+  // string, and snapped arrow. It only appears while hovering a penalized shot.
+  const BROKEN_BOW_CURSOR = (() => {
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'>
+      <path d='M6 3Q15 7 18 13L14 12L17 16' fill='none' stroke='#8b4513' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/>
+      <path d='M15 18L12 16L13 20Q11 25 6 27' fill='none' stroke='#8b4513' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/>
+      <path d='M6 3Q14 7 17 13' fill='none' stroke='#f6ad3c' stroke-width='2.2' stroke-linecap='round'/>
+      <path d='M13 19Q11 24 6 27' fill='none' stroke='#f6ad3c' stroke-width='2.2' stroke-linecap='round'/>
+      <path d='M6 3L12 12M11 19L6 27' fill='none' stroke='#f8e7bd' stroke-width='1.4' stroke-linecap='round'/>
+      <path d='M3 25L12 16M17 11L25 3' fill='none' stroke='#d7dde8' stroke-width='2.1' stroke-linecap='round'/>
+      <path d='M23 3L27 1L25 5Z' fill='#cbd5e1' stroke='#64748b' stroke-width='.7'/>
+      <path d='M3 25L1 29M3 25L7 27' fill='none' stroke='#e34b4b' stroke-width='1.7' stroke-linecap='round'/>
+      <path d='M13 13L16 16L13 18L17 20' fill='none' stroke='#fef3c7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/>
+    </svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 15 15, crosshair`;
+  })();
   const SPELL_CURSOR = emojiCursor('✨');
 
   // Shift forces melee aiming for shooters (LordsWM parity).
@@ -372,7 +393,7 @@
     if (occupantId && attackable) {
       if (meleeAimable(occupantId)) return SWORD_CURSOR;
       const icon = actionIcons.get(occupantId);
-      if (icon === 'shoot') return BOW_CURSOR;
+      if (icon === 'shoot') return penalizedShotIds.has(occupantId) ? BROKEN_BOW_CURSOR : BOW_CURSOR;
       if (icon === 'spell') return SPELL_CURSOR;
       return SWORD_CURSOR;
     }
@@ -437,7 +458,8 @@
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
         {@const deployTarget = deployMode && deployableKeys.has(cellKey(cell.col, cell.row))}
         {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row)) || deployTarget}
-        {@const inHoverRange = rangeKeys.has(cellKey(cell.col, cell.row))}
+        {@const inMovementRange = movementRangeKeys.has(cellKey(cell.col, cell.row))}
+        {@const inShootingRange = shootingRangeKeys.has(cellKey(cell.col, cell.row))}
         {@const attackable = !deployMode && !!occupant && targetIds.has(occupant.id)}
         {@const isAimOrigin = aimKey === cellKey(cell.col, cell.row)}
         {@const isExplicitOrigin = explicitOriginKeys.has(cellKey(cell.col, cell.row))}
@@ -448,7 +470,8 @@
           data-cell-key={cellKey(cell.col, cell.row)}
           class="cell relative aspect-square border border-indigo-300/15
             {reachable ? 'bg-slate-500/50 hover:bg-slate-400/50' : 'bg-slate-900/70'}
-            {inHoverRange ? 'range-cell' : ''}
+            {inMovementRange ? 'movement-range-cell' : ''}
+            {inShootingRange ? 'shooting-range-cell' : ''}
             {attackable ? 'attackable' : ''}
             {isAimOrigin ? 'aim-origin' : ''}
             {isExplicitOrigin ? 'explicit-origin' : ''}
@@ -583,12 +606,22 @@
     touch-action: none;
   }
 
-  /* Hovered stack's threat range: shooting range for shooters, movement
-     reach for melee. Declared before the red target rules so those win
-     when a cell is both. */
-  .cell.range-cell {
+  /* Movement stays the primary hover read for every unit. */
+  .cell.movement-range-cell {
     box-shadow: inset 0 0 0 1.5px rgb(56 189 248 / 0.4);
     background-color: rgb(56 189 248 / 0.12);
+  }
+
+  /* A ranged unit layers its full-damage shooting radius over movement with
+     an amber dashed inset, leaving the blue movement fill visible beneath. */
+  .cell.shooting-range-cell::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    inset: 2px;
+    border: 1.5px dashed rgb(251 191 36 / 0.75);
+    border-radius: 2px;
+    pointer-events: none;
   }
 
   /* Hovering an attackable enemy edges its tile red (LordsWM). */
