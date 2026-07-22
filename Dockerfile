@@ -21,6 +21,9 @@ ENV DATABASE_PATH=/data/warlords.db
 
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/server ./server
+# server/ imports the shared engine/net/replay code under src/lib at runtime
+# (e.g. ENGINE_VERSION, applyAction); Node strips their types on load too.
+COPY --from=builder /app/src/lib ./src/lib
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
