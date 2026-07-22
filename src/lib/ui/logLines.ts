@@ -102,7 +102,12 @@ export function describeEvent(
     case 'status': {
       const u = unit(d.unitId);
       switch (d.effect) {
-        case 'life_drain': return line(u, t(' drain '), num(d.heal), t(' HP of life.'));
+        case 'life_drain': {
+          const revived = (d.revived as number) ?? 0;
+          return revived > 0
+            ? line(u, t(' drain '), num(d.heal), t(' HP, reviving '), num(revived), t(revived === 1 ? ' creature.' : ' creatures.'))
+            : line(u, t(' drain '), num(d.heal), t(' HP of life.'));
+        }
         case 'slow': return line(u, t(' are slowed.'));
         case 'drain_morale': return line(u, t(' morale is drained.'));
         case 'blind': return line(u, t(' are blinded and skip their turn.'));

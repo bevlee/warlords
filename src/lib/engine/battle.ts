@@ -1,7 +1,7 @@
 import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types.ts';
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid.ts';
 import { advanceTurn } from './turnOrder.ts';
-import { calculateDamage, applyDamage, canRetaliate, checkMorale, type LuckSink } from './combat.ts';
+import { calculateDamage, applyDamage, applyHeal, canRetaliate, checkMorale, type LuckSink } from './combat.ts';
 import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors.ts';
 import { mulberry32, type Rng } from './rng.ts';
 import { abilityLevel, lifestealFraction } from './abilityCatalog.ts';
@@ -90,12 +90,19 @@ function applyOnHitEffects(
 
   const lsLevel = abilityLevel(striker.definition, 'life_drain');
   if (lsLevel > 0 && a.count > 0) {
-    // 10%·level of damage dealt, split across the stack (legacy Vampire = level 10 = 100%).
-    const heal = Math.round((damageDealt * lifestealFraction(lsLevel)) / a.count);
-    const newHp = Math.min(a.definition.hp, a.hp + heal);
-    if (heal > 0 && newHp !== a.hp) {
-      a = { ...a, hp: newHp };
-      events.push({ type: 'status', data: { effect: 'life_drain', unitId: a.id, heal } });
+    // Heal the striking stack by 10%·level of the total damage dealt (legacy
+    // Vampire = level 10 = 100%), reviving fallen creatures up to the count it
+    // started the battle with. Heals the stack as a whole, never per-creature.
+    const heal = Math.round(damageDealt * lifestealFraction(lsLevel));
+    const oldHp = a.hp;
+    const { stack, healed, revived } = applyHeal(a, heal);
+    if (healed > 0) {
+      a = stack;
+      // Floater split: `revived` creatures shown green, and the current lead
+      // creature's partial HP shown red (its fresh HP after a revive, else the
+      // plain top-up).
+      const topHp = revived > 0 ? a.hp : a.hp - oldHp;
+      events.push({ type: 'status', data: { effect: 'life_drain', unitId: a.id, heal: healed, revived, topHp } });
     }
   }
 
@@ -205,6 +212,7 @@ function slotToStack(
     id,
     definition: slot.unit,
     count: slot.count,
+    startCount: slot.count,
     hp: slot.unit.hp,
     pos: { col, row },
     side,
@@ -289,6 +297,7 @@ export function initBattle(
       shots: 9999, range: 99, isLarge: false, abilities: [],
     },
     count: 1,
+    startCount: 1,
     hp: 1,
     pos: { col: -2, row: Math.floor(GRID_H / 2) },
     side: 'player',
@@ -433,6 +442,7 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
     id,
     definition: unit.definition,
     count: amount,
+    startCount: amount,
     hp: unit.definition.hp,
     pos: to,
     side: 'player',
@@ -449,7 +459,7 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
     ...(unit.initiativeBonus !== undefined ? { initiativeBonus: unit.initiativeBonus } : {}),
   };
   const units = state.units
-    .map(u => (u.id === unitId ? { ...u, count: u.count - amount } : u))
+    .map(u => (u.id === unitId ? { ...u, count: u.count - amount, startCount: u.startCount - amount } : u))
     .concat(created);
   return { ...state, units, grid: setOccupant(state.grid, to, id), nextId: state.nextId + 1 };
 }

@@ -8,7 +8,7 @@ function stack(id: string, name: string, side: 'player' | 'enemy', overrides: Pa
   return {
     id,
     definition: { name, tier: 1, speed: 5, initiative: 10, hp: 10, attack: 2, defense: 1, minDamage: 1, maxDamage: 2, shots: 0, range: 0, isLarge: false, abilities: [] },
-    count: 5, hp: 10, pos: { col: 0, row: 0 }, side,
+    count: 5, startCount: 5, hp: 10, pos: { col: 0, row: 0 }, side,
     hasRetaliated: false, shotsLeft: 0, morale: 0, luck: 0, atb: 0, isDefending: false,
     ...overrides,
   };
