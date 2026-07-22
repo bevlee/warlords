@@ -219,17 +219,6 @@
     return pickScreenOrigin(current, originCandidates(origins), rectCenter(targetEl.getBoundingClientRect()), point);
   }
 
-  function updateAim(e: PointerEvent, unit: UnitStack) {
-    if (!interactive || !meleeAimable(unit.id)) {
-      if (aim?.targetId === unit.id) aim = null;
-      return;
-    }
-    const targetEl = e.currentTarget as HTMLElement;
-    const current = aim?.targetId === unit.id ? aim.origin : null;
-    const origin = originAtPoint(unit, targetEl, { x: e.clientX, y: e.clientY }, current);
-    if (origin) aim = { targetId: unit.id, origin };
-  }
-
   function samePos(a: Pos, b: Pos): boolean {
     return a.col === b.col && a.row === b.row;
   }
@@ -242,9 +231,9 @@
 
   function beginExplicitTargeting(unit: UnitStack) {
     explicitTargetId = unit.id;
-    const held = aim?.targetId === unit.id ? aim.origin : null;
-    const origin = held ?? defaultOrigin(unit);
-    aim = origin ? { targetId: unit.id, origin } : null;
+    // Every origin is presented equally after a click. Directional selection
+    // only begins if the pointer actually becomes a drag.
+    aim = null;
   }
 
   function clearTargeting() {
@@ -283,12 +272,11 @@
     e.preventDefault();
     const captureEl = e.currentTarget as HTMLElement;
     const point = { x: e.clientX, y: e.clientY };
-    const current = aim?.targetId === unit.id ? aim.origin : null;
-    const origin = originAtPoint(unit, captureEl, point, current) ?? defaultOrigin(unit);
+    const origin = originAtPoint(unit, captureEl, point, null) ?? defaultOrigin(unit);
     // Reveal all choices immediately. If this remains a tap they stay open;
     // if it becomes a drag they provide visible destinations for the gesture.
     explicitTargetId = unit.id;
-    aim = origin ? { targetId: unit.id, origin } : null;
+    aim = null;
     attackDrag = {
       targetId: unit.id,
       pointerId: e.pointerId,
@@ -304,7 +292,6 @@
   function handlePointerMove(e: PointerEvent, unit: UnitStack) {
     const drag = attackDrag;
     if (!drag || drag.pointerId !== e.pointerId || drag.targetId !== unit.id) {
-      updateAim(e, unit);
       return;
     }
 
@@ -356,15 +343,12 @@
   }
 
   const aimKey = $derived(aim ? `${aim.origin.col},${aim.origin.row}` : null);
-  const aimTarget = $derived(aim ? (unitsById.get(aim.targetId) ?? null) : null);
   const explicitOriginKeys = $derived.by(() => {
     if (!explicitTargetId) return new Set<string>();
     return new Set((originsByTarget.get(explicitTargetId) ?? []).map(origin => cellKey(origin.col, origin.row)));
   });
 
-  // updateAim only clears on mousemove, so a locked board (animating, AI turn) would
-  // otherwise strand the red origin tile and arrow on an origin that may no longer be
-  // reachable — and clicking it is a silent no-op, since handleMeleeAim re-checks.
+  // A locked board must not retain an in-progress origin or explicit target.
   $effect(() => {
     if (!interactive) {
       if (attackDrag) releaseDragCapture(attackDrag);
@@ -378,11 +362,6 @@
   $effect(() => {
     ontargetingchange?.(attackDrag?.moved ? 'drag' : explicitTargetId || attackDrag ? 'choose' : null);
   });
-
-  function arrowAngle(): number {
-    if (!aim || !aimTarget) return 0;
-    return (Math.atan2(aimTarget.pos.row - aim.origin.row, aimTarget.pos.col - aim.origin.col) * 180) / Math.PI;
-  }
 
   function cellKey(col: number, row: number): string {
     return `${col},${row}`;
@@ -491,20 +470,12 @@
             if (attackDrag || explicitTargetId) cancelAttackDrag();
             else onunitinspect(occupant ?? null); // right-click normally inspects
           }}
-          onmouseenter={() => {
-            onunithover(occupant ?? null);
-            if (explicitTargetId && isExplicitOrigin) {
-              aim = { targetId: explicitTargetId, origin: { col: cell.col, row: cell.row } };
-            }
-          }}
+          onmouseenter={() => onunithover(occupant ?? null)}
           onpointerdown={occupant && !deployMode ? e => handlePointerDown(e, occupant) : undefined}
           onpointermove={occupant && !deployMode ? e => handlePointerMove(e, occupant) : undefined}
           onpointerup={occupant && !deployMode ? e => handlePointerUp(e, occupant) : undefined}
           onpointercancel={handlePointerCancel}
-          onmouseleave={() => {
-            onunithover(null);
-            if (!attackDrag && !explicitTargetId && aim && occupant && aim.targetId === occupant.id) aim = null;
-          }}
+          onmouseleave={() => onunithover(null)}
         >
           {#if occupant}
             <span class="token-shadow" aria-hidden="true"></span>
@@ -531,9 +502,6 @@
             <div class="token-standing rock-wrap" aria-hidden="true">
               <Sprite name="Rock" class="h-3/4 w-auto" />
             </div>
-          {/if}
-          {#if isAimOrigin}
-            <span class="aim-arrow" style="transform: rotate({arrowAngle()}deg)" aria-hidden="true">➤</span>
           {/if}
           {#if isExplicitOrigin}
             <span class="origin-marker" aria-hidden="true">⚔</span>
@@ -634,8 +602,8 @@
     background-color: rgb(239 68 68 / 0.18);
   }
 
-  /* Simple-click targeting: every legal landing cell is a full-size target.
-     The currently aimed origin retains the stronger red treatment above. */
+  /* Simple-click targeting: every legal landing cell is an equal full-size
+     sword target. The stronger red origin appears only during an active drag. */
   .cell.explicit-origin {
     background-color: rgb(245 158 11 / 0.22);
     box-shadow: inset 0 0 0 2px rgb(245 158 11 / 0.9);
@@ -656,18 +624,6 @@
   .cell.deploy-selected {
     box-shadow: inset 0 0 0 2.5px rgb(251 191 36 / 0.95);
     background-color: rgb(251 191 36 / 0.15);
-  }
-
-  .aim-arrow {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.4rem;
-    color: #f97316;
-    text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
-    pointer-events: none;
   }
 
   .origin-marker {
