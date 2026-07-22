@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGrid, placeUnits } from '../grid';
+import { createGrid, placeUnits, setBlocked } from '../grid';
 import { getReachableCells, getMeleeTargets, getAttackOrigins, canShoot, damagePreview, getRangeCells } from '../selectors';
 import { GOBLIN, ORC, THUNDERBIRD, WOLF_RIDER } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
@@ -84,6 +84,28 @@ describe('getReachableCells', () => {
     expect(has(cells, 2, 0)).toBe(true);  // beyond the wall
     expect(has(cells, 1, 0)).toBe(false); // can't land on occupant
     expect(cells.length).toBeGreaterThan(0);
+  });
+
+  it('lets flyers pass over rocks but not land on them', () => {
+    const bird = makeStack(THUNDERBIRD, { col: 0, row: 0 }, 'player'); // flying, speed 9
+    let state = makeState([bird]);
+    // Wall of rocks sealing the corner: (1,0), (0,1), (1,1)
+    state = { ...state, grid: setBlocked(setBlocked(setBlocked(state.grid,
+      { col: 1, row: 0 }), { col: 0, row: 1 }), { col: 1, row: 1 }) };
+    const cells = getReachableCells(state.grid, bird);
+
+    expect(has(cells, 2, 0)).toBe(true);  // flew over the rock wall
+    expect(has(cells, 1, 0)).toBe(false); // can't land on a rock
+  });
+
+  it('does not let walkers pass through rocks', () => {
+    const goblin = makeStack(GOBLIN, { col: 0, row: 0 }, 'player');
+    let state = makeState([goblin]);
+    state = { ...state, grid: setBlocked(setBlocked(setBlocked(state.grid,
+      { col: 1, row: 0 }), { col: 0, row: 1 }), { col: 1, row: 1 }) };
+    const cells = getReachableCells(state.grid, goblin);
+
+    expect(cells).toHaveLength(0); // walled in by rocks
   });
 
   it('stays within board bounds', () => {

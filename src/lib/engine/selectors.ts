@@ -24,12 +24,15 @@ export function getReachableCells(grid: Grid, unit: UnitStack): Pos[] {
     for (const pos of frontier) {
       for (const nb of getNeighbours(grid, pos.col, pos.row)) {
         const k = key(nb);
-        if (visited.has(k) || nb.blocked) continue;
-        const occupied = nb.occupantId !== null;
-        if (occupied && !flying) continue;
+        if (visited.has(k)) continue;
+        // A cell you can end your move on: empty ground, no rock, no occupant.
+        const landable = nb.occupantId === null && !nb.blocked;
+        // Walkers cannot enter a rock or an occupied cell at all; flyers pass
+        // straight over both but still cannot land on them.
+        if (!landable && !flying) continue;
         visited.add(k);
         next.push({ col: nb.col, row: nb.row });
-        if (!occupied) reachable.push({ col: nb.col, row: nb.row });
+        if (landable) reachable.push({ col: nb.col, row: nb.row });
       }
     }
     frontier = next;
