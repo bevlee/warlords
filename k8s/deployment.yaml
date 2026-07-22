@@ -20,21 +20,46 @@ spec:
       labels:
         app: warlords
     spec:
+      # SIGTERM drains in-flight requests, closes WebSockets, then closes the
+      # SQLite file (server/index.ts) with a 10s hard cap; 30s leaves headroom.
+      terminationGracePeriodSeconds: 30
       containers:
         - name: warlords
-          image: docker.io/bevdev1/warlords:0.1
+          # Bare artifact name so Skaffold rewrites it to the tag it builds
+          # (skaffold.yaml: docker.io/bevdev1/warlords). A pinned tag here would
+          # also leave a plain `kubectl apply` pulling an image that may not exist.
+          image: docker.io/bevdev1/warlords
           ports:
+            # Single Node process serves the SPA, the /api routes, and the /ws
+            # WebSocket endpoint — all on 3000. Traefik proxies the /ws upgrade
+            # through the existing `/` ingress route, no extra config needed.
             - name: http
               containerPort: 3000
           env:
             - name: DATABASE_PATH
               value: /data/warlords.db
+          # First boot dynamically imports the built SPA handler, opens the DB
+          # and runs migrations, then writes an initial backup — slower and more
+          # variable than steady state, so gate readiness/liveness behind startup.
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /api/health
               port: http
-            initialDelaySeconds: 2
             periodSeconds: 5
+          # /api/health is DB-free, so it won't false-fail under DB load; it
+          # does restart a wedged event loop (see the past session-deadlock fix).
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
           volumeMounts:
             - name: data
               mountPath: /data
