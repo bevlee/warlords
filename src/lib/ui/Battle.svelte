@@ -10,6 +10,7 @@
     getAttackOrigins,
     canShoot,
     canShootTarget,
+    isBeyondRange,
     isShootingBlocked,
     damagePreview,
   } from '$lib/engine/selectors';
@@ -231,13 +232,22 @@
   }
 
   function takeAction(action: BattleAction, controller: SoloController) {
-    if (online) return online.action(action);
     if (replay) return;
+    if (online) {
+      // The authoritative animation starts when the server echoes the action,
+      // but clear local hover immediately so it cannot follow a moved stack.
+      hovered = null;
+      return online.action(action);
+    }
     const result = applyAction(battle, action);
     // Invalid casts are rejected by returning the original state. Do not put a
     // rejected cause into the replay journal.
     if (result === battle) return;
     recorder?.record(controller, action);
+    // A hovered stack can move away while the pointer remains over its old
+    // cell. Clear it as soon as an action begins so its old/new range does not
+    // linger through or after the movement animation.
+    hovered = null;
     void revealAction(result);
   }
 
@@ -251,7 +261,7 @@
   );
 
   const reachableKeys = $derived(
-    isPlayerTurn && activeUnit
+    isPlayerTurn && activeUnit && !animating
       ? new Set(getReachableCells(battle.grid, activeUnit).map(p => `${p.col},${p.row}`))
       : new Set<string>()
   );
@@ -279,6 +289,19 @@
   });
 
   const targetIds = $derived(new Set(actionIcons.keys()));
+
+  // Shooters may fire anywhere, but targets beyond their listed range take
+  // half damage. Keep that penalty explicit in the grid rather than making
+  // the player infer it from the forecast numbers.
+  const penalizedShotIds = $derived.by(() => {
+    const ids = new Set<string>();
+    if (!activeUnit) return ids;
+    for (const [id, icon] of actionIcons) {
+      const target = battle.units.find(u => u.id === id);
+      if (icon === 'shoot' && target && isBeyondRange(activeUnit, target)) ids.add(id);
+    }
+    return ids;
+  });
 
   const isHeroTurn = $derived(isPlayerTurn && !!activeUnit?.isHero);
 
@@ -338,18 +361,25 @@
 
   let hovered: UnitStack | null = $state(null);
 
-  // Hovering a stack previews its range: enemies always show movement reach
-  // (the threat: where they can get to), own shooters show their full-damage
-  // shooting range. The hero strikes board-wide — nothing to show.
-  const hoverRangeKeys = $derived.by(() => {
+  // Hover always shows movement reach. Ranged units additionally paint their
+  // full-damage shooting radius in a second color, so neither stat hides the
+  // other. Suppress both while an action is animating so a moving unit cannot
+  // paint stale ranges from either its old or new position.
+  const hoverMovementKeys = $derived.by(() => {
+    if (animating) return new Set<string>();
     const fresh = hovered && !hovered.isHero
       ? battle.units.find(u => u.id === hovered!.id && u.count > 0)
       : undefined;
     if (!fresh) return new Set<string>();
-    const cells = fresh.side === 'player' && fresh.definition.range > 0
-      ? getRangeCells(battle.grid, fresh)
-      : getReachableCells(battle.grid, fresh);
-    return new Set(cells.map(p => `${p.col},${p.row}`));
+    return new Set(getReachableCells(battle.grid, fresh).map(p => `${p.col},${p.row}`));
+  });
+  const hoverShootingKeys = $derived.by(() => {
+    if (animating) return new Set<string>();
+    const fresh = hovered && !hovered.isHero
+      ? battle.units.find(u => u.id === hovered!.id && u.count > 0)
+      : undefined;
+    if (!fresh || fresh.definition.range <= 0) return new Set<string>();
+    return new Set(getRangeCells(battle.grid, fresh).map(p => `${p.col},${p.row}`));
   });
   // Right-click pins a unit into the info panel. A pin is an explicit request,
   // so it outranks hover — without it the panel snaps back to the active unit
@@ -654,7 +684,8 @@
         <BattleGrid
           state={battle}
           reachableKeys={pendingSpell ? new Set() : reachableKeys}
-          rangeKeys={hoverRangeKeys}
+          movementRangeKeys={hoverMovementKeys}
+          shootingRangeKeys={hoverShootingKeys}
           targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
           interactive={isPlayerTurn && !animating}
@@ -662,6 +693,7 @@
           deployableKeys={deployableKeys}
           selectedDeployId={selectedDeployId}
           actionIcons={gridActionIcons}
+          penalizedShotIds={pendingSpell || animating ? new Set() : penalizedShotIds}
           originsByTarget={pendingSpell ? new Map() : originsByTarget}
           {previews}
           hoveredId={hovered?.id ?? null}

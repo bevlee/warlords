@@ -66,6 +66,19 @@ export function armyCost(slots: ArmySlot[]): number {
   return slots.reduce((sum, s) => sum + s.count * (UNIT_COSTS[s.unit.name] ?? 0), 0);
 }
 
+/** Combine loadout entries for the same unit type while preserving first-seen
+ * order. Use this at composition boundaries; initBattle intentionally keeps
+ * duplicate slots because they can represent an explicit tactical split. */
+export function mergeArmySlots(slots: ArmySlot[]): ArmySlot[] {
+  const merged = new Map<string, ArmySlot>();
+  for (const slot of slots) {
+    const existing = merged.get(slot.unit.name);
+    if (existing) existing.count += slot.count;
+    else merged.set(slot.unit.name, { ...slot });
+  }
+  return [...merged.values()];
+}
+
 /**
  * Seeded enemy roster: 3–5 stack picks spending random shares of the budget,
  * then a goblin top-up so at least ~70% of the gold is always fielded.

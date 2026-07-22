@@ -214,7 +214,7 @@ describe('damagePreview', () => {
 });
 
 describe('getRangeCells', () => {
-  it('returns every other cell within Chebyshev range of a shooter, including occupied ones', () => {
+  it('returns cells within cardinal tile-step range of a shooter, including occupied ones', () => {
     const orc = makeStack(ORC, { col: 5, row: 5 }, 'player'); // range 7
     const bystander = makeStack(GOBLIN, { col: 6, row: 5 }, 'enemy');
     const state = makeState([orc, bystander]);
@@ -223,10 +223,10 @@ describe('getRangeCells', () => {
 
     expect(has(cells, 5, 5)).toBe(false); // own cell excluded
     expect(has(cells, 6, 5)).toBe(true); // occupied cells shown
-    expect(has(cells, 11, 9)).toBe(true); // dist 6,4 → 6 ≤ 7
+    expect(has(cells, 8, 9)).toBe(true); // 3 sideways + 4 vertical = 7
+    expect(has(cells, 9, 9)).toBe(false); // 4 sideways + 4 vertical = 8
     expect(has(cells, 5, 0)).toBe(true); // dist 5
-    // farthest corner (0,0)→dist 5; whole 12×10 board is within 7 of (5,5)
-    // except nothing — so use a corner shooter instead for the boundary:
+    // Use a corner shooter for a simple horizontal boundary too:
     const cornerOrc = makeStack(ORC, { col: 0, row: 0 }, 'player');
     const cornerCells = getRangeCells(state.grid, cornerOrc);
     expect(has(cornerCells, 7, 0)).toBe(true); // dist 7 = range

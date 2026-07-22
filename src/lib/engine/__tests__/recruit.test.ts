@@ -1,9 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { UNIT_COSTS, armyCost, generateEnemyArmy, DEFAULT_BUDGET } from '../recruit';
+import { UNIT_COSTS, armyCost, generateEnemyArmy, mergeArmySlots, DEFAULT_BUDGET } from '../recruit';
 import { BARBARIAN_UNITS, GOBLIN, OGRE } from '../barbarian';
 import { mulberry32 } from '../rng';
 
 describe('recruiting', () => {
+  it('merges same-unit loadout entries without changing first-seen order', () => {
+    expect(mergeArmySlots([
+      { unit: GOBLIN, count: 4 },
+      { unit: OGRE, count: 2 },
+      { unit: GOBLIN, count: 6 },
+    ])).toEqual([
+      { unit: GOBLIN, count: 10 },
+      { unit: OGRE, count: 2 },
+    ]);
+  });
+
   it('prices every barbarian unit', () => {
     for (const u of BARBARIAN_UNITS) {
       expect(UNIT_COSTS[u.name]).toBeGreaterThan(0);
