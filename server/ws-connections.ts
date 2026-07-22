@@ -39,13 +39,15 @@ export class ConnectionManager {
   private readonly byPlayer = new Map<string, WebSocket>();
   private readonly playerByToken: Database.Statement;
   private readonly heartbeat: ReturnType<typeof setInterval>;
+  private readonly server: UpgradeServer;
   private handlers: ConnectionHandlers | null = null;
 
   constructor(
-    private readonly server: UpgradeServer,
+    server: UpgradeServer,
     db: Database.Database,
     options: ConnectionManagerOptions = {}
   ) {
+    this.server = server;
     const heartbeatMs = options.heartbeatMs ?? 15_000;
     const helloTimeoutMs = options.helloTimeoutMs ?? 5_000;
     this.playerByToken = db.prepare('SELECT id FROM players WHERE token = ?');

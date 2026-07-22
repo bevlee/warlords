@@ -40,12 +40,16 @@ export class RoomOrchestrator {
   private readonly deployTimeoutMs: number;
   private readonly disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly deployTimers = new Map<string, DeployTimer>();
+  private readonly rooms: RoomRegistry;
+  private readonly transport: RoomTransport;
 
   constructor(
-    private readonly rooms: RoomRegistry,
-    private readonly transport: RoomTransport,
+    rooms: RoomRegistry,
+    transport: RoomTransport,
     options: RoomOrchestratorOptions = {}
   ) {
+    this.rooms = rooms;
+    this.transport = transport;
     this.maxReplayGap = options.maxReplayGap ?? 200;
     this.disconnectGraceMs = options.disconnectGraceMs ?? 10 * 60 * 1000;
     this.deployTimeoutMs = options.deployTimeoutMs ?? 60_000;
