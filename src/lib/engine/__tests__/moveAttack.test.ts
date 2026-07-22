@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createGrid, placeUnits, getCell, chebyshevDistance } from '../grid';
+import { createGrid, placeUnits, getCell, chebyshevDistance, setBlocked } from '../grid';
 import { applyAction } from '../battle';
 import { aiTakeTurn } from '../ai';
 import { canShootTarget, isBeyondRange, getMeleeApproaches, isShootingBlocked } from '../selectors';
-import { GOBLIN, ORC, WOLF_RIDER } from '../barbarian';
+import { GOBLIN, ORC, WOLF_RIDER, THUNDERBIRD } from '../barbarian';
 import type { BattleState, UnitDef, UnitStack, Pos } from '../types';
 
 function makeStack(
@@ -237,6 +237,22 @@ describe('AI with range and move+attack', () => {
 
     const action = aiTakeTurn(state, orc.id);
     expect(action).toEqual({ type: 'shoot', targetId: target.id });
+  });
+
+  it('flies a flyer over a wall of rocks toward the target', () => {
+    const bird = makeStack(THUNDERBIRD, { col: 0, row: 5 }, 'enemy'); // flying, speed 9
+    const target = makeStack(GOBLIN, { col: 11, row: 5 }, 'player');
+    let state = makeState([bird, target]);
+    // A full vertical wall of rocks at column 1 — a walker would be trapped.
+    for (let row = 0; row < 10; row++) state = { ...state, grid: setBlocked(state.grid, { col: 1, row }) };
+
+    const action = aiTakeTurn(state, bird.id);
+    expect(action.type).toBe('move'); // flew over the wall instead of waiting
+    if (action.type === 'move') {
+      // Landed on an empty cell past the wall, closer to the target.
+      expect(action.to.col).toBeGreaterThanOrEqual(2);
+      expect(chebyshevDistance(action.to, target.pos)).toBeLessThan(chebyshevDistance(bird.pos, target.pos));
+    }
   });
 
   it('uses move+attack when a melee approach exists', () => {

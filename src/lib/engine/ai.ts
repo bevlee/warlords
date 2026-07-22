@@ -1,6 +1,6 @@
 import type { BattleAction, BattleState } from './types.ts';
-import { findPath, chebyshevDistance } from './grid.ts';
-import { canShootTarget, effectiveSpeed, getMeleeApproaches, isShootingBlocked } from './selectors.ts';
+import { chebyshevDistance } from './grid.ts';
+import { canShootTarget, getMeleeApproaches, getReachableCells, isShootingBlocked } from './selectors.ts';
 
 export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);
@@ -28,13 +28,16 @@ export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
       : { type: 'attack', targetId: target.id };
   }
 
-  // Out of reach: walk toward the target
-  const path = findPath(state.grid, unit.pos, target.pos, unit.id);
-  if (path.length > 0) {
-    // Move up to `speed` cells; -1: don't step onto the target's cell
-    const steps = Math.min(effectiveSpeed(unit), path.length - 1);
-    const moveTo = steps > 0 ? path[steps - 1] : path[0];
-    return { type: 'move', to: moveTo };
+  // Out of reach: advance to the reachable cell nearest the target. This uses
+  // the same reachability rules the player has, so flyers fly over rocks and
+  // occupants (landing only on free ground) instead of trudging around them.
+  const reachable = getReachableCells(state.grid, unit);
+  if (reachable.length > 0) {
+    const here = chebyshevDistance(unit.pos, target.pos);
+    const best = reachable.reduce((a, b) =>
+      chebyshevDistance(b, target.pos) < chebyshevDistance(a, target.pos) ? b : a
+    );
+    if (chebyshevDistance(best, target.pos) < here) return { type: 'move', to: best };
   }
 
   return { type: 'wait' };
