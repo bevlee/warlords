@@ -527,6 +527,7 @@
   }
 
   const logLines = $derived(battle.log.map(ev => describeEvent(ev, battle.units, battle.hero)));
+  let meleeTargeting = $state<'choose' | 'drag' | null>(null);
 
   const statusText = $derived.by(() => {
     if (battle.result === 'player_wins') return 'Victory!';
@@ -537,12 +538,18 @@
       const friendly = SPELLS[pendingSpell].friendly;
       return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
     }
+    if (meleeTargeting === 'drag') {
+      return 'Release over a highlighted tile to attack — drag back over the enemy to cancel.';
+    }
+    if (meleeTargeting === 'choose') {
+      return 'Choose attack position — click or tap a highlighted tile. Click the enemy again, press Esc, or right-click to cancel.';
+    }
     if (isPlayerTurn && activeUnit.isHero) {
       return 'Your hero\'s turn — click any enemy to strike, or cast a spell.';
     }
     if (isPlayerTurn) {
       const hints = ['highlighted cell to move'];
-      if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy to attack (aim picks your tile)');
+      if ([...actionIcons.values()].includes('melee')) hints.push('⚔️ enemy, then an attack position (or drag)');
       if (canShoot(activeUnit) && !shootingBlocked) {
         hints.push(`🏹 enemy to shoot (${activeUnit.shotsLeft} left)`);
       }
@@ -674,6 +681,7 @@
           oncellclick={handleCellClick}
           onunitclick={handleUnitClick}
           onmeleeaim={handleMeleeAim}
+          ontargetingchange={mode => (meleeTargeting = mode)}
           ondeploycell={handleDeployCell}
           ondeployunit={handleDeployUnit}
           onunithover={u => (hovered = u)}

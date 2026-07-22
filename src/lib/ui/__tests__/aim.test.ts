@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickOrigin } from '../aim';
+import { pickOrigin, pickScreenOrigin } from '../aim';
 import type { Pos } from '$lib/engine/types';
 
 const TARGET: Pos = { col: 5, row: 5 };
@@ -39,5 +39,30 @@ describe('pickOrigin', () => {
 
   it('returns null for an empty origins list', () => {
     expect(pickOrigin(null, [], TARGET, { dx: 1, dy: 0 })).toBeNull();
+  });
+});
+
+describe('pickScreenOrigin', () => {
+  const target = { x: 100, y: 100 };
+  const candidates = [
+    { origin: RIGHT, center: { x: 160, y: 108 } },
+    { origin: BELOW, center: { x: 112, y: 140 } },
+  ];
+
+  it('uses rendered cell centres rather than assuming square board geometry', () => {
+    expect(pickScreenOrigin(null, candidates, target, { x: 155, y: 105 })).toEqual(RIGHT);
+    expect(pickScreenOrigin(null, candidates, target, { x: 108, y: 145 })).toEqual(BELOW);
+  });
+
+  it('keeps a small amount of boundary hysteresis in screen space', () => {
+    // The pointer only narrowly favours BELOW, so the held RIGHT origin stays.
+    expect(pickScreenOrigin(RIGHT, candidates, target, { x: 130, y: 126 })).toEqual(RIGHT);
+    // A decisive move down switches immediately.
+    expect(pickScreenOrigin(RIGHT, candidates, target, { x: 110, y: 145 })).toEqual(BELOW);
+  });
+
+  it('drops a stale held origin and handles no candidates', () => {
+    expect(pickScreenOrigin({ col: 4, row: 5 }, candidates, target, { x: 155, y: 105 })).toEqual(RIGHT);
+    expect(pickScreenOrigin(null, [], target, { x: 155, y: 105 })).toBeNull();
   });
 });

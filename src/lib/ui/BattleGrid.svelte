@@ -2,7 +2,7 @@
   import type { BattleState, Pos, UnitStack } from '$lib/engine/types';
   import type { DamagePreview } from '$lib/engine/selectors';
   import type { AnimStep } from './animSteps';
-  import { pickOrigin } from './aim';
+  import { pickScreenOrigin, type ScreenOrigin, type ScreenPoint } from './aim';
   import UnitToken from './UnitToken.svelte';
   import Sprite from './Sprite.svelte';
   import BattleFx from './BattleFx.svelte';
@@ -32,6 +32,7 @@
     oncellclick: (pos: Pos) => void;
     onunitclick: (unit: UnitStack, shift: boolean) => void;
     onmeleeaim: (targetId: string, origin: Pos) => void;
+    ontargetingchange?: (mode: 'choose' | 'drag' | null) => void;
     ondeploycell?: (pos: Pos) => void;
     ondeployunit?: (unit: UnitStack) => void;
     onunithover: (unit: UnitStack | null) => void;
@@ -61,6 +62,7 @@
     oncellclick,
     onunitclick,
     onmeleeaim,
+    ontargetingchange,
     ondeploycell,
     ondeployunit,
     onunithover,
@@ -68,12 +70,6 @@
   }: Props = $props();
 
   const TILT_DEG = 38;
-
-  // The board is tilted back by TILT_DEG, so one board-row of movement covers only
-  // cos(TILT_DEG) of the screen pixels one board-column does. Aim math compares screen
-  // offsets against board-space cell deltas — divide dy through to undo the
-  // foreshortening, or vertical origins are ~30% harder to select than horizontal ones.
-  const ROW_SQUASH = Math.cos((TILT_DEG * Math.PI) / 180);
 
   // One cell of travel in percent of the standee's own box (92% × 118% of a cell).
   const CELL_X = 100 / 0.92;
@@ -141,14 +137,41 @@
 
   // Shift forces melee aiming for shooters (LordsWM parity).
   let shiftHeld = $state(false);
-  function onKey(e: KeyboardEvent) {
+  function onKeyDown(e: KeyboardEvent) {
+    shiftHeld = e.shiftKey;
+    if (e.key === 'Escape' && (attackDrag || explicitTargetId)) {
+      e.preventDefault();
+      cancelAttackDrag();
+    }
+  }
+
+  function onKeyUp(e: KeyboardEvent) {
     shiftHeld = e.shiftKey;
   }
 
-  // Aim: hovering an attackable enemy picks the landing tile from the cursor's
-  // position within the enemy tile — the valid origin whose direction from the
-  // enemy best matches the cursor offset.
+  // Clicking/tapping an attackable enemy enters explicit targeting, where every
+  // legal origin is a full-cell choice. Press-drag-release remains an expert
+  // shortcut. Pointer capture keeps that gesture stable across the board's
+  // transformed, overlapping standees.
   let aim = $state<{ targetId: string; origin: Pos } | null>(null);
+  let explicitTargetId = $state<string | null>(null);
+  let boardEl: HTMLElement;
+  let suppressNextClick = false;
+
+  interface AttackDrag {
+    targetId: string;
+    pointerId: number;
+    captureEl: HTMLElement;
+    start: ScreenPoint;
+    moved: boolean;
+    cancel: boolean;
+    origin: Pos | null;
+  }
+
+  let attackDrag = $state<AttackDrag | null>(null);
+
+  const DRAG_THRESHOLD_PX = 10;
+  const CANCEL_RADIUS_RATIO = 0.28;
 
   function meleeAimable(id: string): boolean {
     if (!originsByTarget.has(id)) return false;
@@ -156,35 +179,183 @@
     return icon === 'melee' || (icon === 'shoot' && shiftHeld);
   }
 
-  function updateAim(e: MouseEvent, unit: UnitStack) {
+  function rectCenter(rect: DOMRect): ScreenPoint {
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }
+
+  function originCandidates(origins: Pos[]): ScreenOrigin[] {
+    if (!boardEl) return [];
+    const candidates: ScreenOrigin[] = [];
+    for (const origin of origins) {
+      const cell = boardEl.querySelector<HTMLElement>(`[data-cell-key="${cellKey(origin.col, origin.row)}"]`);
+      if (cell) candidates.push({ origin, center: rectCenter(cell.getBoundingClientRect()) });
+    }
+    return candidates;
+  }
+
+  function originAtPoint(unit: UnitStack, targetEl: HTMLElement, point: ScreenPoint, current: Pos | null): Pos | null {
+    const origins = originsByTarget.get(unit.id) ?? [];
+    return pickScreenOrigin(current, originCandidates(origins), rectCenter(targetEl.getBoundingClientRect()), point);
+  }
+
+  function updateAim(e: PointerEvent, unit: UnitStack) {
     if (!interactive || !meleeAimable(unit.id)) {
       if (aim?.targetId === unit.id) aim = null;
       return;
     }
-    const origins = originsByTarget.get(unit.id)!;
-    if (origins.length === 0) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const dx = e.clientX - (rect.left + rect.width / 2);
-    const dy = (e.clientY - (rect.top + rect.height / 2)) / ROW_SQUASH;
-    // Too close to the centre to read a direction — keep the origin we already have
-    // rather than letting sub-pixel jitter reassign it. Entering a tile still picks
-    // one immediately; only re-deciding is suppressed.
-    if (Math.hypot(dx, dy) < rect.width * 0.18 && aim?.targetId === unit.id) return;
-    // Hysteresis lives in pickOrigin: the held pick survives boundary jitter,
-    // and a pick that predates a board change (no longer in origins) is dropped.
+    const targetEl = e.currentTarget as HTMLElement;
     const current = aim?.targetId === unit.id ? aim.origin : null;
-    const origin = pickOrigin(current, origins, unit.pos, { dx, dy });
+    const origin = originAtPoint(unit, targetEl, { x: e.clientX, y: e.clientY }, current);
     if (origin) aim = { targetId: unit.id, origin };
+  }
+
+  function samePos(a: Pos, b: Pos): boolean {
+    return a.col === b.col && a.row === b.row;
+  }
+
+  function defaultOrigin(unit: UnitStack): Pos | null {
+    const origins = originsByTarget.get(unit.id) ?? [];
+    const active = battleState.units.find(candidate => candidate.id === activeId);
+    return (active && origins.find(origin => samePos(origin, active.pos))) ?? origins[0] ?? null;
+  }
+
+  function beginExplicitTargeting(unit: UnitStack) {
+    explicitTargetId = unit.id;
+    const held = aim?.targetId === unit.id ? aim.origin : null;
+    const origin = held ?? defaultOrigin(unit);
+    aim = origin ? { targetId: unit.id, origin } : null;
+  }
+
+  function clearTargeting() {
+    explicitTargetId = null;
+    aim = null;
+  }
+
+  function releaseDragCapture(drag: AttackDrag) {
+    if (drag.captureEl.hasPointerCapture(drag.pointerId)) drag.captureEl.releasePointerCapture(drag.pointerId);
+  }
+
+  function suppressFollowingClick() {
+    suppressNextClick = true;
+    // Native click normally follows pointerup in the same event cycle. Clear
+    // defensively so platforms that omit that click cannot swallow the user's
+    // next, unrelated action.
+    setTimeout(() => {
+      suppressNextClick = false;
+    }, 0);
+  }
+
+  function cancelAttackDrag() {
+    if (attackDrag) {
+      suppressFollowingClick();
+      releaseDragCapture(attackDrag);
+    }
+    attackDrag = null;
+    clearTargeting();
+  }
+
+  function handlePointerDown(e: PointerEvent, unit: UnitStack) {
+    if (e.button !== 0 || !interactive || !meleeAimable(unit.id)) return;
+    // Once the player is choosing a position, let the normal click handler
+    // commit an origin, cancel on the selected enemy, or switch targets.
+    if (explicitTargetId) return;
+    e.preventDefault();
+    const captureEl = e.currentTarget as HTMLElement;
+    const point = { x: e.clientX, y: e.clientY };
+    const current = aim?.targetId === unit.id ? aim.origin : null;
+    const origin = originAtPoint(unit, captureEl, point, current) ?? defaultOrigin(unit);
+    // Reveal all choices immediately. If this remains a tap they stay open;
+    // if it becomes a drag they provide visible destinations for the gesture.
+    explicitTargetId = unit.id;
+    aim = origin ? { targetId: unit.id, origin } : null;
+    attackDrag = {
+      targetId: unit.id,
+      pointerId: e.pointerId,
+      captureEl,
+      start: point,
+      moved: false,
+      cancel: false,
+      origin,
+    };
+    captureEl.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: PointerEvent, unit: UnitStack) {
+    const drag = attackDrag;
+    if (!drag || drag.pointerId !== e.pointerId || drag.targetId !== unit.id) {
+      updateAim(e, unit);
+      return;
+    }
+
+    const point = { x: e.clientX, y: e.clientY };
+    const distance = Math.hypot(point.x - drag.start.x, point.y - drag.start.y);
+    const moved = drag.moved || distance >= DRAG_THRESHOLD_PX;
+    if (!moved) return;
+
+    const targetRect = drag.captureEl.getBoundingClientRect();
+    const targetCenter = rectCenter(targetRect);
+    const inCancelZone = Math.hypot(point.x - targetCenter.x, point.y - targetCenter.y)
+      <= Math.min(targetRect.width, targetRect.height) * CANCEL_RADIUS_RATIO;
+    const boardRect = boardEl.getBoundingClientRect();
+    const outsideBoard = point.x < boardRect.left || point.x > boardRect.right || point.y < boardRect.top || point.y > boardRect.bottom;
+    const cancel = inCancelZone || outsideBoard;
+    const current = drag.origin;
+    const origin = cancel ? null : originAtPoint(unit, drag.captureEl, point, current);
+    attackDrag = { ...drag, moved, cancel: cancel || !origin, origin };
+    aim = origin ? { targetId: unit.id, origin } : null;
+  }
+
+  function handlePointerUp(e: PointerEvent, unit: UnitStack) {
+    const pending = attackDrag;
+    if (!pending || pending.pointerId !== e.pointerId || pending.targetId !== unit.id) return;
+    // Re-evaluate the release coordinate itself. A fast pointer can leave the
+    // board between the browser's final move event and pointerup.
+    handlePointerMove(e, unit);
+    const drag = attackDrag;
+    if (!drag) return;
+    releaseDragCapture(drag);
+    attackDrag = null;
+    suppressFollowingClick();
+
+    if (!drag.moved) {
+      beginExplicitTargeting(unit);
+      return;
+    }
+    if (drag.cancel || !drag.origin) {
+      clearTargeting();
+      return;
+    }
+    clearTargeting();
+    onmeleeaim(unit.id, drag.origin);
+  }
+
+  function handlePointerCancel(e: PointerEvent) {
+    if (!attackDrag || attackDrag.pointerId !== e.pointerId) return;
+    cancelAttackDrag();
   }
 
   const aimKey = $derived(aim ? `${aim.origin.col},${aim.origin.row}` : null);
   const aimTarget = $derived(aim ? (unitsById.get(aim.targetId) ?? null) : null);
+  const explicitOriginKeys = $derived.by(() => {
+    if (!explicitTargetId) return new Set<string>();
+    return new Set((originsByTarget.get(explicitTargetId) ?? []).map(origin => cellKey(origin.col, origin.row)));
+  });
 
   // updateAim only clears on mousemove, so a locked board (animating, AI turn) would
   // otherwise strand the red origin tile and arrow on an origin that may no longer be
   // reachable — and clicking it is a silent no-op, since handleMeleeAim re-checks.
   $effect(() => {
-    if (!interactive) aim = null;
+    if (!interactive) {
+      if (attackDrag) releaseDragCapture(attackDrag);
+      attackDrag = null;
+      clearTargeting();
+    } else if (explicitTargetId && !originsByTarget.has(explicitTargetId)) {
+      clearTargeting();
+    }
+  });
+
+  $effect(() => {
+    ontargetingchange?.(attackDrag?.moved ? 'drag' : explicitTargetId || attackDrag ? 'choose' : null);
   });
 
   function arrowAngle(): number {
@@ -210,8 +381,24 @@
 
   function handleClick(col: number, row: number, shift: boolean) {
     const cell = battleState.grid.cells[row][col];
-    if (cell.blocked) return;
     const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined;
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      return;
+    }
+    if (explicitTargetId) {
+      const targetId = explicitTargetId;
+      if (explicitOriginKeys.has(cellKey(col, row))) {
+        clearTargeting();
+        onmeleeaim(targetId, { col, row });
+      } else if (occupant && occupant.id !== targetId && meleeAimable(occupant.id)) {
+        beginExplicitTargeting(occupant);
+      } else {
+        clearTargeting();
+      }
+      return;
+    }
+    if (cell.blocked) return;
     if (deployMode) {
       if (occupant) ondeployunit?.(occupant);
       else ondeploycell?.({ col, row });
@@ -219,8 +406,10 @@
     }
     if (!interactive) return;
     if (occupant) {
-      if (aim && aim.targetId === occupant.id && meleeAimable(occupant.id)) {
-        onmeleeaim(occupant.id, aim.origin);
+      if (meleeAimable(occupant.id)) {
+        // Keyboard-generated clicks and browsers without Pointer Events use
+        // the same explicit, cancellable flow as a simple pointer click.
+        beginExplicitTargeting(occupant);
       } else {
         onunitclick(occupant, shift);
       }
@@ -230,7 +419,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} onkeyup={onKey} />
+<svelte:window onkeydown={onKeyDown} onkeyup={onKeyUp} />
 
 <!-- Perspective viewport: tilts the board like a tabletop. The stage is a
      size container so the perspective distance scales with board width —
@@ -239,6 +428,7 @@
 <div class="board-stage">
 <div class="board-viewport">
   <div
+    bind:this={boardEl}
     class="board grid rounded-md border border-indigo-300/20 bg-slate-800/60 p-0.5"
     style="grid-template-columns: repeat({battleState.grid.width}, minmax(0, 1fr)); --tilt: {TILT_DEG}deg; --death-ms: {deathMs}ms;"
   >
@@ -250,32 +440,47 @@
         {@const inHoverRange = rangeKeys.has(cellKey(cell.col, cell.row))}
         {@const attackable = !deployMode && !!occupant && targetIds.has(occupant.id)}
         {@const isAimOrigin = aimKey === cellKey(cell.col, cell.row)}
+        {@const isExplicitOrigin = explicitOriginKeys.has(cellKey(cell.col, cell.row))}
+        {@const isExplicitTarget = explicitTargetId === occupant?.id}
         {@const deploySelected = deployMode && !!occupant && occupant.id === selectedDeployId}
         <button
           type="button"
+          data-cell-key={cellKey(cell.col, cell.row)}
           class="cell relative aspect-square border border-indigo-300/15
             {reachable ? 'bg-slate-500/50 hover:bg-slate-400/50' : 'bg-slate-900/70'}
             {inHoverRange ? 'range-cell' : ''}
             {attackable ? 'attackable' : ''}
             {isAimOrigin ? 'aim-origin' : ''}
+            {isExplicitOrigin ? 'explicit-origin' : ''}
+            {isExplicitTarget ? 'explicit-target' : ''}
             {deploySelected ? 'deploy-selected' : ''}
             {!interactive && !deployMode ? 'cursor-default' : ''}"
           style:cursor={deployMode ? (occupant?.side === 'player' && !occupant.isHero ? 'pointer' : deployTarget ? 'pointer' : 'default') : cursorFor(cell.occupantId, attackable)}
           aria-label={cell.blocked
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant
-              ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}`
-              : `cell ${cell.col},${cell.row}`}
+              ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}${isExplicitOrigin ? ' — attack from here' : ''}`
+              : `cell ${cell.col},${cell.row}${isExplicitOrigin ? ' — attack from here' : ''}`}
+          aria-pressed={isExplicitTarget || undefined}
           onclick={e => handleClick(cell.col, cell.row, e.shiftKey)}
           oncontextmenu={e => {
-            e.preventDefault(); // suppress the browser menu: right-click inspects
-            onunitinspect(occupant ?? null);
+            e.preventDefault();
+            if (attackDrag || explicitTargetId) cancelAttackDrag();
+            else onunitinspect(occupant ?? null); // right-click normally inspects
           }}
-          onmouseenter={() => onunithover(occupant ?? null)}
-          onmousemove={occupant && !deployMode ? e => updateAim(e, occupant) : undefined}
+          onmouseenter={() => {
+            onunithover(occupant ?? null);
+            if (explicitTargetId && isExplicitOrigin) {
+              aim = { targetId: explicitTargetId, origin: { col: cell.col, row: cell.row } };
+            }
+          }}
+          onpointerdown={occupant && !deployMode ? e => handlePointerDown(e, occupant) : undefined}
+          onpointermove={occupant && !deployMode ? e => handlePointerMove(e, occupant) : undefined}
+          onpointerup={occupant && !deployMode ? e => handlePointerUp(e, occupant) : undefined}
+          onpointercancel={handlePointerCancel}
           onmouseleave={() => {
             onunithover(null);
-            if (aim && occupant && aim.targetId === occupant.id) aim = null;
+            if (!attackDrag && !explicitTargetId && aim && occupant && aim.targetId === occupant.id) aim = null;
           }}
         >
           {#if occupant}
@@ -306,6 +511,12 @@
           {/if}
           {#if isAimOrigin}
             <span class="aim-arrow" style="transform: rotate({arrowAngle()}deg)" aria-hidden="true">➤</span>
+          {/if}
+          {#if isExplicitOrigin}
+            <span class="origin-marker" aria-hidden="true">⚔</span>
+          {/if}
+          {#if occupant && attackDrag?.targetId === occupant.id && attackDrag.cancel}
+            <span class="cancel-marker" aria-hidden="true">Cancel</span>
           {/if}
         </button>
       {/each}
@@ -339,6 +550,7 @@
 <style>
   .board-stage {
     container-type: inline-size;
+    position: relative;
   }
 
   .board-viewport {
@@ -367,6 +579,10 @@
     transform-style: preserve-3d;
   }
 
+  .cell.attackable {
+    touch-action: none;
+  }
+
   /* Hovered stack's threat range: shooting range for shooters, movement
      reach for melee. Declared before the red target rules so those win
      when a cell is both. */
@@ -385,6 +601,24 @@
     background-color: rgb(239 68 68 / 0.18);
   }
 
+  /* Simple-click targeting: every legal landing cell is a full-size target.
+     The currently aimed origin retains the stronger red treatment above. */
+  .cell.explicit-origin {
+    background-color: rgb(245 158 11 / 0.22);
+    box-shadow: inset 0 0 0 2px rgb(245 158 11 / 0.9);
+    cursor: pointer;
+  }
+
+  .cell.explicit-origin.aim-origin {
+    background-color: rgb(239 68 68 / 0.22);
+    box-shadow: inset 0 0 0 2px rgb(239 68 68 / 0.95);
+  }
+
+  .cell.explicit-target {
+    background-color: rgb(239 68 68 / 0.25);
+    box-shadow: inset 0 0 0 3px rgb(248 113 113 / 0.95), 0 0 12px rgb(239 68 68 / 0.45);
+  }
+
   /* The stack picked up during deployment. */
   .cell.deploy-selected {
     box-shadow: inset 0 0 0 2.5px rgb(251 191 36 / 0.95);
@@ -400,6 +634,33 @@
     font-size: 1.4rem;
     color: #f97316;
     text-shadow: 0 1px 2px rgb(0 0 0 / 0.7);
+    pointer-events: none;
+  }
+
+  .origin-marker {
+    position: absolute;
+    right: 7%;
+    top: 7%;
+    z-index: 2;
+    font-size: 0.9rem;
+    line-height: 1;
+    color: #fbbf24;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.85));
+    pointer-events: none;
+  }
+
+  .cancel-marker {
+    position: absolute;
+    inset: 28%;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: rgb(15 23 42 / 0.92);
+    box-shadow: 0 0 0 2px rgb(148 163 184 / 0.9);
+    color: #f8fafc;
+    font: 700 9px/1 ui-monospace, monospace;
     pointer-events: none;
   }
 
