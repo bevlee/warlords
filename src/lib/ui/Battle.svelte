@@ -38,6 +38,7 @@
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
+  import { statusIconFor } from './statusIcons';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -760,7 +761,11 @@
           disabled={!isPlayerTurn}
           onclick={handleDefend}
         >
-          <span class="text-5xl leading-none">🛡️</span>
+          <img
+            src={statusIconFor('defending')}
+            alt=""
+            class="h-14 w-14 object-contain [image-rendering:pixelated]"
+          />
           <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Defend</span>
         </button>
         <button

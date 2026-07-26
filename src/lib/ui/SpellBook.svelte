@@ -2,6 +2,7 @@
   import type { Hero, SpellId } from '$lib/engine/types';
   import { SPELLS, lightningDamage } from '$lib/engine/battle';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { statusIconFor } from './statusIcons';
 
   interface Props {
     hero: Hero;
@@ -15,7 +16,8 @@
 
   interface SpellEntry {
     id: SpellId;
-    glyph: string;
+    glyph?: string;
+    icon?: string;
     label: string;
     target: string;
     effect: string;
@@ -37,7 +39,7 @@
     },
     {
       id: 'bloodlust' as SpellId,
-      glyph: '💪',
+      icon: statusIconFor('bloodlust'),
       label: 'Bloodlust',
       target: 'Friendly stack',
       effect: '+4 attack',
@@ -48,7 +50,7 @@
     },
     {
       id: 'stoneskin' as SpellId,
-      glyph: '🗿',
+      icon: statusIconFor('stoneskin'),
       label: 'Stoneskin',
       target: 'Friendly stack',
       effect: '+4 defense',
@@ -87,7 +89,15 @@
             disabled={!affordable}
             onclick={() => onpick(s.id)}
           >
-            {s.glyph}
+            {#if s.icon}
+              <img
+                src={s.icon}
+                alt=""
+                class="h-12 w-12 object-contain [image-rendering:pixelated]"
+              />
+            {:else}
+              {s.glyph}
+            {/if}
           </button>
           <p class="mt-2 text-sm font-bold text-stone-800">{s.label}</p>
           <p class="font-mono text-[11px] leading-tight text-stone-600">Mana: {SPELLS[s.id].cost}</p>

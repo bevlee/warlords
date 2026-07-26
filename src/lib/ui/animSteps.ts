@@ -1,16 +1,18 @@
 import type { BattleEvent, BattleState, Pos } from '$lib/engine/types';
 import { applyDamage } from '$lib/engine/combat';
 import { setOccupant } from '$lib/engine/grid';
+import { statusIconFor } from './statusIcons';
 
 const STATUS_ICON: Partial<Record<string, string>> = {
-  burn_apply: '🔥',
-  blind: '😵',
-  bind: '⛓',
-  bind_block: '⛓',
-  slow: '🐌',
-  drain_morale: '💔',
-  life_drain: '🩸',
-  gating: '✨',
+  burn_apply: statusIconFor('burn'),
+  burn: statusIconFor('burn'),
+  blind: statusIconFor('blind'),
+  bind: statusIconFor('bind'),
+  bind_block: statusIconFor('bind'),
+  slow: statusIconFor('slow'),
+  drain_morale: statusIconFor('morale_drain'),
+  life_drain: statusIconFor('life_drain'),
+  gating: statusIconFor('gating'),
 };
 
 export type AnimStep =
@@ -110,17 +112,17 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
     // entry and animate on their own beat — no extra sequencing needed.
     case 'morale_boost': {
       const { unitId } = entry.data as { unitId: string };
-      return [{ unitId, kind: 'status', icon: '🎺' }];
+      return [{ unitId, kind: 'status', icon: statusIconFor('morale_boost') }];
     }
     case 'morale_freeze': {
       const { unitId } = entry.data as { unitId: string };
-      return [{ unitId, kind: 'status', icon: '❄️' }];
+      return [{ unitId, kind: 'status', icon: statusIconFor('morale_freeze') }];
     }
     // Luck is rolled before damage lands, and the engine emits it as its own
     // entry ahead of the attack — the flash reads as the cause of the big hit.
     case 'luck': {
       const { unitId, kind } = entry.data as { unitId: string; kind: 'good' | 'bad' };
-      return [{ unitId, kind: 'status', icon: kind === 'good' ? '🍀' : '💢' }];
+      return [{ unitId, kind: 'status', icon: statusIconFor(kind === 'good' ? 'good_luck' : 'bad_luck') }];
     }
     case 'move': {
       const { unitId, from, to } = entry.data as { unitId: string; from?: Pos; to: Pos };

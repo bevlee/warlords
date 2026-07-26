@@ -53,8 +53,12 @@
 
 <div class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-slate-700 pt-3 text-sm">
   {#each stats as stat (stat.key)}
-    <span class="flex cursor-help items-baseline gap-2" title={STAT_META[stat.key].title}>
-      <span aria-hidden="true">{STAT_META[stat.key].icon}</span>
+    <span class="flex cursor-help items-center gap-2" title={STAT_META[stat.key].title}>
+      <img
+        src={STAT_META[stat.key].icon}
+        alt=""
+        class="h-5 w-5 shrink-0 object-contain [image-rendering:pixelated]"
+      />
       <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
       <span class="font-mono text-slate-100">{stat.value}</span>
     </span>

@@ -129,8 +129,12 @@
 
     <div class="grid shrink-0 grid-cols-2 gap-x-4 border-t border-slate-700 pt-1.5 {sz.stat}">
       {#each stats as stat (stat.key)}
-        <span class="flex cursor-help items-baseline gap-1.5" title={STAT_META[stat.key].title}>
-          <span aria-hidden="true">{STAT_META[stat.key].icon}</span>
+        <span class="flex cursor-help items-center gap-1.5" title={STAT_META[stat.key].title}>
+          <img
+            src={STAT_META[stat.key].icon}
+            alt=""
+            class="h-4 w-4 shrink-0 object-contain [image-rendering:pixelated]"
+          />
           <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
           <span class="font-mono text-slate-100">
             {#if stat.buff}
