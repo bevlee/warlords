@@ -110,7 +110,7 @@
           <span class="fx-text fx-heal-hp" class:fx-below={step.revived > 0}>+{step.topHp}</span>
         {/if}
       {:else if step.kind === 'status'}
-        <span class="fx-text fx-status">{step.icon}</span>
+        <img src={step.icon} alt="" class="fx-text fx-status" />
       {/if}
     </div>
   {/each}
@@ -164,7 +164,11 @@
   }
 
   .fx-status {
-    font-size: 1.1rem;
+    width: 2rem;
+    height: 2rem;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.85));
   }
 
   /* Damage floater size tiers, matching the log's damageTier(). */
