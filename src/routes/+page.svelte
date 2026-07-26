@@ -7,10 +7,13 @@
   import { loadCampaign, totalChapters, type CampaignState } from '$lib/campaign/campaignStore';
   import { getCurrentSeason } from '$lib/events/season';
   import { actOf, RUN_LENGTH, type RunState } from '$lib/gauntlet/run';
+  import { unitEntries, factionEntries } from '$lib/compendium/entries';
   import type { Hero } from '$lib/engine/types';
 
   const ROMAN = ['', 'I', 'II', 'III'];
   const CHAPTERS = totalChapters();
+  const UNIT_COUNT = unitEntries().length;
+  const FACTION_COUNT = factionEntries().length;
 
   let hero = $state<Hero | null>(null);
   let run = $state<RunState | null>(null);
@@ -118,10 +121,26 @@
         badge={started ? `Lv ${hero?.level}` : undefined}
       />
     </div>
+
+    <p class="mb-3 mt-6 px-0.5 text-[11px] font-extrabold uppercase tracking-widest text-slate-500">Reference</p>
+
+    <a
+      href="/compendium"
+      class="flex items-center gap-3 rounded-xl border border-slate-700/60 bg-slate-800/60 px-4 py-3 transition hover:border-slate-600 hover:bg-slate-800"
+    >
+      <span class="text-2xl">📖</span>
+      <span class="min-w-0 flex-1">
+        <b class="block text-sm font-extrabold text-slate-100">Compendium</b>
+        <span class="block truncate text-[11px] text-slate-400">
+          {UNIT_COUNT} units across {FACTION_COUNT} factions — stats, abilities, spells, and artifacts.
+        </span>
+      </span>
+      <span class="shrink-0 text-xs font-bold text-slate-400">Browse →</span>
+    </a>
   </div>
 
   <!-- Mobile-only bottom nav in the thumb zone -->
-  <nav class="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t border-slate-700/60 bg-slate-900/90 py-2 backdrop-blur sm:hidden">
+  <nav class="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-slate-700/60 bg-slate-900/90 py-2 backdrop-blur sm:hidden">
     <a href="/" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-amber-300">
       <span class="text-lg">🏰</span>Home
     </a>
@@ -130,6 +149,9 @@
     </a>
     <a href="/events" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
       <span class="text-lg">❄️</span>Events
+    </a>
+    <a href="/compendium" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
+      <span class="text-lg">📖</span>Codex
     </a>
     <a href="/settings" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
       <span class="text-lg">👤</span>Profile

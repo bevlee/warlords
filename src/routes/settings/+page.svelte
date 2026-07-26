@@ -3,6 +3,7 @@
   import { resetHero, clearArmy, clearRun } from '$lib/storage';
   import { loadProfile, saveProfile, clearProfile, DEFAULT_PROFILE, type Profile } from '$lib/profile';
   import { resetCampaign } from '$lib/campaign/campaignStore';
+  import { resetDiscovery } from '$lib/compendium/discovery';
 
   let profile = $state<Profile>({ ...DEFAULT_PROFILE });
   let loaded = $state(false);
@@ -21,7 +22,7 @@
   });
 
   async function resetEverything() {
-    await Promise.all([resetHero(), clearArmy(), clearRun(), resetCampaign()]);
+    await Promise.all([resetHero(), clearArmy(), clearRun(), resetCampaign(), resetDiscovery()]);
     clearProfile();
     profile = { ...DEFAULT_PROFILE };
     confirming = false;

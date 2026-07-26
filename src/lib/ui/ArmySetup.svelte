@@ -5,7 +5,8 @@
   import { maxMana } from '$lib/engine/factionSkills';
   import { abilityInfo } from './abilities';
   import Sprite from './Sprite.svelte';
-  import { heroSpriteName } from './sprites';
+  import { heroSpriteName, unitSlug } from './sprites';
+  import { entryHref } from '$lib/compendium/entries';
   import type { SavedArmy } from '$lib/storage';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
@@ -134,15 +135,29 @@
 
   <div class="mb-4 grid grid-cols-3 gap-3">
     {#each Object.entries(FACTION_INFO) as [cls, info] (cls)}
-      <button
-        type="button"
-        class="rounded-lg border px-3 py-2 text-left transition
-          {hero.class === cls ? 'border-amber-500 bg-slate-700' : 'border-slate-700 bg-slate-800 hover:bg-slate-700/60'}"
-        onclick={() => onclass(cls as typeof hero.class)}
-      >
-        <p class="text-sm font-semibold text-slate-100">{info.name}</p>
-        <p class="mt-0.5 text-[11px] leading-tight text-slate-400">{info.description}</p>
-      </button>
+      <!-- The card is the picker button, so the compendium link is a sibling:
+           an <a> nested in a <button> is invalid HTML. -->
+      <div class="relative">
+        <button
+          type="button"
+          class="w-full rounded-lg border px-3 py-2 pr-7 text-left transition
+            {hero.class === cls ? 'border-amber-500 bg-slate-700' : 'border-slate-700 bg-slate-800 hover:bg-slate-700/60'}"
+          onclick={() => onclass(cls as typeof hero.class)}
+        >
+          <p class="text-sm font-semibold text-slate-100">{info.name}</p>
+          <p class="mt-0.5 text-[11px] leading-tight text-slate-400">{info.description}</p>
+        </button>
+        <a
+          href={entryHref('faction', cls)}
+          target="_blank"
+          rel="noopener"
+          title="Read about the {info.name} faction in the compendium"
+          aria-label="Read about the {info.name} faction in the compendium"
+          class="absolute right-1 top-1 rounded px-1 text-xs text-slate-500 hover:bg-slate-600 hover:text-amber-300"
+        >
+          📖
+        </a>
+      </div>
     {/each}
   </div>
 
@@ -192,7 +207,14 @@
       >
         <Sprite name={unit.name} class="h-11 w-9 shrink-0 {locked ? 'grayscale' : ''}" />
         <div class="w-32">
-          <p class="text-sm font-semibold text-slate-100">{unit.name}</p>
+          <!-- Opens in a new tab: recruiting state is mid-edit here. -->
+          <a
+            href={entryHref('unit', unitSlug(unit.name))}
+            target="_blank"
+            rel="noopener"
+            title="Read about {unit.name} in the compendium"
+            class="text-sm font-semibold text-slate-100 hover:text-amber-300 hover:underline"
+          >{unit.name}</a>
           {#if locked}
             <p class="font-mono text-[10px] text-slate-400">🔒 Unlocks at level {unit.tier - 1}</p>
           {:else}

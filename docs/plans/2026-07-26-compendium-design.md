@@ -65,6 +65,14 @@ A discriminated union over seven kinds, each built by mapping an existing export
 Every entry carries `{ kind, id, name }`. `id` is the existing stable key — a catalog
 slug, an ability id, an `ItemId` — so nothing new is persisted or migrated.
 
+**Ids are unique within a kind, not globally.** The URL carries both (`?tab=&entry=`),
+and two collisions make global uniqueness the wrong goal: a gauntlet skill deliberately
+shares its id with the engine ability it grants (`life_drain` is both), and several
+factions define a skill of the same name. Faction skills are therefore keyed
+`<faction>:<skill>` — Armorer is +3%/level for Barbarian but +5%/level for Knight, so
+the two are genuinely different entries. The tests assert per-kind uniqueness and pin
+that Armorer difference.
+
 **`entries.ts` never restates a fact.** A unit's damage is read from
 `CatalogUnit.base`; an item's effect line from `itemEffectText()`. Adding a unit to
 `demon.ts` makes it appear in the compendium with no further edits. This is the
@@ -119,13 +127,15 @@ picking an entry swaps the grid for the detail with a back chevron.
 
 ```
 src/lib/ui/compendium/
-  EntryGrid.svelte      cards, faction/tier/kind filters, text search, Encountered badges
-  EntryDetail.svelte    thin dispatcher, one branch per kind
-  UnitEntry.svelte
-  AbilityEntry.svelte
-  ItemEntry.svelte
-  FactionEntry.svelte
+  EntryCard.svelte      one grid row: art, name, kind-appropriate subtitle, Met badge
+  EntryDetail.svelte    dispatcher; every kind but unit is a short inline branch
+  UnitEntryView.svelte  the one kind with enough structure to be its own file
 ```
+
+Only the unit view earned a separate component. Faction, ability, spell, faction-skill,
+item, and gauntlet-skill panels are a handful of elements each, and four more files
+would have been indirection without payoff. Filtering and search live in the route
+rather than an `EntryGrid`, since they read and write the query string the route owns.
 
 Reused as-is: `Sprite`, `TIER_STYLE`, `ItemIcon`, `skillIconFor`/`skillGlyph`,
 `abilityInfo`.
@@ -208,7 +218,8 @@ and by design the logic worth testing lives in the pure layer.
 
 - `SaveSlot` union in `src/lib/net/api.ts` — add `compendium`
 - `SLOTS` guard in `server/api.ts` — add `compendium`
-- Hero reset path — clear the compendium save so a fresh warlord starts with an empty log
+- Both hero-reset paths — `/settings` "Reset progress" and the campaign screen's
+  "Reset hero" — clear the compendium so a fresh warlord starts with an empty log
 
 ## Out of scope
 

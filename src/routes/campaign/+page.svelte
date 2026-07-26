@@ -18,6 +18,7 @@
     type CampaignState,
   } from '$lib/campaign/campaignStore';
   import { generateEnemyArmy as generateCampaignArmy, type Encounter } from '$lib/campaign/encounters';
+  import { resetDiscovery } from '$lib/compendium/discovery';
   import type { ArmySlot, FactionClass, Hero } from '$lib/engine/types';
 
   const DEFAULT_HERO: Hero = updateFactionSkills({
@@ -145,6 +146,7 @@
     await resetHero();
     await resetCampaign();
     await clearArmy();
+    await resetDiscovery();
   }
 
   function handleArmyClear() {

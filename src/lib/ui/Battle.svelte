@@ -31,7 +31,8 @@
   import ArtifactStrip from './ArtifactStrip.svelte';
   import type { ItemId } from '$lib/gauntlet/items';
   import Sprite from './Sprite.svelte';
-  import { heroSpriteName } from './sprites';
+  import { heroSpriteName, unitSlug } from './sprites';
+  import { recordSeen } from '$lib/compendium/discovery';
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
@@ -541,6 +542,19 @@
         battle = state;
       },
     });
+
+    // Compendium discovery, recorded on sight: every stack on the field counts,
+    // win or lose. `battle` is already resolved here whether it came from
+    // initBattle or an initialState, so campaign, gauntlet, events, and co-op
+    // are all covered by this one call. Replays discover nothing — re-watching
+    // history isn't meeting anything new. Fire-and-forget: recordSeen swallows
+    // its own failures, and a missing badge must never disturb a battle.
+    if (!replay) {
+      void recordSeen({
+        units: battle.units.filter(u => !u.isHero).map(u => unitSlug(u.definition.name)),
+        factions: [hero.class],
+      });
+    }
   });
 
   function restart() {

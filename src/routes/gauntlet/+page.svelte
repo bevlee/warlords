@@ -9,6 +9,8 @@
   import { UNIT_SKILLS, applyUnitSkills, canLearnSkill, migrateUnitSkills, type SkillId } from '$lib/gauntlet/skills';
   import { skillIconFor, skillGlyph } from '$lib/ui/skillIcons';
   import { isUnique } from '$lib/engine/abilityCatalog';
+  import { recordSeen } from '$lib/compendium/discovery';
+  import { entryHref } from '$lib/compendium/entries';
 
   const ROMAN_LVL = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
   import {
@@ -99,6 +101,16 @@
     run = recordBattle(run, result === 'player_wins', survivorsFrom(finalUnits));
     void saveRun(run);
   }
+
+  // Compendium discovery: an *offered* item or skill counts as met, so a card
+  // the player passed over stays readable afterwards. An effect rather than a
+  // call in handleResult, so a run resumed mid-draft records its offers too.
+  // recordSeen writes only when something is genuinely new.
+  $effect(() => {
+    const items = run?.pendingItems ?? [];
+    const unitSkills = run?.pendingSkills ?? [];
+    if (items.length > 0 || unitSkills.length > 0) void recordSeen({ items, unitSkills });
+  });
 
   function pick(card: UnitCard) {
     if (!run) return;
@@ -262,17 +274,31 @@
           {#each run.pendingItems as id (id)}
             {@const item = ITEMS[id]}
             {@const rs = RARITY_STYLE[item.rarity]}
-            <button
-              type="button"
-              class="flex flex-col items-center gap-1.5 rounded-lg border-2 bg-slate-800 p-6
-                hover:bg-slate-700 hover:brightness-110 {rs.border}"
-              onclick={() => pickItem(id)}
-            >
-              <ItemIcon {id} class="h-14 w-14" />
-              <span class="text-xl font-bold {rs.text}">{item.name}</span>
-              <span class="text-xs font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
-              <span class="font-mono text-base text-amber-200">{itemEffectText(item)}</span>
-            </button>
+            <!-- The card is the pick button, so the compendium link sits beside
+                 it rather than inside: an <a> nested in a <button> is invalid. -->
+            <div class="relative">
+              <button
+                type="button"
+                class="flex w-full flex-col items-center gap-1.5 rounded-lg border-2 bg-slate-800 p-6
+                  hover:bg-slate-700 hover:brightness-110 {rs.border}"
+                onclick={() => pickItem(id)}
+              >
+                <ItemIcon {id} class="h-14 w-14" />
+                <span class="text-xl font-bold {rs.text}">{item.name}</span>
+                <span class="text-xs font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
+                <span class="font-mono text-base text-amber-200">{itemEffectText(item)}</span>
+              </button>
+              <a
+                href={entryHref('item', id)}
+                target="_blank"
+                rel="noopener"
+                title="Read about {item.name} in the compendium"
+                aria-label="Read about {item.name} in the compendium"
+                class="absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-sm text-slate-500 hover:bg-slate-700 hover:text-amber-300"
+              >
+                📖
+              </a>
+            </div>
           {/each}
         </div>
       {/if}
@@ -283,9 +309,10 @@
         <div class="grid grid-cols-3 gap-3">
           {#each run.pendingSkills as id (id)}
             {@const skill = UNIT_SKILLS[id]}
+            <div class="relative">
             <button
               type="button"
-              class="flex flex-col items-center gap-1.5 rounded-lg border-2 bg-slate-800 p-5
+              class="flex w-full flex-col items-center gap-1.5 rounded-lg border-2 bg-slate-800 p-5
                 hover:bg-slate-700 hover:brightness-110
                 {chosenSkill === id ? 'border-violet-300 ring-2 ring-violet-400/60' : 'border-violet-500/60'}"
               onclick={() => (chosenSkill = chosenSkill === id ? null : id)}
@@ -298,6 +325,17 @@
               <span class="text-lg font-bold text-violet-300">{skill.name}</span>
               <span class="text-center text-sm leading-snug text-slate-400">{skill.description}</span>
             </button>
+            <a
+              href={entryHref('unitSkill', id)}
+              target="_blank"
+              rel="noopener"
+              title="Read about {skill.name} in the compendium"
+              aria-label="Read about {skill.name} in the compendium"
+              class="absolute right-1.5 top-1.5 rounded px-1.5 py-0.5 text-sm text-slate-500 hover:bg-slate-700 hover:text-amber-300"
+            >
+              📖
+            </a>
+            </div>
           {/each}
         </div>
         {#if chosenSkill}

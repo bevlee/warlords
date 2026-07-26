@@ -4,6 +4,9 @@
   import { abilityInfo } from './abilities';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { skillIconFor, skillGlyph } from './skillIcons';
+  import { STAT_META, type StatKey } from './statMeta';
+  import { unitSlug } from './sprites';
+  import { entryHref } from '$lib/compendium/entries';
   import Sprite from './Sprite.svelte';
 
   interface Props {
@@ -39,27 +42,8 @@
         }
   );
 
-  // Icon + label + hover explanation per stat, kept in one place so the meaning
-  // of each glyph is discoverable via title tooltip as well as its label.
-  const STAT_META = {
-    level: { icon: '⭐', title: 'Level', label: 'Level' },
-    mana: { icon: '🔷', title: 'Mana — spent casting spells', label: 'Mana' },
-    xp: { icon: '✨', title: 'Experience points', label: 'Experience' },
-    count: { icon: '👥', title: 'Count — creatures remaining in this stack', label: 'Count' },
-    hp: { icon: '💚', title: 'Hit points — current / max per creature', label: 'HP' },
-    attack: { icon: '⚔️', title: 'Attack — raises damage dealt', label: 'Attack' },
-    defense: { icon: '🛡️', title: 'Defense — reduces damage taken', label: 'Defense' },
-    damage: { icon: '💥', title: 'Damage — min–max per hit', label: 'Damage' },
-    speed: { icon: '🥾', title: 'Speed — tiles moved per turn', label: 'Speed' },
-    initiative: { icon: '⚡', title: 'Initiative — determines turn order', label: 'Initiative' },
-    range: { icon: '🎯', title: 'Range — shooting distance', label: 'Range' },
-    shots: { icon: '🏹', title: 'Shots — ranged attacks left / max', label: 'Shots' },
-    morale: { icon: '🎺', title: 'Morale — chance to act again, or freeze if negative', label: 'Morale' },
-    luck: { icon: '🍀', title: 'Luck — chance to double damage, or halve it if negative', label: 'Luck' },
-  } as const;
-
   interface Stat {
-    key: keyof typeof STAT_META;
+    key: StatKey;
     value: string;
     buff?: number;
   }
@@ -113,8 +97,20 @@
     <div class="flex shrink-0 items-center gap-2">
       <Sprite name={unit.definition.name} class={sz.sprite} />
       <span class="flex-1 truncate font-semibold {sz.name} {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
-        {unit.isHero ? `Hero — level ${hero?.level ?? '?'}` : unit.definition.name}
-        {#if !unit.isHero}<span class="ml-1 font-mono text-slate-400 {sz.count}">×{unit.count}</span>{/if}
+        {#if unit.isHero}
+          Hero — level {hero?.level ?? '?'}
+        {:else}
+          <!-- New tab on purpose: this panel is often shown mid-battle, and
+               navigating away would end it. -->
+          <a
+            href={entryHref('unit', unitSlug(unit.definition.name))}
+            target="_blank"
+            rel="noopener"
+            title="Read about {unit.definition.name} in the compendium"
+            class="hover:underline">{unit.definition.name}</a
+          >
+          <span class="ml-1 font-mono text-slate-400 {sz.count}">×{unit.count}</span>
+        {/if}
       </span>
       {#if pinned}
         <button
@@ -162,11 +158,13 @@
                 {:else}
                   <span aria-hidden="true">{skillGlyph(ability)}</span>
                 {/if}
-                {info.label}
+                <a href={entryHref('ability', ability)} target="_blank" rel="noopener" class="hover:underline">{info.label}</a>
                 <span class="text-[9px] font-normal uppercase tracking-wider text-violet-400/80">taught</span>
               </p>
             {:else}
-              <p class="font-semibold leading-tight text-amber-300 {sz.ability}">{info.label}</p>
+              <p class="font-semibold leading-tight text-amber-300 {sz.ability}">
+                <a href={entryHref('ability', ability)} target="_blank" rel="noopener" class="hover:underline">{info.label}</a>
+              </p>
             {/if}
             <p class="leading-tight text-slate-400 {sz.ability}">{info.description}</p>
           </div>

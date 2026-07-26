@@ -12,7 +12,7 @@ export interface Session {
   token: string;
 }
 
-export type SaveSlot = 'hero' | 'army' | 'campaign' | 'gauntletRun';
+export type SaveSlot = 'hero' | 'army' | 'campaign' | 'gauntletRun' | 'compendium';
 
 export type SoloController = 'host' | 'ai';
 
