@@ -41,7 +41,7 @@
           name: 'text-[21px]',
           count: 'text-lg',
           stat: 'text-lg gap-y-1.5',
-          statGrid: 'grid-cols-1',
+          statGrid: 'grid-cols-2',
           ability: 'text-[16.5px]',
           statIcon: 'h-6 w-6',
           abilityIcon: 'h-6 w-6',
