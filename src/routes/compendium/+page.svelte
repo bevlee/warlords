@@ -7,10 +7,11 @@
   import {
     ENTRY_KINDS,
     KIND_LABEL,
-    TAB_OF,
     entriesOfKind,
-    entryHref,
+    entryHrefFrom,
     kindOfTab,
+    matchesFilters,
+    tabHrefFrom,
     type CompendiumEntry,
     type EntryKind,
   } from '$lib/compendium/entries';
@@ -40,15 +41,16 @@
 
   const all = $derived(entriesOfKind(kind, hero?.level ?? 1));
 
-  const shown = $derived.by(() => {
-    const q = search.trim().toLowerCase();
-    return all.filter((e) => {
-      if (q && !e.name.toLowerCase().includes(q)) return false;
-      if (factionFilter && 'faction' in e && e.faction !== factionFilter) return false;
-      if (tierFilter && (e.kind !== 'unit' || e.tier !== tierFilter)) return false;
-      return true;
-    });
-  });
+  const shown = $derived(
+    all.filter((e) => matchesFilters(e, { faction: factionFilter, tier: tierFilter, search })),
+  );
+
+  /** Entry links keep the active filters, so picking a Knight while filtered to
+   *  Knight leaves the list filtered. Passed down so the detail panel's
+   *  cross-links behave identically. */
+  const hrefFor = $derived(
+    (k: EntryKind, id: string) => entryHrefFrom(page.url.searchParams, k, id, hero?.level ?? 1),
+  );
 
   const selected = $derived(shown.find((e) => e.id === selectedId) ?? all.find((e) => e.id === selectedId) ?? null);
 
@@ -65,10 +67,9 @@
   const metCount = $derived(all.filter(isMet).length);
   const tracksDiscovery = $derived(['unit', 'item', 'unitSkill', 'faction'].includes(kind));
 
-  /** Filters are per-kind; changing tab drops them along with the selection. */
-  function tabHref(k: EntryKind): string {
-    return `/compendium?tab=${TAB_OF[k]}`;
-  }
+  /** Filters carry across tabs and stay until cleared; the selection doesn't,
+   *  since it belongs to the tab being left. */
+  const tabHref = $derived((k: EntryKind) => tabHrefFrom(page.url.searchParams, k));
 
   function filterHref(params: Record<string, string | null>): string {
     const url = new URL(page.url);
@@ -171,7 +172,7 @@
             {#each shown as entry (entry.id)}
               <EntryCard
                 {entry}
-                href={entryHref(entry.kind, entry.id)}
+                href={hrefFor(entry.kind, entry.id)}
                 selected={entry.id === selectedId}
                 seen={isMet(entry)}
               />
@@ -189,7 +190,7 @@
             >
               ‹ Back to {KIND_LABEL[kind].toLowerCase()}
             </a>
-            <EntryDetail entry={selected} {discovery} />
+            <EntryDetail entry={selected} {discovery} {hrefFor} />
           </div>
         {:else}
           <p class="rounded-lg border border-dashed border-slate-700 px-4 py-10 text-center text-sm text-slate-500">

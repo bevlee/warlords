@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { UnitEntry } from '$lib/compendium/entries';
-  import { entryHref } from '$lib/compendium/entries';
+  import type { EntryKind, UnitEntry } from '$lib/compendium/entries';
   import { FACTION_INFO } from '$lib/engine/factions';
   import { TIER_STYLE } from '../tierStyle';
   import { STAT_META, type StatKey } from '../statMeta';
@@ -8,7 +7,13 @@
   import { skillIconFor, skillGlyph } from '../skillIcons';
   import Sprite from '../Sprite.svelte';
 
-  let { entry }: { entry: UnitEntry } = $props();
+  interface Props {
+    entry: UnitEntry;
+    /** Filter-preserving link builder, supplied by the route. */
+    hrefFor: (kind: EntryKind, id: string) => string;
+  }
+
+  let { entry, hrefFor }: Props = $props();
 
   const tier = $derived(TIER_STYLE[entry.tier]);
   const base = $derived(entry.unit.base);
@@ -39,7 +44,7 @@
     <p class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider">
       <span class="rounded border {tier.border} px-1.5 py-0.5 {tier.text}">Tier {entry.tier} · {tier.label}</span>
       <a
-        href={entryHref('faction', entry.faction)}
+        href={hrefFor('faction', entry.faction)}
         class="rounded border border-slate-600 px-1.5 py-0.5 text-slate-300 hover:border-amber-500 hover:text-amber-300"
       >
         {FACTION_INFO[entry.faction].name}
@@ -69,7 +74,7 @@
         {@const info = abilityInfo(ability.id, ability.level)}
         <div>
           <a
-            href={entryHref('ability', ability.id)}
+            href={hrefFor('ability', ability.id)}
             class="flex items-center gap-1.5 text-sm font-semibold text-amber-300 hover:underline"
           >
             {#if skillIconFor(ability.id)}
