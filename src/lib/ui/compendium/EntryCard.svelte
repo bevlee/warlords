@@ -5,6 +5,7 @@
   import { skillIconFor, skillGlyph } from '../skillIcons';
   import Sprite from '../Sprite.svelte';
   import ItemIcon from '../ItemIcon.svelte';
+  import { spellIconFor } from '../spellIcons';
 
   interface Props {
     entry: CompendiumEntry;
@@ -49,31 +50,42 @@
 <a
   {href}
   aria-current={selected ? 'true' : undefined}
-  class="flex w-full items-center gap-3 rounded-lg border bg-slate-800 px-3 py-2.5 text-left transition
+  class="flex w-full items-center gap-3 rounded-lg border bg-slate-800 px-3 text-left transition
+    {entry.kind === 'ability' ? 'py-2' : 'py-2.5'}
     hover:bg-slate-700/70 focus:outline-none focus:ring-2 focus:ring-amber-500
     {selected ? 'border-amber-500 bg-slate-700 ring-1 ring-amber-500/40' : 'border-slate-700'}
     {tier?.glow ?? ''}"
 >
-  <!-- Kind-appropriate art, all boxed to the same footprint so rows align. -->
-  <span class="grid h-12 w-11 shrink-0 place-items-center">
-    {#if entry.kind === 'unit'}
-      <Sprite name={entry.name} class="h-12 w-11" />
-    {:else if entry.kind === 'faction'}
-      <Sprite name="Hero {entry.faction}" class="h-12 w-11" />
-    {:else if entry.kind === 'item'}
-      <ItemIcon id={entry.id} class="h-10 w-10" />
-    {:else if entry.kind === 'spell'}
-      <span class="text-2xl">{entry.glyph}</span>
-    {:else if entry.kind === 'unitSkill' || entry.kind === 'ability'}
-      {#if skillIconFor(entry.id)}
-        <img src={skillIconFor(entry.id)} alt="" class="h-8 w-8" />
+  <!-- Abilities are deliberately text-only until the whole set has art. -->
+  {#if entry.kind !== 'ability'}
+    <span class="grid h-12 w-11 shrink-0 place-items-center">
+      {#if entry.kind === 'unit'}
+        <Sprite name={entry.name} class="h-12 w-11" />
+      {:else if entry.kind === 'faction'}
+        <Sprite name="Hero {entry.faction}" class="h-12 w-11" />
+      {:else if entry.kind === 'item'}
+        <ItemIcon id={entry.id} class="h-10 w-10" />
+      {:else if entry.kind === 'spell'}
+        {#if spellIconFor(entry.id)}
+          <img
+            src={spellIconFor(entry.id)}
+            alt=""
+            class="h-10 w-10 object-contain [image-rendering:pixelated]"
+          />
+        {:else}
+          <span class="text-2xl">{entry.glyph}</span>
+        {/if}
+      {:else if entry.kind === 'unitSkill'}
+        {#if skillIconFor(entry.id)}
+          <img src={skillIconFor(entry.id)} alt="" class="h-8 w-8" />
+        {:else}
+          <span class="text-2xl">{skillGlyph(entry.id)}</span>
+        {/if}
       {:else}
-        <span class="text-2xl">{skillGlyph(entry.id)}</span>
+        <span class="text-2xl">🎖️</span>
       {/if}
-    {:else}
-      <span class="text-2xl">🎖️</span>
-    {/if}
-  </span>
+    </span>
+  {/if}
 
   <span class="min-w-0 flex-1">
     <span class="flex items-center gap-1.5">

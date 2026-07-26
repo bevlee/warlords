@@ -39,6 +39,7 @@
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
   import { statusIconFor } from './statusIcons';
+  import { attributeIconFor } from './attributeIcons';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -737,24 +738,24 @@
         />
       </div>
 
-      <!-- Right rail: big action buttons, top-aligned where the board's
+      <!-- Right rail: compact action buttons, top-aligned where the board's
            projected far edge is narrow — clear of every tile. -->
-      <div class="ml-2 flex w-32 shrink-0 flex-col items-center gap-3 self-start pt-1">
+      <div class="ml-2 flex w-20 shrink-0 flex-col items-center gap-2 self-start pt-1">
         <button
           type="button"
-          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
+          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500
             bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Wait"
           title="Wait — act again in half a cycle"
           disabled={!isPlayerTurn}
           onclick={handleWait}
         >
-          <span class="text-5xl leading-none">⏳</span>
-          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Wait</span>
+          <span class="text-2xl leading-none">⏳</span>
+          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Wait</span>
         </button>
         <button
           type="button"
-          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
+          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500
             bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Defend"
           title="Defend — +30% defense until your next turn"
@@ -764,13 +765,13 @@
           <img
             src={statusIconFor('defending')}
             alt=""
-            class="h-14 w-14 object-contain [image-rendering:pixelated]"
+            class="h-7 w-7 object-contain [image-rendering:pixelated]"
           />
-          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Defend</span>
+          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Defend</span>
         </button>
         <button
           type="button"
-          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 shadow-lg
+          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 shadow-lg
             disabled:cursor-not-allowed disabled:opacity-40
             {spellbookOpen ? 'border-violet-300 bg-violet-700' : 'border-violet-500/70 bg-violet-950/90 hover:bg-violet-800'}"
           aria-label="Spellbook"
@@ -778,8 +779,12 @@
           disabled={!isHeroTurn}
           onclick={() => (spellbookOpen = !spellbookOpen)}
         >
-          <span class="text-5xl leading-none">📖</span>
-          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-violet-200">Spells</span>
+          <img
+            src={attributeIconFor('mana')}
+            alt=""
+            class="h-7 w-7 object-contain [image-rendering:pixelated]"
+          />
+          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">Spells</span>
         </button>
       </div>
 

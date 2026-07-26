@@ -164,8 +164,8 @@
   }
 
   .fx-status {
-    width: 2rem;
-    height: 2rem;
+    width: 3rem;
+    height: 3rem;
     object-fit: contain;
     image-rendering: pixelated;
     filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.85));

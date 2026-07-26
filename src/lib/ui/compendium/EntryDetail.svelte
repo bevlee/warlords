@@ -10,6 +10,7 @@
   import Sprite from '../Sprite.svelte';
   import ItemIcon from '../ItemIcon.svelte';
   import UnitEntryView from './UnitEntryView.svelte';
+  import { spellIconFor } from '../spellIcons';
 
   interface Props {
     entry: CompendiumEntry;
@@ -106,7 +107,17 @@
   </div>
 {:else if entry.kind === 'spell'}
   <div class="flex items-center gap-4">
-    <span class="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-slate-700 text-5xl">{entry.glyph}</span>
+    <span class="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-slate-700">
+      {#if spellIconFor(entry.id)}
+        <img
+          src={spellIconFor(entry.id)}
+          alt=""
+          class="h-16 w-16 object-contain [image-rendering:pixelated]"
+        />
+      {:else}
+        <span class="text-5xl">{entry.glyph}</span>
+      {/if}
+    </span>
     <div>
       <h2 class="text-2xl font-black text-slate-100">{entry.name}</h2>
       <p class="mt-1 font-mono text-sm text-sky-300">{entry.manaCost} mana · {entry.target}</p>

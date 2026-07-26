@@ -26,9 +26,9 @@
       {@const item = ITEMS[id]}
       <div class="group relative" role="listitem">
         <div
-          class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900/85 p-1 shadow ring-1 {RING[item.rarity]}"
+          class="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900/85 p-1 shadow ring-1 {RING[item.rarity]}"
         >
-          <ItemIcon {id} class="h-7 w-7" />
+          <ItemIcon {id} class="h-10 w-10" />
         </div>
         <!-- Hover card, spellbook-tooltip style; strip sits at the top so it opens downward. -->
         <div
