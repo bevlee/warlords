@@ -139,9 +139,15 @@ describe('No Enemy Retaliation (Monk/Naga/Titan) blocks the defender, not just i
     expect(canRetaliate(defender, attacker)).toBe(true);
   });
 
-  it('a defender with its own no_retaliation still cannot retaliate, attacker ability aside', () => {
+  it('a defender with its own no_retaliation still retaliates when it is hit', () => {
     const attacker = makeStack({ definition: GOBLIN });
     const defender = makeStack({ definition: NAGA, side: 'enemy', hasRetaliated: false });
+    expect(canRetaliate(defender, attacker)).toBe(true);
+  });
+
+  it('a no_retaliation defender still only retaliates once per turn', () => {
+    const attacker = makeStack({ definition: GOBLIN });
+    const defender = makeStack({ definition: NAGA, side: 'enemy', hasRetaliated: true });
     expect(canRetaliate(defender, attacker)).toBe(false);
   });
 });

@@ -163,9 +163,9 @@ export function applyHeal(stack: UnitStack, heal: number): HealResult {
 
 /**
  * Whether `defender` can retaliate against `attacker`'s hit.
- * Two independent abilities gate this: the defender's own `no_retaliation`
- * (it never retaliates, regardless of who hit it) and the attacker's
- * `no_retaliation` (nothing it hits can retaliate — e.g. Monk/Naga/Titan).
+ * `no_retaliation` is an offensive ability: it only stops the targets its
+ * owner hits (e.g. Monk/Naga/Titan). It never stops its owner from
+ * retaliating when something else attacks it.
  * Griffin's `unlimited_retaliation` bypasses the once-per-turn limit.
  */
 export function canRetaliate(defender: UnitStack, attacker?: UnitStack): boolean {
@@ -173,7 +173,6 @@ export function canRetaliate(defender: UnitStack, attacker?: UnitStack): boolean
   const attackerBlocks = attacker?.definition.abilities.includes('no_retaliation') ?? false;
   return (unlimited || !defender.hasRetaliated)
     && defender.count > 0
-    && !defender.definition.abilities.includes('no_retaliation')
     && !attackerBlocks;
 }
 
