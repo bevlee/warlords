@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UNIT_COSTS, armyCost, generateEnemyArmy, mergeArmySlots, DEFAULT_BUDGET } from '../recruit';
+import { UNIT_COSTS, armyCost, generateEnemyArmy, mergeArmySlots, recruitLimit, DEFAULT_BUDGET } from '../recruit';
 import { BARBARIAN_UNITS, GOBLIN, OGRE } from '../barbarian';
 import { mulberry32 } from '../rng';
 
@@ -61,5 +61,43 @@ describe('recruiting', () => {
     const shape = (army: typeof a) => army.map(s => `${s.unit.name}x${s.count}`).join(',');
     expect(shape(a)).toBe(shape(b));
     expect(shape(a)).not.toBe(shape(c));
+  });
+});
+
+describe('recruitLimit', () => {
+  const open = { cost: 10, count: 0, goldLeft: 100, locked: false, atStackCap: false };
+
+  it('reaches as far as the unspent gold affords', () => {
+    expect(recruitLimit(open)).toEqual({ max: 10, blocked: null });
+  });
+
+  it("counts the row's own troops on top of what the rest of the gold buys", () => {
+    // 300 budget, 12 already recruited at 10 each → 180 left, so 12 + 18.
+    expect(recruitLimit({ ...open, count: 12, goldLeft: 180 }).max).toBe(30);
+  });
+
+  it('stops where the gold does', () => {
+    expect(recruitLimit({ ...open, count: 30, goldLeft: 0 }).max).toBe(30);
+    expect(recruitLimit({ ...open, count: 30, goldLeft: 9 }).max).toBe(30);
+  });
+
+  it('raises a row ceiling when gold is freed elsewhere', () => {
+    const tight = recruitLimit({ ...open, count: 5, goldLeft: 0 });
+    const freed = recruitLimit({ ...open, count: 5, goldLeft: 250 });
+    expect(tight.max).toBe(5);
+    expect(freed.max).toBe(30);
+  });
+
+  it('refuses a locked tier outright', () => {
+    expect(recruitLimit({ ...open, locked: true, goldLeft: 999 })).toEqual({ max: 0, blocked: 'locked' });
+  });
+
+  it('refuses a new stack at the cap but still resizes the existing ones', () => {
+    expect(recruitLimit({ ...open, atStackCap: true })).toEqual({ max: 0, blocked: 'stacks' });
+    expect(recruitLimit({ ...open, atStackCap: true, count: 4 })).toEqual({ max: 14, blocked: null });
+  });
+
+  it('holds a priceless unit at its current count rather than an infinite one', () => {
+    expect(recruitLimit({ ...open, cost: 0, count: 3 })).toEqual({ max: 3, blocked: null });
   });
 });

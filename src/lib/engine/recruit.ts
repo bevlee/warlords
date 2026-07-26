@@ -66,6 +66,36 @@ export function armyCost(slots: ArmySlot[]): number {
   return slots.reduce((sum, s) => sum + s.count * (UNIT_COSTS[s.unit.name] ?? 0), 0);
 }
 
+export interface RecruitLimit {
+  /** Highest count this row can hold right now — its slider's maximum. */
+  max: number;
+  /** Set when the row is pinned at 0 and cannot be recruited at all. */
+  blocked: 'locked' | 'stacks' | null;
+}
+
+/**
+ * How far one unit row may be recruited, given what the rest of the army is
+ * already spending. The ceiling is the row's own count plus whatever the
+ * unspent gold affords, so lowering one row raises every other row's ceiling —
+ * the rows share a single budget rather than each holding an independent cap.
+ *
+ * `goldLeft` is the budget minus the *whole* army's cost, this row included.
+ */
+export function recruitLimit(opts: {
+  cost: number;
+  count: number;
+  goldLeft: number;
+  locked: boolean;      // tier above the hero's recruiting cap
+  atStackCap: boolean;  // MAX_STACKS slots already filled
+}): RecruitLimit {
+  const { cost, count, goldLeft, locked, atStackCap } = opts;
+  if (locked) return { max: 0, blocked: 'locked' };
+  // A full army can still resize the stacks it has — only new ones are refused.
+  if (atStackCap && count === 0) return { max: 0, blocked: 'stacks' };
+  if (!(cost > 0)) return { max: count, blocked: null };
+  return { max: count + Math.max(0, Math.floor(goldLeft / cost)), blocked: null };
+}
+
 /** Combine loadout entries for the same unit type while preserving first-seen
  * order. Use this at composition boundaries; initBattle intentionally keeps
  * duplicate slots because they can represent an explicit tactical split. */

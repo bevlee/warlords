@@ -23,7 +23,9 @@
   onMount(async () => {
     hero = await loadHero();
     run = await loadRun<RunState>();
-    campaign = await loadCampaign();
+    // The card only reads progress, but a pre-lock save still needs a faction
+    // to backfill: the hero's own class, same as the campaign screen uses.
+    campaign = hero ? await loadCampaign(hero.class) : null;
   });
 
   const gold = $derived(hero?.gold ?? 0);

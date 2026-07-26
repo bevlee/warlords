@@ -10,12 +10,16 @@
     hero: Hero;
     campaign: CampaignState;
     onselect: (encounter: Encounter) => void;
-    onback: () => void;
+    onreset: () => void;
   }
 
-  let { hero, campaign, onselect, onback }: Props = $props();
+  let { hero, campaign, onselect, onreset }: Props = $props();
 
   const chapters = $derived(Array.from({ length: totalChapters() }, (_, i) => i + 1));
+
+  // Reset wipes hero, campaign, army and compendium discovery — and is the only
+  // way to leave the locked faction. Too much to hang off a single click.
+  let confirmingReset = $state(false);
 
   function nodeClasses(status: NodeStatus): string {
     if (status === 'completed') return 'border-emerald-500 bg-emerald-900/40 text-emerald-300';
@@ -29,19 +33,42 @@
     <div class="flex items-center gap-3">
       <Sprite name={heroSpriteName(hero.class)} class="h-12 w-10" />
       <div>
-        <p class="text-sm font-semibold text-amber-200">Level {hero.level} {FACTION_INFO[hero.class].name}</p>
+        <p class="text-sm font-semibold text-amber-200">
+          Level {hero.level} {FACTION_INFO[hero.class].name}
+          <span class="ml-2 font-mono text-xs text-amber-300">🪙 {hero.gold ?? 0}</span>
+        </p>
         <p class="text-xs text-slate-400">
           {campaign.completed ? 'Campaign complete!' : `Chapter ${campaign.chapter} — ${CHAPTER_TITLES[campaign.chapter]}`}
         </p>
       </div>
     </div>
-    <button
-      type="button"
-      class="rounded px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
-      onclick={onback}
-    >
-      ← Back to Army Setup
-    </button>
+    {#if confirmingReset}
+      <div class="flex items-center gap-2">
+        <p class="text-xs text-slate-300">Erase your warlord, campaign and faction?</p>
+        <button
+          type="button"
+          class="rounded bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-600"
+          onclick={onreset}
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          class="rounded px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
+          onclick={() => (confirmingReset = false)}
+        >
+          Cancel
+        </button>
+      </div>
+    {:else}
+      <button
+        type="button"
+        class="rounded px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+        onclick={() => (confirmingReset = true)}
+      >
+        Reset hero
+      </button>
+    {/if}
   </div>
 
   <div class="space-y-5">

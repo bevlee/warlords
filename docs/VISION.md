@@ -51,9 +51,11 @@ Stoneskin battle-long buffs; spell bar on the hero's turn).
 
 ### Gaps, roughly in priority order
 
-All LordsWM combat mechanics are in, plus the **army setup screen**
-(300-gold recruiting, generated matching enemy, setup → battle → result →
-setup loop). What remains is content and meta-game:
+All LordsWM combat mechanics are in, plus the **campaign loop** — the map is
+home, and a chapter node opens an encounter screen carrying the brief, the
+enemy army it will field, and slider-based recruiting against the gold budget
+(map → encounter → battle → result → map). Faction is chosen once at campaign
+start and locked for its lifetime. What remains is content and meta-game:
 
 Also done: **hero progression** — victories grant XP equal to the defeated
 army's value, levels give +1 attack/defense (mana, strike, and Lightning
@@ -61,7 +63,7 @@ already scale), battle budgets grow 50/level, and the hero persists through
 the SQLite-backed save API with a reset option.
 
 Also done: **Knight and Wizard factions** (7-tier rosters each, picked on
-the army setup screen alongside Barbarian) and **faction skills** —
+the campaign's faction screen alongside Barbarian) and **faction skills** —
 Barbarian Offense/Armorer/Leadership, Knight Tactics/Armorer/Leadership,
 Wizard Sorcery/Intelligence/Mysticism — unlocking and levelling with the
 hero and feeding the damage formula (Offense/Armorer) and starting morale
@@ -82,9 +84,9 @@ cast remain stubs for a future milestone.
 
 Also done: a **single-player campaign** — 5 chapters of linear encounters
 with procedurally generated enemy armies that scale with hero level, a
-visual campaign map (locked/available/completed nodes) between the
-faction picker and army setup, and server-persisted campaign progress
-alongside the hero record.
+visual campaign map (locked/available/completed nodes) as the mode's home
+screen, and server-persisted campaign progress — including its faction
+lock — alongside the hero record.
 
 Also done: **experimental online co-op and combat history** — authenticated
 room codes, dual deployment, server-authoritative turns and AI, reconnect

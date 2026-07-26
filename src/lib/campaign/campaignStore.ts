@@ -1,7 +1,9 @@
 import { getSave, putSave, deleteSave } from '../net/api';
 import { ENCOUNTERS, type Encounter } from './encounters';
+import type { FactionClass } from '../engine/types';
 
 export interface CampaignState {
+  faction: FactionClass; // chosen when the campaign starts; never written again
   chapter: number;   // 1–5
   encounter: number; // 0-based index within the chapter
   completed: boolean; // true once every encounter has been beaten
@@ -10,12 +12,19 @@ export interface CampaignState {
 
 export type NodeStatus = 'locked' | 'available' | 'completed';
 
-export function newCampaign(heroSaveId = 'default'): CampaignState {
-  return { chapter: 1, encounter: 0, completed: false, heroSaveId };
+export function newCampaign(faction: FactionClass, heroSaveId = 'default'): CampaignState {
+  return { faction, chapter: 1, encounter: 0, completed: false, heroSaveId };
 }
 
-export async function loadCampaign(): Promise<CampaignState | null> {
-  return getSave<CampaignState>('campaign');
+/**
+ * Loads the saved campaign, backfilling the faction lock for campaigns written
+ * before it existed: whatever class that save's hero is already playing is the
+ * faction it is locked to. `fallbackFaction` is the caller's loaded hero class.
+ */
+export async function loadCampaign(fallbackFaction: FactionClass): Promise<CampaignState | null> {
+  const saved = await getSave<CampaignState>('campaign');
+  if (!saved) return null;
+  return saved.faction ? saved : { ...saved, faction: fallbackFaction };
 }
 
 export async function saveCampaign(state: CampaignState): Promise<void> {

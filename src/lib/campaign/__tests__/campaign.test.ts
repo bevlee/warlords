@@ -11,18 +11,20 @@ import { ENCOUNTERS, CHAPTER_TITLES, generateEnemyArmy } from '../encounters';
 
 describe('campaign state', () => {
   it('starts at chapter 1, encounter 0, not completed', () => {
-    expect(newCampaign('hero-1')).toEqual({ chapter: 1, encounter: 0, completed: false, heroSaveId: 'hero-1' });
+    expect(newCampaign('knight', 'hero-1')).toEqual({
+      faction: 'knight', chapter: 1, encounter: 0, completed: false, heroSaveId: 'hero-1',
+    });
   });
 
   it('marks only the current encounter as available', () => {
-    const state = newCampaign();
+    const state = newCampaign('knight');
     expect(nodeStatus(state, 1, 0)).toBe('available');
     expect(nodeStatus(state, 1, 1)).toBe('locked');
     expect(nodeStatus(state, 2, 0)).toBe('locked');
   });
 
   it('advances within a chapter after a win', () => {
-    const state = newCampaign();
+    const state = newCampaign('knight');
     const next = advanceCampaign(state);
     expect(next).toEqual({ ...state, encounter: 1 });
     expect(nodeStatus(next, 1, 0)).toBe('completed');
@@ -30,7 +32,7 @@ describe('campaign state', () => {
   });
 
   it("rolls into the next chapter after the current one's last encounter", () => {
-    let state = newCampaign();
+    let state = newCampaign('knight');
     const chapter1Count = encountersInChapter(1).length;
     for (let i = 0; i < chapter1Count; i++) state = advanceCampaign(state);
     expect(state.chapter).toBe(2);
@@ -38,7 +40,7 @@ describe('campaign state', () => {
   });
 
   it("marks the campaign completed after the final chapter's last encounter", () => {
-    let state = newCampaign();
+    let state = newCampaign('knight');
     for (let chapter = 1; chapter <= totalChapters(); chapter++) {
       const count = encountersInChapter(chapter).length;
       for (let i = 0; i < count; i++) state = advanceCampaign(state);
@@ -48,7 +50,7 @@ describe('campaign state', () => {
   });
 
   it('exposes the current encounter for a given state', () => {
-    const state = newCampaign();
+    const state = newCampaign('knight');
     expect(currentEncounter(state)?.id).toBe(encountersInChapter(1)[0].id);
   });
 

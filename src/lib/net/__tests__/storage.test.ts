@@ -62,11 +62,26 @@ describe('storage over the API (signatures unchanged)', () => {
   });
 
   it('campaign round-trip', async () => {
-    expect(await loadCampaign()).toBeNull();
-    const c = newCampaign('default');
+    expect(await loadCampaign('barbarian')).toBeNull();
+    const c = newCampaign('necromancer', 'default');
     await saveCampaign(c);
-    expect(await loadCampaign()).toEqual(c);
+    expect(await loadCampaign('barbarian')).toEqual(c);
     await resetCampaign();
-    expect(await loadCampaign()).toBeNull();
+    expect(await loadCampaign('barbarian')).toBeNull();
+  });
+
+  it('backfills the faction lock on a campaign saved before it existed', async () => {
+    const { faction, ...legacy } = newCampaign('barbarian', 'default');
+    await saveCampaign(legacy as never);
+    // The hero's own class is the faction that campaign has been played as.
+    expect(await loadCampaign('wizard')).toEqual({ ...legacy, faction: 'wizard' });
+    await resetCampaign();
+  });
+
+  it('leaves an already-locked faction alone', async () => {
+    const c = newCampaign('demon', 'default');
+    await saveCampaign(c);
+    expect((await loadCampaign('wizard'))?.faction).toBe('demon');
+    await resetCampaign();
   });
 });

@@ -20,11 +20,18 @@ npm run dev -- --port 5199   # background; ready when curl localhost:5199 → 20
 
 ## Drive (headless Chrome via playwright-core)
 
-The app opens on the **army setup screen**: stepper buttons
-`button[aria-label="add 5 Goblin"]` etc., gold in the first
-`span.text-amber-300`, then `Start battle` (role=button; disabled until
-something is bought). Battles end with "New battle" (same armies, new seed)
-or "Change army" (back to setup, fresh generated enemy).
+`/campaign` opens on the **faction screen** (first run only: six cards, then
+`Begin campaign`), otherwise straight to the **map** — the mode's home. A
+chapter node leads to the **encounter screen**: brief, the enemy army it will
+actually field, and recruiting. Recruiting is one `input[type=range]` per unit
+(`aria-label="<Unit> count"`), flanked by `one more/one fewer <Unit>` buttons;
+its `max` is the row's count plus whatever the unspent gold buys, so it moves
+as other rows change. Then `Start battle` (disabled until something is bought).
+Battles end on a result screen whose only exit is `Continue` → map. Faction is
+fixed for the campaign; `Reset hero` on the map (two-step confirm) is the only
+way to change it.
+
+`/coop` still uses the older `ArmySetup` with `add 5 <Unit>` stepper buttons.
 
 No Playwright browsers are installed; use system Chrome:
 `chromium.launch({ channel: 'chrome', headless: true })` with `playwright-core`
@@ -46,6 +53,11 @@ Useful hooks in the battle UI:
   melee. A damage forecast (`.preview`, 💀 kills / 💥 damage) floats by the
   hovered target.
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
+- **Tall tokens overlap the cell above them.** A rock or unit standing at
+  `col,row` covers the lower ~half of `col,row-1`, so a click aimed at a
+  stack's rect centre can land on the token below it and do nothing. Probe
+  with `document.elementFromPoint(...).closest('button')` and click the
+  topmost point that still resolves to the intended cell.
 - Actions are large circular buttons in a rail to the RIGHT of the board:
   `Wait` ⏳, `Defend` 🛡️, `Spellbook` 📖 (hero turn only; opens the book panel —
   role=dialog 'Spellbook', spells are `Cast <Name>` buttons with hover

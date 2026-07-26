@@ -1,13 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Battle from '$lib/ui/Battle.svelte';
-  import ArmySetup from '$lib/ui/ArmySetup.svelte';
+  import EncounterSetup from '$lib/ui/EncounterSetup.svelte';
+  import FactionSelect from '$lib/ui/FactionSelect.svelte';
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
-  import { generateEnemyArmy, armyCost } from '$lib/engine/recruit';
-  import { recruitBudget, maxRecruitTier, applyVictory } from '$lib/engine/progression';
+  import { recruitBudget, applyVictory } from '$lib/engine/progression';
   import { updateFactionSkills, necromancyBonusSkeletons } from '$lib/engine/factionSkills';
   import { SKELETON } from '$lib/engine/necromancer';
-  import { mulberry32 } from '$lib/engine/rng';
   import { loadHero, saveHero, resetHero, loadArmy, saveArmy, clearArmy, type SavedArmy } from '$lib/storage';
   import {
     loadCampaign,
@@ -27,7 +26,8 @@
 
   let hero: Hero = $state({ ...DEFAULT_HERO });
   let lastBattle: { xp: number; levels: number } | null = $state(null);
-  let screen: 'setup' | 'campaign' | 'battle' | 'result' = $state('setup');
+  // The map is home; every other screen is a step out of it and back.
+  let screen: 'faction' | 'map' | 'encounter' | 'battle' | 'result' = $state('faction');
   let campaign: CampaignState | null = $state(null);
   let activeEncounter: Encounter | null = $state(null);
   let lastReward: { xp: number; gold: number } | null = $state(null);
@@ -45,20 +45,36 @@
     if (saved) {
       hero = updateFactionSkills({ ...saved, factionSkills: saved.factionSkills ?? [], gold: saved.gold ?? 0 });
       savedCounts = await loadArmy();
-      // Returning player: resume (or backfill) their campaign and skip straight to the map.
-      campaign = (await loadCampaign()) ?? newCampaign();
+      // Returning player: resume (or backfill) their campaign, locked to the
+      // faction they are already playing, and go straight to the map.
+      campaign = (await loadCampaign(hero.class)) ?? newCampaign(hero.class);
+      hero = updateFactionSkills({ ...hero, class: campaign.faction });
       void saveCampaign(campaign);
-      screen = 'campaign';
+      screen = 'map';
     }
   });
 
+  // The one and only faction choice: it starts the campaign and is then fixed
+  // for its lifetime. Changing it means resetting the hero.
+  function chooseFaction(cls: FactionClass) {
+    hero = updateFactionSkills({ ...DEFAULT_HERO, class: cls });
+    void saveHero(hero);
+    campaign = newCampaign(cls);
+    void saveCampaign(campaign);
+    screen = 'map';
+  }
+
   function selectEncounter(encounter: Encounter) {
     activeEncounter = encounter;
-    screen = 'setup';
+    // Generated once here so the army previewed while recruiting is the very
+    // one the battle fields.
+    enemyArmy = generateCampaignArmy(encounter, hero.level);
+    lastBattle = null;
+    screen = 'encounter';
   }
 
   function startBattle(army: ArmySlot[]) {
-    // Remember the picks so the next setup screen starts from them.
+    // Remember the picks so the next encounter's recruiting starts from them.
     savedCounts = Object.fromEntries(army.map(s => [s.unit.name, s.count]));
     void saveArmy(savedCounts);
     playerArmy = hero.bonusSkeletons
@@ -68,9 +84,6 @@
       hero = { ...hero, bonusSkeletons: 0 };
       void saveHero(hero);
     }
-    enemyArmy = activeEncounter
-      ? generateCampaignArmy(activeEncounter, hero.level)
-      : generateEnemyArmy(budget, mulberry32(Date.now() % 2 ** 31), maxRecruitTier(hero.level));
     battleKey += 1;
     lastBattle = null;
     lastReward = null;
@@ -80,16 +93,16 @@
 
   function handleResult(result: 'player_wins' | 'enemy_wins') {
     lastOutcome = result;
-    if (result === 'player_wins') {
-      const gained = activeEncounter ? activeEncounter.xpReward : armyCost(enemyArmy);
-      const { hero: next, levels } = applyVictory(hero, gained, activeEncounter?.goldReward ?? 0);
+    if (result === 'player_wins' && activeEncounter) {
+      const gained = activeEncounter.xpReward;
+      const { hero: next, levels } = applyVictory(hero, gained, activeEncounter.goldReward);
       const bonusSkeletons = (hero.bonusSkeletons ?? 0) + necromancyBonusSkeletons(hero, enemyArmy);
       hero = updateFactionSkills({ ...next, bonusSkeletons });
       lastBattle = { xp: gained, levels };
+      lastReward = { xp: gained, gold: activeEncounter.goldReward };
       void saveHero(hero);
 
-      if (activeEncounter && campaign) {
-        lastReward = { xp: gained, gold: activeEncounter.goldReward };
+      if (campaign) {
         campaign = advanceCampaign(campaign);
         void saveCampaign(campaign);
       }
@@ -106,32 +119,15 @@
       return;
     }
     activeEncounter = null;
-    screen = 'setup';
+    screen = 'map';
   }
 
-  // Both result exits clear activeEncounter: it marks "a fight is in flight", and
-  // by here the encounter is resolved (advanceCampaign already ran in handleResult).
-  function resultToSetup() {
+  // A defeat leaves the node available, so the map is the retry route too: walk
+  // back in and recruit again.
+  function resultToMap() {
     activeEncounter = null;
     lastOutcome = null;
-    screen = 'setup';
-  }
-
-  function resultToCampaign() {
-    activeEncounter = null;
-    lastOutcome = null;
-    screen = 'campaign';
-  }
-
-  function handleClass(cls: FactionClass) {
-    hero = updateFactionSkills({ ...hero, class: cls });
-    void saveHero(hero);
-    // First-ever faction pick kicks off the campaign; later switches just change the roster.
-    if (!campaign) {
-      campaign = newCampaign();
-      void saveCampaign(campaign);
-      screen = 'campaign';
-    }
+    screen = 'map';
   }
 
   async function handleReset() {
@@ -142,7 +138,7 @@
     campaign = null;
     activeEncounter = null;
     savedCounts = null;
-    screen = 'setup';
+    screen = 'faction';
     await resetHero();
     await resetCampaign();
     await clearArmy();
@@ -154,9 +150,9 @@
     void clearArmy();
   }
 
-  function backToSetup() {
+  function backToMap() {
     activeEncounter = null;
-    screen = 'setup';
+    screen = 'map';
   }
 </script>
 
@@ -166,10 +162,21 @@
     <h1 class="text-2xl font-bold">Campaign</h1>
     <a href="/history" class="text-lg text-violet-400 hover:text-violet-300">🎬 Battle history →</a>
   </div>
-  {#if screen === 'setup'}
-    <ArmySetup {hero} {budget} {lastBattle} initialCounts={savedCounts} onstart={startBattle} onreset={handleReset} onclass={handleClass} onclear={handleArmyClear} />
-  {:else if screen === 'campaign' && campaign}
-    <CampaignMap {hero} {campaign} onselect={selectEncounter} onback={backToSetup} />
+  {#if screen === 'faction'}
+    <FactionSelect onchoose={chooseFaction} />
+  {:else if screen === 'map' && campaign}
+    <CampaignMap {hero} {campaign} onselect={selectEncounter} onreset={handleReset} />
+  {:else if screen === 'encounter' && activeEncounter}
+    <EncounterSetup
+      {hero}
+      {budget}
+      {enemyArmy}
+      encounter={activeEncounter}
+      initialCounts={savedCounts}
+      onstart={startBattle}
+      onback={backToMap}
+      onclear={handleArmyClear}
+    />
   {:else if screen === 'result'}
     <div class="mx-auto mt-10 max-w-md rounded-lg border border-slate-700 bg-slate-800/60 p-6 text-center">
       <p class="text-3xl font-bold {lastOutcome === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
@@ -177,31 +184,23 @@
       </p>
       {#if lastReward}
         <p class="mt-3 text-sm text-emerald-300">+{lastReward.gold} gold, +{lastReward.xp} XP</p>
-      {:else if lastBattle && lastBattle.xp > 0}
-        <p class="mt-3 text-sm text-emerald-300">+{lastBattle.xp} XP</p>
       {/if}
       {#if lastBattle && lastBattle.levels > 0}
         <p class="mt-1 text-sm font-semibold text-amber-300">
           Level up! Now level {hero.level}
         </p>
       {/if}
-      <div class="mt-6 flex justify-center gap-3">
+      {#if lastOutcome === 'enemy_wins'}
+        <p class="mt-3 text-sm text-slate-400">The encounter still stands — regroup and march on it again.</p>
+      {/if}
+      <div class="mt-6 flex justify-center">
         <button
           type="button"
-          class="rounded bg-slate-600 px-4 py-2 font-semibold text-white hover:bg-slate-500"
-          onclick={resultToSetup}
+          class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500"
+          onclick={resultToMap}
         >
-          Change army
+          Continue
         </button>
-        {#if campaign}
-          <button
-            type="button"
-            class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
-            onclick={resultToCampaign}
-          >
-            Continue
-          </button>
-        {/if}
       </div>
     </div>
   {:else}
@@ -212,7 +211,7 @@
         {hero}
         onexit={exitBattle}
         onresult={handleResult}
-        allowRestart={!activeEncounter}
+        allowRestart={false}
         exitLabel="Continue"
       />
     {/key}
