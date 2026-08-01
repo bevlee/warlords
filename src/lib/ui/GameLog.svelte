@@ -112,17 +112,18 @@
 
 <style>
   /* The dense variant is the battle screen's bottom-right panel: same markup,
-     sized off --fx so it keeps its proportions at any resolution. */
+     sized off --fx so it keeps its proportions at any resolution — see
+     "Fitting the screen" in Battle.svelte. */
   .expand-button {
     display: flex;
     align-items: center;
-    gap: calc(4 * var(--fx, 1px));
-    padding: calc(2 * var(--fx, 1px)) calc(7 * var(--fx, 1px));
-    border-radius: calc(5 * var(--fx, 1px));
+    gap: calc(4 * var(--fx));
+    padding: calc(2 * var(--fx)) calc(7 * var(--fx));
+    border-radius: calc(5 * var(--fx));
     border: 1px solid rgb(148 163 184 / 0.4);
     background: rgb(30 41 59 / 0.9);
     font-family: ui-monospace, monospace;
-    font-size: calc(9 * var(--fx, 1px));
+    font-size: calc(9 * var(--fx));
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.08em;
@@ -136,28 +137,28 @@
   }
 
   .dense .log-header {
-    padding: calc(5 * var(--fx, 1px)) calc(9 * var(--fx, 1px));
+    padding: calc(5 * var(--fx)) calc(9 * var(--fx));
   }
 
   .dense .log-title {
-    font-size: calc(10 * var(--fx, 1px));
+    font-size: calc(10 * var(--fx));
     letter-spacing: 0.18em;
   }
 
   .dense .log-body {
-    padding: calc(5 * var(--fx, 1px)) calc(9 * var(--fx, 1px));
-    font-size: calc(11 * var(--fx, 1px));
+    padding: calc(5 * var(--fx)) calc(9 * var(--fx));
+    font-size: calc(11 * var(--fx));
     line-height: 1.45;
   }
 
   .dense .round-header {
-    margin-inline: calc(-9 * var(--fx, 1px));
-    padding-inline: calc(9 * var(--fx, 1px));
-    font-size: calc(10 * var(--fx, 1px));
+    margin-inline: calc(-9 * var(--fx));
+    padding-inline: calc(9 * var(--fx));
+    font-size: calc(10 * var(--fx));
   }
 
   .log-body::-webkit-scrollbar {
-    width: calc(7 * var(--fx, 1px));
+    width: calc(7 * var(--fx));
   }
 
   .log-body::-webkit-scrollbar-track {

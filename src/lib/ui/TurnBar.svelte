@@ -119,8 +119,8 @@
     /* Without this the ribbon sits at its min-content width and spills past
        the viewport instead of clamping and letting the strip scroll. */
     min-width: 0;
-    gap: calc(8 * var(--fx, 1px));
-    padding: calc(5 * var(--fx, 1px)) calc(22 * var(--fx, 1px));
+    gap: calc(8 * var(--fx));
+    padding: calc(5 * var(--fx)) calc(22 * var(--fx));
     background: linear-gradient(180deg, #1c2748 0%, #111a33 60%, #0b1121 100%);
     border-top: 1px solid rgb(203 168 92 / 0.45);
     border-bottom: 1px solid rgb(203 168 92 / 0.45);
@@ -128,11 +128,11 @@
       0 6px 24px rgb(0 0 0 / 0.6),
       inset 0 1px 0 rgb(255 255 255 / 0.05);
     clip-path: polygon(
-      calc(20 * var(--fx, 1px)) 0,
-      calc(100% - 20 * var(--fx, 1px)) 0,
+      calc(20 * var(--fx)) 0,
+      calc(100% - 20 * var(--fx)) 0,
       100% 50%,
-      calc(100% - 20 * var(--fx, 1px)) 100%,
-      calc(20 * var(--fx, 1px)) 100%,
+      calc(100% - 20 * var(--fx)) 100%,
+      calc(20 * var(--fx)) 100%,
       0 50%
     );
   }
@@ -143,8 +143,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: calc(38 * var(--fx, 1px));
-    height: calc(38 * var(--fx, 1px));
+    width: calc(38 * var(--fx));
+    height: calc(38 * var(--fx));
     border-radius: 50%;
     border: 2px solid rgb(203 168 92 / 0.7);
     background: #0d1428;
@@ -153,7 +153,7 @@
 
   .round-label {
     font-family: ui-monospace, monospace;
-    font-size: calc(9 * var(--fx, 1px));
+    font-size: calc(9 * var(--fx));
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.08em;
@@ -162,7 +162,7 @@
 
   .round-value {
     font-family: ui-monospace, monospace;
-    font-size: calc(15 * var(--fx, 1px));
+    font-size: calc(15 * var(--fx));
     font-weight: 700;
     line-height: 1.15;
     color: #f5d98b;
@@ -170,13 +170,13 @@
 
   .atb-arrow {
     flex: none;
-    width: calc(24 * var(--fx, 1px));
-    height: calc(46 * var(--fx, 1px));
-    border-radius: calc(4 * var(--fx, 1px));
+    width: calc(24 * var(--fx));
+    height: calc(46 * var(--fx));
+    border-radius: calc(4 * var(--fx));
     border: 1px solid rgb(148 163 184 / 0.4);
     background: rgb(30 41 59 / 0.9);
     color: #cbd5e1;
-    font-size: calc(12 * var(--fx, 1px));
+    font-size: calc(12 * var(--fx));
     line-height: 1;
   }
 
@@ -194,29 +194,29 @@
     display: flex;
     min-width: 0;
     align-items: flex-end;
-    gap: calc(5 * var(--fx, 1px));
-    padding: calc(4 * var(--fx, 1px)) 0;
+    gap: calc(5 * var(--fx));
+    padding: calc(4 * var(--fx)) 0;
     overflow-x: scroll;
     overflow-y: hidden;
   }
 
   .portrait {
-    width: calc(62 * var(--fx, 1px));
-    height: calc(74 * var(--fx, 1px));
+    width: calc(62 * var(--fx));
+    height: calc(74 * var(--fx));
   }
 
   .portrait.current {
-    transform: translateY(calc(-4 * var(--fx, 1px)));
+    transform: translateY(calc(-4 * var(--fx)));
   }
 
   .count-plate {
     position: absolute;
     right: 0;
     bottom: 0;
-    padding: 0 calc(3 * var(--fx, 1px));
+    padding: 0 calc(3 * var(--fx));
     background: rgb(0 0 0 / 0.72);
     font-family: ui-monospace, monospace;
-    font-size: calc(12 * var(--fx, 1px));
+    font-size: calc(12 * var(--fx));
     font-weight: 700;
     line-height: 1.3;
     color: #fcd34d;
@@ -225,14 +225,14 @@
   .cycle-divider {
     flex: none;
     width: 1px;
-    height: calc(60 * var(--fx, 1px));
+    height: calc(60 * var(--fx));
     background: #475569;
   }
 
   /* Persistent scrollbar even with macOS overlay scrollbars: custom-styled
      WebKit scrollbars always render. */
   .turnbar-scroll::-webkit-scrollbar {
-    height: calc(7 * var(--fx, 1px));
+    height: calc(7 * var(--fx));
   }
 
   .turnbar-scroll::-webkit-scrollbar-track {

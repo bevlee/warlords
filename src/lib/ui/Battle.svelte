@@ -978,7 +978,7 @@
     display: flex;
     min-height: 0;
     flex-direction: column;
-    gap: calc(8 * var(--fx, 1px));
+    gap: calc(8 * var(--fx));
   }
 
   .atb-band {
@@ -992,7 +992,7 @@
     min-height: 0;
     flex: 1;
     align-items: stretch;
-    gap: calc(12 * var(--fx, 1px));
+    gap: calc(12 * var(--fx));
   }
 
   /* ── left flank ─────────────────────────────────────────────────── */
@@ -1001,7 +1001,7 @@
     position: relative;
     z-index: 30;
     display: flex;
-    width: calc(90 * var(--fx, 1px));
+    width: calc(90 * var(--fx));
     flex: none;
     flex-direction: column;
     align-items: center;
@@ -1013,25 +1013,25 @@
     width: 100%;
     flex-direction: column;
     align-items: center;
-    gap: calc(7 * var(--fx, 1px));
+    gap: calc(7 * var(--fx));
   }
 
   .flank-buttons {
     display: flex;
     align-items: center;
-    gap: calc(6 * var(--fx, 1px));
+    gap: calc(6 * var(--fx));
   }
 
   .flank-button {
     display: flex;
-    width: calc(40 * var(--fx, 1px));
-    height: calc(40 * var(--fx, 1px));
+    width: calc(40 * var(--fx));
+    height: calc(40 * var(--fx));
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     border: 1px solid rgb(148 163 184 / 0.55);
     background: rgb(30 41 59 / 0.9);
-    font-size: calc(18 * var(--fx, 1px));
+    font-size: calc(18 * var(--fx));
     line-height: 1;
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
   }
@@ -1051,20 +1051,20 @@
 
   .settings-popover {
     position: absolute;
-    top: calc(46 * var(--fx, 1px));
+    top: calc(46 * var(--fx));
     left: 0;
     z-index: 50;
-    width: calc(186 * var(--fx, 1px));
-    padding: calc(11 * var(--fx, 1px));
-    border-radius: calc(8 * var(--fx, 1px));
+    width: calc(186 * var(--fx));
+    padding: calc(11 * var(--fx));
+    border-radius: calc(8 * var(--fx));
     border: 1px solid #475569;
     background: rgb(15 23 42 / 0.97);
     box-shadow: 0 12px 32px rgb(0 0 0 / 0.6);
   }
 
   .settings-heading {
-    margin: 0 0 calc(5 * var(--fx, 1px));
-    font-size: calc(11 * var(--fx, 1px));
+    margin: 0 0 calc(5 * var(--fx));
+    font-size: calc(11 * var(--fx));
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -1074,18 +1074,18 @@
   .settings-pills {
     display: flex;
     align-items: center;
-    gap: calc(2 * var(--fx, 1px));
-    margin-bottom: calc(11 * var(--fx, 1px));
-    padding: calc(2 * var(--fx, 1px));
-    border-radius: calc(5 * var(--fx, 1px));
+    gap: calc(2 * var(--fx));
+    margin-bottom: calc(11 * var(--fx));
+    padding: calc(2 * var(--fx));
+    border-radius: calc(5 * var(--fx));
     background: #1e293b;
   }
 
   .settings-pill {
     flex: 1;
-    border-radius: calc(4 * var(--fx, 1px));
-    padding: calc(4 * var(--fx, 1px)) calc(6 * var(--fx, 1px));
-    font-size: calc(11 * var(--fx, 1px));
+    border-radius: calc(4 * var(--fx));
+    padding: calc(4 * var(--fx)) calc(6 * var(--fx));
+    font-size: calc(11 * var(--fx));
     font-weight: 500;
     text-transform: capitalize;
     color: #94a3b8;
@@ -1102,10 +1102,10 @@
 
   .settings-resign {
     width: 100%;
-    border-radius: calc(5 * var(--fx, 1px));
-    padding: calc(6 * var(--fx, 1px)) calc(11 * var(--fx, 1px));
+    border-radius: calc(5 * var(--fx));
+    padding: calc(6 * var(--fx)) calc(11 * var(--fx));
     background: #7f1d1d;
-    font-size: calc(12.5 * var(--fx, 1px));
+    font-size: calc(12.5 * var(--fx));
     font-weight: 500;
     color: #fee2e2;
   }
@@ -1127,32 +1127,32 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    padding-bottom: calc(18 * var(--fx, 1px));
+    padding-bottom: calc(18 * var(--fx));
     transition: filter 0.15s ease;
   }
 
   .hero-standee :global(.hero-sprite) {
     position: relative;
-    width: calc(76 * var(--fx, 1px));
+    width: calc(76 * var(--fx));
     height: auto;
   }
 
   .hero-shadow {
     position: absolute;
-    bottom: calc(14 * var(--fx, 1px));
+    bottom: calc(14 * var(--fx));
     left: 15%;
     right: 15%;
-    height: calc(16 * var(--fx, 1px));
+    height: calc(16 * var(--fx));
     border-radius: 50%;
     background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.55), transparent 70%);
   }
 
   .hero-arc {
     position: absolute;
-    bottom: calc(10 * var(--fx, 1px));
+    bottom: calc(10 * var(--fx));
     left: 12%;
     right: 12%;
-    height: calc(22 * var(--fx, 1px));
+    height: calc(22 * var(--fx));
     border: 3px solid #facc15;
     border-top-color: transparent;
     border-radius: 50%;
@@ -1176,20 +1176,20 @@
     display: flex;
     flex: none;
     justify-content: center;
-    margin-bottom: calc(4 * var(--fx, 1px));
+    margin-bottom: calc(4 * var(--fx));
   }
 
   .status-card {
     display: flex;
-    height: calc(58 * var(--fx, 1px));
-    max-width: calc(660 * var(--fx, 1px));
+    height: calc(58 * var(--fx));
+    max-width: calc(660 * var(--fx));
     flex-direction: column;
     justify-content: center;
     overflow: hidden;
-    border-radius: calc(7 * var(--fx, 1px));
+    border-radius: calc(7 * var(--fx));
     border: 1px solid rgb(100 116 139 / 0.6);
     background: rgb(15 23 42 / 0.85);
-    padding: 0 calc(18 * var(--fx, 1px));
+    padding: 0 calc(18 * var(--fx));
     text-align: center;
     box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
   }
@@ -1197,34 +1197,34 @@
   .status-card.deploy {
     flex-direction: row;
     align-items: center;
-    gap: calc(11 * var(--fx, 1px));
+    gap: calc(11 * var(--fx));
     border-color: rgb(245 158 11 / 0.5);
     text-align: left;
   }
 
   .status-text {
     margin: 0;
-    font-size: calc(13.5 * var(--fx, 1px));
+    font-size: calc(13.5 * var(--fx));
     line-height: 1.3;
     text-wrap: pretty;
   }
 
   .status-note {
-    font-size: calc(11.5 * var(--fx, 1px));
+    font-size: calc(11.5 * var(--fx));
     color: #cbd5e1;
   }
 
   .status-amount {
-    width: calc(30 * var(--fx, 1px));
-    font-size: calc(13 * var(--fx, 1px));
+    width: calc(30 * var(--fx));
+    font-size: calc(13 * var(--fx));
   }
 
   .status-button {
     flex: none;
-    border-radius: calc(4 * var(--fx, 1px));
-    padding: calc(5 * var(--fx, 1px)) calc(12 * var(--fx, 1px));
+    border-radius: calc(4 * var(--fx));
+    padding: calc(5 * var(--fx)) calc(12 * var(--fx));
     background: #334155;
-    font-size: calc(12.5 * var(--fx, 1px));
+    font-size: calc(12.5 * var(--fx));
     font-weight: 600;
     color: #fde68a;
   }
@@ -1268,14 +1268,14 @@
     align-items: center;
     justify-content: center;
     gap: 1rem;
-    border-radius: calc(8 * var(--fx, 1px));
+    border-radius: calc(8 * var(--fx));
     background: rgb(0 0 0 / 0.7);
   }
 
   /* ── creature-info rail ─────────────────────────────────────────── */
 
   .info-rail {
-    width: calc(238 * var(--fx, 1px));
+    width: calc(238 * var(--fx));
     flex: none;
   }
 
@@ -1290,9 +1290,9 @@
     z-index: 20;
     display: flex;
     flex: none;
-    height: calc(148 * var(--fx, 1px));
+    height: calc(148 * var(--fx));
     align-items: stretch;
-    gap: calc(12 * var(--fx, 1px));
+    gap: calc(12 * var(--fx));
   }
 
   .dock-slot {
@@ -1301,7 +1301,7 @@
   }
 
   .log-slot {
-    width: calc(330 * var(--fx, 1px));
+    width: calc(330 * var(--fx));
     flex: none;
   }
 
@@ -1319,23 +1319,23 @@
 
   .log-modal {
     position: relative;
-    width: min(90vw, calc(720 * var(--fx, 1px)));
-    height: min(80vh, calc(640 * var(--fx, 1px)));
+    width: min(90vw, calc(720 * var(--fx)));
+    height: min(80vh, calc(640 * var(--fx)));
   }
 
   .log-modal-close {
     position: absolute;
-    top: calc(6 * var(--fx, 1px));
-    right: calc(8 * var(--fx, 1px));
+    top: calc(6 * var(--fx));
+    right: calc(8 * var(--fx));
     display: flex;
-    width: calc(26 * var(--fx, 1px));
-    height: calc(26 * var(--fx, 1px));
+    width: calc(26 * var(--fx));
+    height: calc(26 * var(--fx));
     align-items: center;
     justify-content: center;
-    border-radius: calc(5 * var(--fx, 1px));
+    border-radius: calc(5 * var(--fx));
     border: 1px solid rgb(148 163 184 / 0.4);
     background: rgb(30 41 59 / 0.9);
-    font-size: calc(15 * var(--fx, 1px));
+    font-size: calc(15 * var(--fx));
     line-height: 1;
     color: #cbd5e1;
   }

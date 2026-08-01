@@ -246,15 +246,15 @@
     flex: none;
     align-items: center;
     justify-content: space-between;
-    gap: calc(6 * var(--fx, 1px));
-    padding: calc(6 * var(--fx, 1px)) calc(9 * var(--fx, 1px));
+    gap: calc(6 * var(--fx));
+    padding: calc(6 * var(--fx)) calc(9 * var(--fx));
     border-bottom: 1px solid rgb(100 116 139 / 0.4);
     background: rgb(2 6 23 / 0.5);
   }
 
   .rail-title {
     margin: 0;
-    font-size: calc(10 * var(--fx, 1px));
+    font-size: calc(10 * var(--fx));
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0.18em;
@@ -264,16 +264,16 @@
 
   .rail-hint {
     font-family: ui-monospace, monospace;
-    font-size: calc(8 * var(--fx, 1px));
+    font-size: calc(8 * var(--fx));
     font-weight: 600;
     letter-spacing: 0.08em;
     color: #475569;
   }
 
   .rail-unpin {
-    border-radius: calc(4 * var(--fx, 1px));
-    padding: 0 calc(5 * var(--fx, 1px));
-    font-size: calc(14 * var(--fx, 1px));
+    border-radius: calc(4 * var(--fx));
+    padding: 0 calc(5 * var(--fx));
+    font-size: calc(14 * var(--fx));
     line-height: 1.2;
     color: #94a3b8;
   }
@@ -288,61 +288,61 @@
     min-height: 0;
     flex: 1;
     flex-direction: column;
-    gap: calc(6 * var(--fx, 1px));
-    padding: calc(7 * var(--fx, 1px)) calc(9 * var(--fx, 1px)) calc(9 * var(--fx, 1px));
+    gap: calc(6 * var(--fx));
+    padding: calc(7 * var(--fx)) calc(9 * var(--fx)) calc(9 * var(--fx));
     overflow-y: auto;
   }
 
   .rail :global(.rail-sprite) {
-    width: calc(44 * var(--fx, 1px));
+    width: calc(44 * var(--fx));
     height: auto;
     flex: none;
   }
 
   .rail .info-name {
-    font-size: calc(16 * var(--fx, 1px));
+    font-size: calc(16 * var(--fx));
   }
 
   .rail .info-count {
-    font-size: calc(12 * var(--fx, 1px));
+    font-size: calc(12 * var(--fx));
   }
 
   .rail .stat-grid {
-    row-gap: calc(4 * var(--fx, 1px));
-    padding-top: calc(6 * var(--fx, 1px));
-    font-size: calc(12.5 * var(--fx, 1px));
+    row-gap: calc(4 * var(--fx));
+    padding-top: calc(6 * var(--fx));
+    font-size: calc(12.5 * var(--fx));
   }
 
   .rail :global(.rail-stat-icon) {
-    width: calc(17 * var(--fx, 1px));
-    height: calc(17 * var(--fx, 1px));
+    width: calc(17 * var(--fx));
+    height: calc(17 * var(--fx));
   }
 
   .rail :global(.rail-ability-icon) {
-    width: calc(15 * var(--fx, 1px));
-    height: calc(15 * var(--fx, 1px));
+    width: calc(15 * var(--fx));
+    height: calc(15 * var(--fx));
   }
 
   .rail .ability-list {
-    padding-top: calc(6 * var(--fx, 1px));
-    gap: calc(5 * var(--fx, 1px));
+    padding-top: calc(6 * var(--fx));
+    gap: calc(5 * var(--fx));
   }
 
   .rail .ability-label {
-    font-size: calc(12.5 * var(--fx, 1px));
+    font-size: calc(12.5 * var(--fx));
   }
 
   .rail .ability-desc {
-    font-size: calc(11 * var(--fx, 1px));
+    font-size: calc(11 * var(--fx));
     text-wrap: pretty;
   }
 
   .rail .empty-hint {
-    font-size: calc(12.5 * var(--fx, 1px));
+    font-size: calc(12.5 * var(--fx));
   }
 
   .rail-body::-webkit-scrollbar {
-    width: calc(7 * var(--fx, 1px));
+    width: calc(7 * var(--fx));
   }
 
   .rail-body::-webkit-scrollbar-track {
