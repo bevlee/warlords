@@ -39,8 +39,6 @@
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
-  import { statusIconFor } from './statusIcons';
-  import { attributeIconFor } from './attributeIcons';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -416,23 +414,50 @@
   // a scaled pixel derived from that space. One measurement therefore keeps the
   // whole layout — ribbon, rails, dock, type — in proportion from a small
   // laptop to a 4K display, instead of pinning it to a design-canvas size.
-  const DESIGN_H = 900; // the height --fx was authored against
+  // TurnBar, ActionDock, UnitInfo's rail variant and GameLog's dense variant
+  // all consume `--fx` and point back here.
+  //
+  // The design these sizes were authored against. `--fx` is the ratio between
+  // that and the space we actually got, so a `calc(38 * var(--fx))` medallion
+  // is 38px at design size and scales from there.
+  const DESIGN_H = 900;
   const DESIGN_W = 1560;
+  // Clamp ends: below 0.7 the dock's type stops being legible (the board
+  // absorbs the squeeze instead, since .battle-middle is flex:1/min-height:0);
+  // above 1.4 the chrome would keep growing on a huge display when the
+  // battlefield is the thing that should be taking the extra room.
+  const FX_MIN = 0.7;
+  const FX_MAX = 1.4;
+  // Enough to keep all three bands on screen at FX_MIN.
+  const MIN_SCREEN_H = 460;
+
   let screenEl = $state<HTMLDivElement>();
+  // First paint uses design scale; the effect below corrects it on mount, so
+  // SSR output is proportioned rather than collapsed.
   let availableH = $state(720);
   let fx = $state(1);
 
   function measureFit() {
     const el = screenEl;
     if (!el) return;
+    // Document-space top on purpose: what we want is "how much room is there
+    // with the page at rest", which must not change when the page is scrolled.
+    // Safe against feedback despite writing a height back onto `el`: every
+    // hosting <main> is plain block flow, so our own height cannot move our
+    // own top.
     const top = el.getBoundingClientRect().top + window.scrollY;
     // Leave the hosting page's own bottom padding intact, or the screen would
-    // overshoot the viewport by exactly that much and add a scrollbar.
-    const page = el.closest('main');
+    // overshoot the viewport by exactly that much and add a scrollbar. Every
+    // host (campaign, gauntlet, coop, history/[id]) wraps us in a padded
+    // <main>; the fallback just means we claim a little less room.
+    const page = el.closest('main') ?? el.parentElement;
     const bottomPad = page ? parseFloat(getComputedStyle(page).paddingBottom) || 0 : 0;
-    availableH = Math.max(460, window.innerHeight - top - bottomPad);
+    // Computed into locals first: assigning `availableH` and then reading it
+    // back would make it a dependency of the effect that writes it.
+    const height = Math.max(MIN_SCREEN_H, window.innerHeight - top - bottomPad);
     const width = el.clientWidth || window.innerWidth;
-    fx = Math.max(0.7, Math.min(1.4, Math.min(availableH / DESIGN_H, width / DESIGN_W)));
+    availableH = height;
+    fx = Math.max(FX_MIN, Math.min(FX_MAX, Math.min(height / DESIGN_H, width / DESIGN_W)));
   }
 
   $effect(() => {
@@ -1256,6 +1281,10 @@
 
   /* ── dock band ──────────────────────────────────────────────────── */
 
+  /* The dock's height is the one number that decides how much vertical space
+     is left for the board, so tune it here rather than padding the segments:
+     84 portrait + caption + padding is the floor before the passive list
+     stops showing a full entry. */
   .dock-band {
     position: relative;
     z-index: 20;

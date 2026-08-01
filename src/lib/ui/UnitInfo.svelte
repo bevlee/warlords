@@ -40,7 +40,9 @@
           abilityIcon: 'h-6 w-6',
         }
       : size === 'rail'
-        ? // Sizes come from the .rail CSS below, which tracks the --fx scale.
+        ? // 'rail-*' values are hooks for the :global() rules in the .rail
+          // block below; '' means "sized entirely by .rail". Everything there
+          // tracks --fx (see "Fitting the screen" in Battle.svelte).
           {
             pad: '',
             sprite: 'rail-sprite',
@@ -113,7 +115,7 @@
      panel can toggle the page scrollbar and reflow the width-driven board. A
      unit with many abilities scrolls rather than growing. -->
 <div
-  class="unit-info flex h-full flex-col overflow-x-hidden rounded-lg {isRail ? 'rail overflow-hidden bg-slate-900/90' : 'overflow-y-auto bg-slate-800'} {sz.pad}
+  class="flex h-full flex-col overflow-x-hidden rounded-lg {isRail ? 'rail overflow-hidden bg-slate-900/90' : 'overflow-y-auto bg-slate-800'} {sz.pad}
     {embedded ? '' : `border ${pinned ? 'border-amber-500/60' : 'border-slate-700'}`}"
 >
   {#if isRail}
@@ -133,6 +135,9 @@
     </div>
   {/if}
 
+  <!-- info-name, info-count, stat-grid, ability-list, ability-label,
+       ability-desc and empty-hint are style hooks for the .rail rules at the
+       bottom of this file — renaming one silently unsizes the rail variant. -->
   <div class="{isRail ? 'rail-body' : 'contents'}">
     {#if unit}
       <div class="flex shrink-0 items-center gap-2">
@@ -170,14 +175,14 @@
 
       <div class="stat-grid grid shrink-0 gap-x-4 border-t border-slate-700 pt-1.5 {sz.statGrid} {sz.stat}">
         {#each stats as stat (stat.key)}
-          <span class="stat-row flex cursor-help items-center gap-1.5" title={STAT_META[stat.key].title}>
+          <span class="flex cursor-help items-center gap-1.5" title={STAT_META[stat.key].title}>
             <img
               src={STAT_META[stat.key].icon}
               alt=""
               class="shrink-0 object-contain [image-rendering:pixelated] {sz.statIcon}"
             />
-            <span class="stat-label flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
-            <span class="stat-value font-mono text-slate-100">
+            <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
+            <span class="font-mono text-slate-100">
               {#if stat.buff}
                 <span class="text-emerald-400">(+{stat.buff})</span>{stat.value}
               {:else}

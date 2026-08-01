@@ -35,12 +35,14 @@
     atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 1;
   }
 
-  /** Scroll by three portraits, measured off a real one so it tracks --fx. */
+  /** Scroll by three portraits. Both the portrait width and the gap are read
+   *  off the live DOM so the step tracks --fx instead of guessing at it. */
   function scrollByPage(direction: -1 | 1) {
     const el = scroller;
     if (!el) return;
     const step = el.querySelector('.portrait')?.clientWidth ?? 64;
-    el.scrollBy({ left: direction * (step + 6) * 3, behavior: 'smooth' });
+    const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+    el.scrollBy({ left: direction * (step + gap) * 3, behavior: 'smooth' });
   }
 
   // Re-measure whenever the predicted order changes (units die, wait, act) —
@@ -62,7 +64,7 @@
 
 <!-- LordsWM-style turns bar: a chevron ribbon holding the round medallion and a
      scrolling strip of framed portraits, count in the corner. Every dimension
-     is a multiple of --fx, the viewport-derived scaled pixel set by Battle. -->
+     is a multiple of --fx — see "Fitting the screen" in Battle.svelte. -->
 <div class="flex justify-center">
   <div class="atb-ribbon flex max-w-full items-center">
     <div class="round-medallion" title="Round {battleState.round}">

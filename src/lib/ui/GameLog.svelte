@@ -64,7 +64,7 @@
 </script>
 
 <div
-  class="game-log flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-600/60
+  class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-600/60
     bg-slate-900/85 shadow-lg"
   class:dense
 >

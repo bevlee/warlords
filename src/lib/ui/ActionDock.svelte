@@ -8,6 +8,10 @@
   import { entryHref } from '$lib/compendium/entries';
   import Sprite from './Sprite.svelte';
 
+  // The battle screen's bottom band: everything the acting stack can do, in one
+  // strip. Sized entirely off `--fx`, the scaled pixel published by
+  // Battle.svelte — see "Fitting the screen" there for what it is and why.
+
   interface Props {
     /** The stack whose turn it is — the dock always describes this unit. */
     unit: UnitStack | null;
@@ -37,11 +41,10 @@
   // The engine has no per-unit active abilities yet. The slots are reserved so
   // the dock's width never jumps between stacks; the hero's spellbook takes the
   // first one on its turn.
-  const EMPTY_SLOTS = [0, 1, 2];
+  const ABILITY_SLOTS = [0, 1, 2];
 </script>
 
 <div class="dock">
-  <!-- Active creature -->
   <div class="segment active-creature">
     {#if unit}
       <div class="portrait-ring">
@@ -64,7 +67,6 @@
 
   <div class="rule" aria-hidden="true"></div>
 
-  <!-- Actions -->
   <div class="segment column">
     <div class="segment-body row">
       <button
@@ -98,7 +100,7 @@
   <!-- Active abilities: the hero's spellbook lives in the first slot. -->
   <div class="segment column">
     <div class="segment-body row slots">
-      {#each EMPTY_SLOTS as slot (slot)}
+      {#each ABILITY_SLOTS as slot (slot)}
         {#if slot === 0 && isHeroTurn}
           <div class="slot-wrap">
             <button
@@ -154,6 +156,8 @@
 </div>
 
 <style>
+  /* Sizes track --fx (see Battle.svelte, "Fitting the screen"): each N in
+     calc(N * var(--fx)) is the design's pixel value at reference size. */
   .dock {
     display: flex;
     height: 100%;
