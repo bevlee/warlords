@@ -9,56 +9,228 @@
     onhover: (unit: UnitStack | null) => void;
   }
 
-  let { state, hoveredId, onhover }: Props = $props();
+  // Aliased: a local `state` would shadow the `$state` rune.
+  let { state: battleState, hoveredId, onhover }: Props = $props();
 
   const ENTRIES = 16;
 
   const entries = $derived(
-    predictTurnOrder(state.units, ENTRIES)
-      .map(id => state.units.find(u => u.id === id))
+    predictTurnOrder(battleState.units, ENTRIES)
+      .map(id => battleState.units.find(u => u.id === id))
       .filter((u): u is UnitStack => !!u)
   );
+
+  // Arrow scrolling. The arrows are always part of the ribbon's frame; they
+  // grey out when the whole order already fits, or at whichever end is reached.
+  let scroller = $state<HTMLDivElement>();
+  let overflowing = $state(false);
+  let atStart = $state(true);
+  let atEnd = $state(false);
+
+  function measure() {
+    const el = scroller;
+    if (!el) return;
+    overflowing = el.scrollWidth - el.clientWidth > 1;
+    atStart = el.scrollLeft <= 1;
+    atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 1;
+  }
+
+  /** Scroll by three portraits, measured off a real one so it tracks --fx. */
+  function scrollByPage(direction: -1 | 1) {
+    const el = scroller;
+    if (!el) return;
+    const step = el.querySelector('.portrait')?.clientWidth ?? 64;
+    el.scrollBy({ left: direction * (step + 6) * 3, behavior: 'smooth' });
+  }
+
+  // Re-measure whenever the predicted order changes (units die, wait, act) —
+  // the strip can stop overflowing mid-battle — and whenever the ribbon is
+  // resized by the viewport-driven --fx scale.
+  $effect(() => {
+    void entries.length;
+    measure();
+  });
+
+  $effect(() => {
+    const el = scroller;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
 </script>
 
-<!-- LordsWM-style turns bar: bare strip of framed portraits, count in the corner. -->
-<div class="flex items-center gap-2">
-  <span class="mr-1 shrink-0 text-center text-xs font-semibold uppercase leading-tight tracking-wide text-slate-400">
-    Round<br />{state.round}
-  </span>
-  <!-- overflow-x-scroll (not auto): the horizontal scrollbar is always there,
-       so entries never shift vertically; overflow-y-hidden + padding keeps the
-       hover scale-up from spawning a vertical scrollbar. -->
-  <div class="turnbar-scroll flex min-w-0 items-center gap-1.5 overflow-x-scroll overflow-y-hidden py-2">
-    {#each entries as unit, i (`${unit.id}-${i}`)}
-      <button
-        type="button"
-        class="portrait relative h-24 w-[5.25rem] shrink-0 overflow-hidden rounded-sm border-2 transition-transform
-          {unit.side === 'player' ? 'border-sky-400 bg-sky-950' : 'border-red-500 bg-red-950'}
-          {i === 0 ? 'ring-2 ring-amber-300' : ''}
-          {unit.id === hoveredId ? 'scale-110 brightness-125' : ''}"
-        aria-label="turn {i + 1}: {unit.definition.name} ×{unit.count}"
-        onmouseenter={() => onhover(unit)}
-        onmouseleave={() => onhover(null)}
-      >
-        <Sprite name={unit.definition.name} class="h-full w-full" />
-        <span
-          class="absolute bottom-0 right-0 bg-black/70 px-1 font-mono text-sm font-bold leading-tight text-amber-300"
+<!-- LordsWM-style turns bar: a chevron ribbon holding the round medallion and a
+     scrolling strip of framed portraits, count in the corner. Every dimension
+     is a multiple of --fx, the viewport-derived scaled pixel set by Battle. -->
+<div class="flex justify-center">
+  <div class="atb-ribbon flex max-w-full items-center">
+    <div class="round-medallion" title="Round {battleState.round}">
+      <span class="round-label">RND</span>
+      <span class="round-value">{battleState.round}</span>
+    </div>
+
+    <button
+      type="button"
+      class="atb-arrow"
+      aria-label="Scroll turn order left"
+      disabled={!overflowing || atStart}
+      onclick={() => scrollByPage(-1)}
+    >◀</button>
+
+    <!-- overflow-x-scroll (not auto): the horizontal scrollbar is always there,
+         so entries never shift vertically; overflow-y-hidden + padding keeps the
+         hover scale-up from spawning a vertical scrollbar. -->
+    <div bind:this={scroller} onscroll={measure} class="turnbar-scroll">
+      {#each entries as unit, i (`${unit.id}-${i}`)}
+        <button
+          type="button"
+          class="portrait relative shrink-0 overflow-hidden rounded-sm border-2 transition-transform
+            {unit.side === 'player' ? 'border-sky-400 bg-sky-950' : 'border-red-500 bg-red-950'}
+            {i === 0 ? 'current ring-2 ring-amber-300' : ''}
+            {unit.id === hoveredId ? 'scale-110 brightness-125' : ''}"
+          aria-label="turn {i + 1}: {unit.definition.name} ×{unit.count}"
+          onmouseenter={() => onhover(unit)}
+          onmouseleave={() => onhover(null)}
         >
-          {unit.count}
-        </span>
-      </button>
-      {#if i === 0}
-        <div class="h-20 w-px shrink-0 bg-slate-600" aria-hidden="true"></div>
-      {/if}
-    {/each}
+          <Sprite name={unit.definition.name} class="h-full w-full" />
+          <span class="count-plate">{unit.count}</span>
+        </button>
+        {#if i === 0}
+          <div class="cycle-divider" aria-hidden="true"></div>
+        {/if}
+      {/each}
+    </div>
+
+    <button
+      type="button"
+      class="atb-arrow"
+      aria-label="Scroll turn order right"
+      disabled={!overflowing || atEnd}
+      onclick={() => scrollByPage(1)}
+    >▶</button>
   </div>
 </div>
 
 <style>
+  .atb-ribbon {
+    /* Without this the ribbon sits at its min-content width and spills past
+       the viewport instead of clamping and letting the strip scroll. */
+    min-width: 0;
+    gap: calc(8 * var(--fx, 1px));
+    padding: calc(5 * var(--fx, 1px)) calc(22 * var(--fx, 1px));
+    background: linear-gradient(180deg, #1c2748 0%, #111a33 60%, #0b1121 100%);
+    border-top: 1px solid rgb(203 168 92 / 0.45);
+    border-bottom: 1px solid rgb(203 168 92 / 0.45);
+    box-shadow:
+      0 6px 24px rgb(0 0 0 / 0.6),
+      inset 0 1px 0 rgb(255 255 255 / 0.05);
+    clip-path: polygon(
+      calc(20 * var(--fx, 1px)) 0,
+      calc(100% - 20 * var(--fx, 1px)) 0,
+      100% 50%,
+      calc(100% - 20 * var(--fx, 1px)) 100%,
+      calc(20 * var(--fx, 1px)) 100%,
+      0 50%
+    );
+  }
+
+  .round-medallion {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: calc(38 * var(--fx, 1px));
+    height: calc(38 * var(--fx, 1px));
+    border-radius: 50%;
+    border: 2px solid rgb(203 168 92 / 0.7);
+    background: #0d1428;
+    box-shadow: inset 0 0 12px rgb(0 0 0 / 0.7);
+  }
+
+  .round-label {
+    font-family: ui-monospace, monospace;
+    font-size: calc(9 * var(--fx, 1px));
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    color: rgb(203 168 92 / 0.85);
+  }
+
+  .round-value {
+    font-family: ui-monospace, monospace;
+    font-size: calc(15 * var(--fx, 1px));
+    font-weight: 700;
+    line-height: 1.15;
+    color: #f5d98b;
+  }
+
+  .atb-arrow {
+    flex: none;
+    width: calc(24 * var(--fx, 1px));
+    height: calc(46 * var(--fx, 1px));
+    border-radius: calc(4 * var(--fx, 1px));
+    border: 1px solid rgb(148 163 184 / 0.4);
+    background: rgb(30 41 59 / 0.9);
+    color: #cbd5e1;
+    font-size: calc(12 * var(--fx, 1px));
+    line-height: 1;
+  }
+
+  .atb-arrow:hover:not(:disabled) {
+    background: rgb(51 65 85 / 0.95);
+    border-color: #cbd5e1;
+  }
+
+  .atb-arrow:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .turnbar-scroll {
+    display: flex;
+    min-width: 0;
+    align-items: flex-end;
+    gap: calc(5 * var(--fx, 1px));
+    padding: calc(4 * var(--fx, 1px)) 0;
+    overflow-x: scroll;
+    overflow-y: hidden;
+  }
+
+  .portrait {
+    width: calc(62 * var(--fx, 1px));
+    height: calc(74 * var(--fx, 1px));
+  }
+
+  .portrait.current {
+    transform: translateY(calc(-4 * var(--fx, 1px)));
+  }
+
+  .count-plate {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 0 calc(3 * var(--fx, 1px));
+    background: rgb(0 0 0 / 0.72);
+    font-family: ui-monospace, monospace;
+    font-size: calc(12 * var(--fx, 1px));
+    font-weight: 700;
+    line-height: 1.3;
+    color: #fcd34d;
+  }
+
+  .cycle-divider {
+    flex: none;
+    width: 1px;
+    height: calc(60 * var(--fx, 1px));
+    background: #475569;
+  }
+
   /* Persistent scrollbar even with macOS overlay scrollbars: custom-styled
      WebKit scrollbars always render. */
   .turnbar-scroll::-webkit-scrollbar {
-    height: 8px;
+    height: calc(7 * var(--fx, 1px));
   }
 
   .turnbar-scroll::-webkit-scrollbar-track {

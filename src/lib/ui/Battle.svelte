@@ -35,6 +35,7 @@
   import { recordSeen } from '$lib/compendium/discovery';
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
+  import ActionDock from './ActionDock.svelte';
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
@@ -404,9 +405,42 @@
     selectedId = !unit || unit.id === selectedId ? null : unit.id;
   }
 
-  // Spellbook panel and the settings popover.
+  // Spellbook panel, the settings popover, and the expanded battle log.
   let spellbookOpen = $state(false);
   let settingsOpen = $state(false);
+  let logOpen = $state(false);
+
+  // --- Fitting the screen ---
+  // The battle screen claims whatever vertical space is left below whichever
+  // page header hosts it, and every dimension inside is a multiple of `--fx`,
+  // a scaled pixel derived from that space. One measurement therefore keeps the
+  // whole layout — ribbon, rails, dock, type — in proportion from a small
+  // laptop to a 4K display, instead of pinning it to a design-canvas size.
+  const DESIGN_H = 900; // the height --fx was authored against
+  const DESIGN_W = 1560;
+  let screenEl = $state<HTMLDivElement>();
+  let availableH = $state(720);
+  let fx = $state(1);
+
+  function measureFit() {
+    const el = screenEl;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY;
+    // Leave the hosting page's own bottom padding intact, or the screen would
+    // overshoot the viewport by exactly that much and add a scrollbar.
+    const page = el.closest('main');
+    const bottomPad = page ? parseFloat(getComputedStyle(page).paddingBottom) || 0 : 0;
+    availableH = Math.max(460, window.innerHeight - top - bottomPad);
+    const width = el.clientWidth || window.innerWidth;
+    fx = Math.max(0.7, Math.min(1.4, Math.min(availableH / DESIGN_H, width / DESIGN_W)));
+  }
+
+  $effect(() => {
+    measureFit();
+    // Fonts and images can settle a frame late and shift our offset.
+    const raf = requestAnimationFrame(measureFit);
+    return () => cancelAnimationFrame(raf);
+  });
 
   // Spell selection is per-turn state: whoever acts next starts clean.
   $effect(() => {
@@ -605,90 +639,92 @@
     }
     return `Enemy ${activeUnit.definition.name}s are acting…`;
   });
-  // Escape backs out of the most recent thing first: a spell being aimed, then
-  // a pinned unit.
+  // Escape backs out of the most recent thing first: the expanded log, then a
+  // spell being aimed, then a pinned unit.
   function handleKeydown(e: KeyboardEvent) {
     if (e.key !== 'Escape') return;
-    if (pendingSpell) pendingSpell = null;
+    if (logOpen) logOpen = false;
+    else if (pendingSpell) pendingSpell = null;
     else if (selectedId) selectedId = null;
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} onresize={measureFit} />
 
-<div class="flex items-stretch justify-center gap-3">
-  <!-- Cap the board width by viewport height so the whole battle (board +
-       turns bar) fits without scrolling on laptop screens. The subtrahend
-       reserves the non-board chrome: status strip + the h-60 bottom row. -->
-  <div class="w-full min-w-0" style="max-width: calc((100dvh - 430px) * 1.45 + 220px)">
-    <!-- Combat indicator: the current status/prompt above the battlefield.
-         Full event history lives in the Battle Log column to the right.
-         Fixed height: content changes must never reflow the board below. -->
-    <!-- z-40: the tilted board viewport's projection overflows upward over this
-         strip; without a stacking context its buttons are unclickable. -->
-    <div class="relative z-40 mb-1 flex justify-center">
-      {#if inDeploy}
-        <div
-          class="flex h-16 max-w-2xl items-center gap-3 overflow-hidden rounded-lg border
-            border-amber-500/50 bg-slate-900/85 px-4 shadow-lg"
-        >
-          {#if selectedDeployUnit && selectedDeployUnit.count > 1}
-            <span class="text-xs text-slate-300">{selectedDeployUnit.definition.name}: split off</span>
-            <input
-              type="range"
-              min="1"
-              max={selectedDeployUnit.count - 1}
-              bind:value={splitAmount}
-              class="w-28 accent-amber-400"
-              aria-label="split amount"
-            />
-            <span class="w-8 font-mono text-sm text-amber-200">{splitAmount}</span>
+<!-- Three horizontal bands, each answering one question: whose turn is it (ATB
+     ribbon), where is everyone (flank · battlefield · creature rail), and what
+     can the acting stack do (action dock · battle log). The screen claims the
+     space left below whichever page header hosts it, and everything inside is
+     sized in multiples of --fx so the proportions hold at any resolution. -->
+<div bind:this={screenEl} class="battle-screen" style="--fx: {fx}px; height: {availableH}px">
+  <!-- ══ Band 1: ATB turn ribbon ══ -->
+  <div class="atb-band">
+    <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
+  </div>
+
+  <!-- ══ Band 2: flank · battlefield · creature info ══ -->
+  <div class="battle-middle">
+    <!-- Left flank: battle controls at the top, hero standee at the foot. -->
+    <div class="flank">
+      {#if !replay}
+        <div class="flank-top">
+          <div class="flank-buttons">
             <button
               type="button"
-              class="rounded px-3 py-1 text-sm font-semibold {splitArmed ? 'bg-amber-500 text-slate-900' : 'bg-slate-700 text-amber-200 hover:bg-slate-600'}"
-              onclick={() => (splitArmed = !splitArmed)}
-            >
-              {splitArmed ? 'Click a cell…' : 'Split'}
-            </button>
+              class="flank-button {settingsOpen ? 'active' : ''}"
+              aria-label="Settings"
+              title="Battle settings"
+              onclick={() => (settingsOpen = !settingsOpen)}
+            >⚙️</button>
+            <button
+              type="button"
+              class="flank-button"
+              aria-label="Auto battle"
+              title="Auto battle — not wired up yet"
+              disabled
+            >⏩</button>
+          </div>
+
+          {#if settingsOpen}
+            <div class="settings-popover">
+              <p class="settings-heading">Combat speed</p>
+              <div class="settings-pills" role="group" aria-label="battle speed">
+                {#each Object.keys(AI_SPEEDS) as speed (speed)}
+                  <button
+                    type="button"
+                    class="settings-pill {battleSpeed === speed ? 'on' : ''}"
+                    onclick={() => (battleSpeed = speed as BattleSpeed)}
+                  >
+                    {speed}
+                  </button>
+                {/each}
+              </div>
+              <button
+                type="button"
+                class="settings-resign"
+                aria-label="Resign"
+                disabled={battle.result !== 'ongoing'}
+                onclick={() => {
+                  settingsOpen = false;
+                  handleForfeit();
+                }}
+              >
+                🏳️ Resign battle
+              </button>
+            </div>
           {:else}
-            <p class="text-sm font-medium text-slate-100">
-              Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
-            </p>
+            <!-- Active artifacts: army-wide bonuses in play, tucked under the cog. -->
+            <ArtifactStrip {items} />
           {/if}
-          {#if !online}
-            <button
-              type="button"
-              class="ml-auto rounded bg-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-600"
-              onclick={resetDeploy}
-            >Reset</button>
-          {/if}
-          <button
-            type="button"
-            class="rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-500"
-            onclick={beginBattle}
-          >
-            {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
-          </button>
-        </div>
-      {:else}
-        <div
-          class="flex h-16 max-w-2xl flex-col justify-center overflow-hidden rounded-lg border
-            border-slate-600/60 bg-slate-900/85 px-5 text-center shadow-lg"
-        >
-          <p class="text-sm font-medium text-slate-100">{statusText}</p>
         </div>
       {/if}
-    </div>
 
-    <!-- Battlefield stage: everything battle-related overlays this box. -->
-    <div class="relative flex items-stretch gap-2">
       {#if heroUnit && heroUnit.count > 0}
         <!-- Hero on the flank: a bare sprite like any other unit; its
-             attributes appear in the bottom-right info panel on hover. -->
+             attributes appear in the creature-info rail on hover. -->
         <button
           type="button"
-          class="hero-standee relative flex w-20 shrink-0 flex-col items-center justify-end self-center pb-2 transition
-            {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
+          class="hero-standee {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
           aria-label="Hero — level {deployHero.level}"
           onmouseenter={() => (hovered = heroUnit)}
           onmouseleave={() => (hovered = null)}
@@ -701,10 +737,63 @@
           {#if heroUnit.id === battle.currentUnitId}
             <span class="hero-arc" aria-hidden="true"></span>
           {/if}
-          <Sprite name={heroSpriteName(deployHero.class)} class="relative h-24 w-20" />
+          <Sprite name={heroSpriteName(deployHero.class)} class="hero-sprite" />
         </button>
       {/if}
-      <div class="min-w-0 flex-1">
+    </div>
+
+    <!-- Battlefield stage: the status strip and every battle overlay live here. -->
+    <div class="board-column">
+      <!-- Combat indicator: the current status/prompt above the battlefield.
+           Full event history lives in the battle log at bottom-right.
+           Fixed height: content changes must never reflow the board below.
+           z-40: the tilted board viewport's projection overflows upward over
+           this strip; without a stacking context its buttons are unclickable. -->
+      <div class="status-band">
+        {#if inDeploy}
+          <div class="status-card deploy">
+            {#if selectedDeployUnit && selectedDeployUnit.count > 1}
+              <span class="status-note">{selectedDeployUnit.definition.name}: split off</span>
+              <input
+                type="range"
+                min="1"
+                max={selectedDeployUnit.count - 1}
+                bind:value={splitAmount}
+                class="w-28 accent-amber-400"
+                aria-label="split amount"
+              />
+              <span class="status-amount font-mono text-amber-200">{splitAmount}</span>
+              <button
+                type="button"
+                class="status-button {splitArmed ? 'armed' : ''}"
+                onclick={() => (splitArmed = !splitArmed)}
+              >
+                {splitArmed ? 'Click a cell…' : 'Split'}
+              </button>
+            {:else}
+              <p class="status-text text-sm font-medium text-slate-100">
+                Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
+              </p>
+            {/if}
+            {#if !online}
+              <button type="button" class="status-button ml-auto" onclick={resetDeploy}>Reset</button>
+            {/if}
+            <button type="button" class="status-button primary" onclick={beginBattle}>
+              {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
+            </button>
+          </div>
+        {:else}
+          <div class="status-card">
+            <p class="status-text text-sm font-medium text-slate-100">{statusText}</p>
+          </div>
+        {/if}
+      </div>
+
+      <!-- The board is width-driven (a 12×9 grid of square cells projected to
+           ~0.68 × its width). Giving the wrapper that aspect ratio at full
+           height lets the board grow to fill whatever the bands leave over —
+           no viewport-height arithmetic, no fixed maximum. -->
+      <div class="board-fit">
         <BattleGrid
           state={battle}
           reachableKeys={pendingSpell ? new Set() : reachableKeys}
@@ -738,176 +827,97 @@
         />
       </div>
 
-      <!-- Right rail: compact action buttons, top-aligned where the board's
-           projected far edge is narrow — clear of every tile. -->
-      <div class="ml-2 flex w-20 shrink-0 flex-col items-center gap-2 self-start pt-1">
-        <button
-          type="button"
-          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500
-            bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Wait"
-          title="Wait — act again in half a cycle"
-          disabled={!isPlayerTurn}
-          onclick={handleWait}
-        >
-          <span class="text-2xl leading-none">⏳</span>
-          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Wait</span>
-        </button>
-        <button
-          type="button"
-          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500
-            bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Defend"
-          title="Defend — +30% defense until your next turn"
-          disabled={!isPlayerTurn}
-          onclick={handleDefend}
-        >
-          <img
-            src={statusIconFor('defending')}
-            alt=""
-            class="h-7 w-7 object-contain [image-rendering:pixelated]"
-          />
-          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Defend</span>
-        </button>
-        <button
-          type="button"
-          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 shadow-lg
-            disabled:cursor-not-allowed disabled:opacity-40
-            {spellbookOpen ? 'border-violet-300 bg-violet-700' : 'border-violet-500/70 bg-violet-950/90 hover:bg-violet-800'}"
-          aria-label="Spellbook"
-          title="Spellbook — cast on the hero's turn"
-          disabled={!isHeroTurn}
-          onclick={() => (spellbookOpen = !spellbookOpen)}
-        >
-          <img
-            src={attributeIconFor('mana')}
-            alt=""
-            class="h-7 w-7 object-contain [image-rendering:pixelated]"
-          />
-          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">Spells</span>
-        </button>
-      </div>
-
-      <!-- Settings: cog at the top-left, under the page title. -->
-      {#if !replay}<div class="absolute left-1 top-1 z-30 flex flex-col items-start gap-1.5">
-        <button
-          type="button"
-          class="flex h-12 w-12 items-center justify-center rounded-full border border-slate-500
-            bg-slate-800/90 text-2xl shadow hover:bg-slate-700
-            {settingsOpen ? 'bg-slate-600' : ''}"
-          aria-label="Settings"
-          title="Battle settings"
-          onclick={() => (settingsOpen = !settingsOpen)}
-        >
-          ⚙️
-        </button>
-        {#if !settingsOpen}
-          <!-- Active artifacts: army-wide bonuses in play, tucked under the cog. -->
-          <ArtifactStrip {items} />
-        {/if}
-        {#if settingsOpen}
-          <div class="w-48 rounded-lg border border-slate-600 bg-slate-900/95 p-3 shadow-xl">
-            <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Combat speed</p>
-            <div class="mb-3 flex items-center gap-1 rounded bg-slate-800 p-0.5" role="group" aria-label="battle speed">
-              {#each Object.keys(AI_SPEEDS) as speed (speed)}
-                <button
-                  type="button"
-                  class="flex-1 rounded px-2 py-1 text-xs font-medium capitalize
-                    {battleSpeed === speed ? 'bg-slate-600 text-slate-100' : 'text-slate-400 hover:text-slate-200'}"
-                  onclick={() => (battleSpeed = speed as BattleSpeed)}
-                >
-                  {speed}
-                </button>
-              {/each}
-            </div>
-            <button
-              type="button"
-              class="w-full rounded bg-red-900 px-3 py-1.5 text-sm font-medium text-red-100
-                hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Resign"
-              disabled={battle.result !== 'ongoing'}
-              onclick={() => {
-                settingsOpen = false;
-                handleForfeit();
-              }}
-            >
-              🏳️ Resign battle
-            </button>
-          </div>
-        {/if}
-      </div>{/if}
-
-    {#if spellbookOpen && isHeroTurn}
-      <SpellBook
-        hero={activeUnit ? heroFor(battle, activeUnit) : battle.hero}
-        onpick={spell => {
-          pendingSpell = spell;
-          spellbookOpen = false;
-        }}
-        onclose={() => (spellbookOpen = false)}
-      />
-    {/if}
-
-    {#if battle.result !== 'ongoing' && !replay}
-      <div
-        class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-lg bg-black/70"
-      >
-        <p class="text-4xl font-bold {battle.result === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
-          {battle.result === 'player_wins' ? 'Victory!' : 'Defeat'}
-        </p>
-        <div class="flex gap-3">
-          {#if allowRestart}
-            <button
-              type="button"
-              class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
-              onclick={restart}
-            >
-              New battle
-            </button>
-          {/if}
-          {#if onexit}
-            <button
-              type="button"
-              class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
-              onclick={onexit}
-            >
-              {exitLabel}
-            </button>
-          {/if}
-        </div>
-      </div>
-    {/if}
-    </div>
-
-    <!-- Bottom: turns bar keeps its original 70% share. On desktop the unit
-         panel starts in its original 30% slot, then extends across the gap and
-         over the lower battle log. This leaves the upper log readable while
-         giving the two-column stat layout enough horizontal room. -->
-    <div class="battle-footer relative z-20 mt-1.5 flex h-60 items-stretch gap-3">
-      <div class="battle-turnbar min-w-0 flex-[4]">
-        <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
-      </div>
-      <!-- Anything taller than the fixed footer scrolls inside UnitInfo. -->
-      <div class="battle-unit-info h-60 min-w-0 flex-[6]">
-        <UnitInfo
-          unit={infoUnit}
-          hero={infoUnit ? heroFor(battle, infoUnit) : battle.hero}
-          pinned={!!selectedUnit}
-          onunpin={() => (selectedId = null)}
+      {#if spellbookOpen && isHeroTurn}
+        <SpellBook
+          hero={activeUnit ? heroFor(battle, activeUnit) : battle.hero}
+          onpick={spell => {
+            pendingSpell = spell;
+            spellbookOpen = false;
+          }}
+          onclose={() => (spellbookOpen = false)}
         />
-      </div>
+      {/if}
+
+      {#if battle.result !== 'ongoing' && !replay}
+        <div class="result-overlay">
+          <p class="text-4xl font-bold {battle.result === 'player_wins' ? 'text-amber-300' : 'text-red-400'}">
+            {battle.result === 'player_wins' ? 'Victory!' : 'Defeat'}
+          </p>
+          <div class="flex gap-3">
+            {#if allowRestart}
+              <button
+                type="button"
+                class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
+                onclick={restart}
+              >
+                New battle
+              </button>
+            {/if}
+            {#if onexit}
+              <button
+                type="button"
+                class="rounded bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-500"
+                onclick={onexit}
+              >
+                {exitLabel}
+              </button>
+            {/if}
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Right rail: whatever is hovered or pinned, at full height. -->
+    <div class="info-rail">
+      <UnitInfo
+        unit={infoUnit}
+        hero={infoUnit ? heroFor(battle, infoUnit) : battle.hero}
+        pinned={!!selectedUnit}
+        onunpin={() => (selectedId = null)}
+        size="rail"
+      />
     </div>
   </div>
 
-  <!-- Permanent, scrollable full-game history beside the board. Fixed width;
-       the relative/absolute wrapper pins the panel to the board column's
-       height so a long log scrolls INSIDE the panel instead of stretching
-       the row taller than the viewport. -->
-  <div class="relative hidden w-56 shrink-0 lg:block">
-    <div class="absolute inset-0">
-      <GameLog lines={logLines} />
+  <!-- ══ Band 3: action dock + battle log ══ -->
+  <div class="dock-band">
+    <div class="dock-slot">
+      <ActionDock
+        unit={activeUnit}
+        disabled={!isPlayerTurn || animating}
+        {isHeroTurn}
+        {spellbookOpen}
+        onwait={handleWait}
+        ondefend={handleDefend}
+        onspellbook={() => (spellbookOpen = !spellbookOpen)}
+      />
+    </div>
+    <div class="log-slot">
+      <GameLog lines={logLines} dense onexpand={() => (logOpen = true)} />
     </div>
   </div>
+
+  {#if logOpen}
+    <!-- Full history, same component at full size. -->
+    <div
+      class="log-modal-backdrop"
+      role="presentation"
+      onclick={e => {
+        if (e.target === e.currentTarget) logOpen = false;
+      }}
+    >
+      <div class="log-modal" role="dialog" aria-label="Battle log">
+        <GameLog lines={logLines} />
+        <button
+          type="button"
+          class="log-modal-close"
+          aria-label="Close battle log"
+          title="Close"
+          onclick={() => (logOpen = false)}
+        >×</button>
+      </div>
+    </div>
+  {/if}
 </div>
 
 {#if online}
@@ -935,43 +945,384 @@
 {/if}
 
 <style>
-  /* The desktop log is 14rem wide with a 0.75rem outer flex gap. Extending
-     across exactly both values lets UnitInfo cover the log's lower section
-     without changing the board or turn-bar width. */
-  @media (min-width: 64rem) {
-    .battle-turnbar {
-      flex: 0 0 calc((100% - 0.75rem) * 0.7);
-    }
+  /* --fx is the scaled pixel: one design pixel at the current viewport. Every
+     length below (and in TurnBar, ActionDock, UnitInfo's rail variant and
+     GameLog's dense variant) is a multiple of it, so the whole screen keeps its
+     proportions rather than being pinned to a canvas size. */
+  .battle-screen {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: calc(8 * var(--fx, 1px));
+  }
 
-    .battle-unit-info {
-      position: absolute;
-      inset-block: 0;
-      right: -14.75rem;
-      width: calc((100% - 0.75rem) * 0.3 + 14.75rem);
-      z-index: 20;
-    }
+  .atb-band {
+    flex: none;
+    position: relative;
+    z-index: 40;
+  }
+
+  .battle-middle {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    align-items: stretch;
+    gap: calc(12 * var(--fx, 1px));
+  }
+
+  /* ── left flank ─────────────────────────────────────────────────── */
+
+  .flank {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    width: calc(90 * var(--fx, 1px));
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .flank-top {
+    position: relative;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(7 * var(--fx, 1px));
+  }
+
+  .flank-buttons {
+    display: flex;
+    align-items: center;
+    gap: calc(6 * var(--fx, 1px));
+  }
+
+  .flank-button {
+    display: flex;
+    width: calc(40 * var(--fx, 1px));
+    height: calc(40 * var(--fx, 1px));
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgb(148 163 184 / 0.55);
+    background: rgb(30 41 59 / 0.9);
+    font-size: calc(18 * var(--fx, 1px));
+    line-height: 1;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+
+  .flank-button:hover:not(:disabled) {
+    background: rgb(51 65 85 / 0.95);
+  }
+
+  .flank-button.active {
+    background: rgb(71 85 105 / 0.95);
+  }
+
+  .flank-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .settings-popover {
+    position: absolute;
+    top: calc(46 * var(--fx, 1px));
+    left: 0;
+    z-index: 50;
+    width: calc(186 * var(--fx, 1px));
+    padding: calc(11 * var(--fx, 1px));
+    border-radius: calc(8 * var(--fx, 1px));
+    border: 1px solid #475569;
+    background: rgb(15 23 42 / 0.97);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.6);
+  }
+
+  .settings-heading {
+    margin: 0 0 calc(5 * var(--fx, 1px));
+    font-size: calc(11 * var(--fx, 1px));
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .settings-pills {
+    display: flex;
+    align-items: center;
+    gap: calc(2 * var(--fx, 1px));
+    margin-bottom: calc(11 * var(--fx, 1px));
+    padding: calc(2 * var(--fx, 1px));
+    border-radius: calc(5 * var(--fx, 1px));
+    background: #1e293b;
+  }
+
+  .settings-pill {
+    flex: 1;
+    border-radius: calc(4 * var(--fx, 1px));
+    padding: calc(4 * var(--fx, 1px)) calc(6 * var(--fx, 1px));
+    font-size: calc(11 * var(--fx, 1px));
+    font-weight: 500;
+    text-transform: capitalize;
+    color: #94a3b8;
+  }
+
+  .settings-pill:hover {
+    color: #e2e8f0;
+  }
+
+  .settings-pill.on {
+    background: #475569;
+    color: #f1f5f9;
+  }
+
+  .settings-resign {
+    width: 100%;
+    border-radius: calc(5 * var(--fx, 1px));
+    padding: calc(6 * var(--fx, 1px)) calc(11 * var(--fx, 1px));
+    background: #7f1d1d;
+    font-size: calc(12.5 * var(--fx, 1px));
+    font-weight: 500;
+    color: #fee2e2;
+  }
+
+  .settings-resign:hover:not(:disabled) {
+    background: #991b1b;
+  }
+
+  .settings-resign:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .hero-standee {
+    position: relative;
+    display: flex;
+    width: 100%;
+    margin-top: auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: calc(18 * var(--fx, 1px));
+    transition: filter 0.15s ease;
+  }
+
+  .hero-standee :global(.hero-sprite) {
+    position: relative;
+    width: calc(76 * var(--fx, 1px));
+    height: auto;
   }
 
   .hero-shadow {
     position: absolute;
-    bottom: 4px;
+    bottom: calc(14 * var(--fx, 1px));
     left: 15%;
     right: 15%;
-    height: 16px;
+    height: calc(16 * var(--fx, 1px));
     border-radius: 50%;
     background: radial-gradient(ellipse at center, rgb(0 0 0 / 0.55), transparent 70%);
   }
 
   .hero-arc {
     position: absolute;
-    bottom: 0;
+    bottom: calc(10 * var(--fx, 1px));
     left: 12%;
     right: 12%;
-    height: 22px;
+    height: calc(22 * var(--fx, 1px));
     border: 3px solid #facc15;
     border-top-color: transparent;
     border-radius: 50%;
     filter: drop-shadow(0 0 3px rgb(250 204 21 / 0.7));
     pointer-events: none;
+  }
+
+  /* ── battlefield column ─────────────────────────────────────────── */
+
+  .board-column {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .status-band {
+    position: relative;
+    z-index: 40;
+    display: flex;
+    flex: none;
+    justify-content: center;
+    margin-bottom: calc(4 * var(--fx, 1px));
+  }
+
+  .status-card {
+    display: flex;
+    height: calc(58 * var(--fx, 1px));
+    max-width: calc(660 * var(--fx, 1px));
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: calc(7 * var(--fx, 1px));
+    border: 1px solid rgb(100 116 139 / 0.6);
+    background: rgb(15 23 42 / 0.85);
+    padding: 0 calc(18 * var(--fx, 1px));
+    text-align: center;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+  }
+
+  .status-card.deploy {
+    flex-direction: row;
+    align-items: center;
+    gap: calc(11 * var(--fx, 1px));
+    border-color: rgb(245 158 11 / 0.5);
+    text-align: left;
+  }
+
+  .status-text {
+    margin: 0;
+    font-size: calc(13.5 * var(--fx, 1px));
+    line-height: 1.3;
+    text-wrap: pretty;
+  }
+
+  .status-note {
+    font-size: calc(11.5 * var(--fx, 1px));
+    color: #cbd5e1;
+  }
+
+  .status-amount {
+    width: calc(30 * var(--fx, 1px));
+    font-size: calc(13 * var(--fx, 1px));
+  }
+
+  .status-button {
+    flex: none;
+    border-radius: calc(4 * var(--fx, 1px));
+    padding: calc(5 * var(--fx, 1px)) calc(12 * var(--fx, 1px));
+    background: #334155;
+    font-size: calc(12.5 * var(--fx, 1px));
+    font-weight: 600;
+    color: #fde68a;
+  }
+
+  .status-button:hover {
+    background: #475569;
+  }
+
+  .status-button.armed {
+    background: #f59e0b;
+    color: #0f172a;
+  }
+
+  .status-button.primary {
+    background: #d97706;
+    color: #fff;
+  }
+
+  .status-button.primary:hover {
+    background: #f59e0b;
+  }
+
+  .board-fit {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    /* The projected board is ~0.68 × its own width. */
+    aspect-ratio: 100 / 68;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  .result-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    border-radius: calc(8 * var(--fx, 1px));
+    background: rgb(0 0 0 / 0.7);
+  }
+
+  /* ── creature-info rail ─────────────────────────────────────────── */
+
+  .info-rail {
+    width: calc(238 * var(--fx, 1px));
+    flex: none;
+  }
+
+  /* ── dock band ──────────────────────────────────────────────────── */
+
+  .dock-band {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    flex: none;
+    height: calc(148 * var(--fx, 1px));
+    align-items: stretch;
+    gap: calc(12 * var(--fx, 1px));
+  }
+
+  .dock-slot {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .log-slot {
+    width: calc(330 * var(--fx, 1px));
+    flex: none;
+  }
+
+  /* ── expanded battle log ────────────────────────────────────────── */
+
+  .log-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(2 6 23 / 0.72);
+  }
+
+  .log-modal {
+    position: relative;
+    width: min(90vw, calc(720 * var(--fx, 1px)));
+    height: min(80vh, calc(640 * var(--fx, 1px)));
+  }
+
+  .log-modal-close {
+    position: absolute;
+    top: calc(6 * var(--fx, 1px));
+    right: calc(8 * var(--fx, 1px));
+    display: flex;
+    width: calc(26 * var(--fx, 1px));
+    height: calc(26 * var(--fx, 1px));
+    align-items: center;
+    justify-content: center;
+    border-radius: calc(5 * var(--fx, 1px));
+    border: 1px solid rgb(148 163 184 / 0.4);
+    background: rgb(30 41 59 / 0.9);
+    font-size: calc(15 * var(--fx, 1px));
+    line-height: 1;
+    color: #cbd5e1;
+  }
+
+  .log-modal-close:hover {
+    background: rgb(51 65 85 / 0.95);
+    border-color: #cbd5e1;
+  }
+
+  /* Narrow screens: something has to give, and the log is the piece the dock's
+     status line and the creature rail can least replace — same call the old
+     layout made. Mobile stays cramped by design; the battle screen is built for
+     a desktop-sized viewport. */
+  @media (max-width: 63.9375rem) {
+    .log-slot {
+      display: none;
+    }
   }
 </style>
