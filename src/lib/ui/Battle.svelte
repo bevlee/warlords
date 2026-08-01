@@ -40,6 +40,7 @@
   import { postSoloBattle, type SoloController } from '$lib/net/api';
   import { statusIconFor } from './statusIcons';
   import { attributeIconFor } from './attributeIcons';
+  import { shouldAutomateTurn } from './battleAutomation';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -96,6 +97,7 @@
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
   type BattleSpeed = keyof typeof AI_SPEEDS;
   let battleSpeed: BattleSpeed = $state('normal');
+  let autoBattle = $state(false);
   const AI_DELAY_MS = $derived(AI_SPEEDS[battleSpeed]);
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
@@ -260,7 +262,7 @@
     battle.units.find(u => u.isHero && (!online || u.controllerId === localControllerId)) ?? null
   );
   const isPlayerTurn = $derived(
-    !replay && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
+    !replay && !autoBattle && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
       (!online || activeUnit.controllerId === localControllerId)
   );
 
@@ -408,6 +410,24 @@
   let spellbookOpen = $state(false);
   let settingsOpen = $state(false);
 
+  // Co-op actions are authoritative on the server: sending an action does not
+  // immediately advance our local battle state. Until the server echoes that
+  // action, this component still sees the same current unit and its reactive
+  // auto-battle effect may run again (for example after another UI state
+  // change). Remember which unit already has an automated action in flight so
+  // we submit at most one action for that turn. Solo actions update `battle`
+  // immediately and do not need this guard.
+  let pendingAutoActionUnitId: string | null = null;
+
+  function toggleAutoBattle() {
+    autoBattle = !autoBattle;
+    if (autoBattle) {
+      pendingSpell = null;
+      spellbookOpen = false;
+      hovered = null;
+    }
+  }
+
   // Spell selection is per-turn state: whoever acts next starts clean.
   $effect(() => {
     void battle.currentUnitId;
@@ -432,15 +452,29 @@
     }
   });
 
-  // Enemy turns play automatically, one action at a time, so the player can follow.
+  // Automated turns play one action at a time, using the same pacing and AI
+  // for enemies, summoned allies, and (when enabled) the player's own stacks.
   $effect(() => {
-    if (online || replay || battle.result !== 'ongoing' || animating || inDeploy) return;
+    if (replay || battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
-    if (!unit || unit.side !== 'enemy') return;
+    if (!unit || !shouldAutomateTurn(unit, autoBattle, !!online, localControllerId)) return;
+    // The server has not confirmed this unit's previously submitted choice yet.
+    if (online && pendingAutoActionUnitId === unit.id) return;
     const timer = setTimeout(() => {
-      // Re-check at fire time: forfeited or still animating while pending.
-      if (battle.result !== 'ongoing' || animating) return;
-      takeAction(aiTakeTurn(battle, unit.id), 'ai');
+      // Re-check at fire time: the toggle, turn, or battle may have changed.
+      const current = battle.units.find(u => u.id === battle.currentUnitId);
+      if (
+        battle.result !== 'ongoing' ||
+        animating ||
+        !current ||
+        current.id !== unit.id ||
+        !shouldAutomateTurn(current, autoBattle, !!online, localControllerId)
+      ) return;
+      // Set this before sending because `takeAction` deliberately leaves the
+      // local state unchanged in online mode while it awaits the server echo.
+      if (online) pendingAutoActionUnitId = current.id;
+      const controller: SoloController = current.side === 'enemy' || current.isAlly ? 'ai' : 'host';
+      takeAction(aiTakeTurn(battle, current.id), controller);
     }, AI_DELAY_MS);
     return () => clearTimeout(timer);
   });
@@ -533,6 +567,9 @@
       async applyRemote(action) {
         const result = applyAction(battle, action);
         await revealAction(result);
+        // The authoritative action has arrived and the next turn may now be
+        // automated, even if morale gives the same unit another action.
+        pendingAutoActionUnitId = null;
         return $state.snapshot(battle) as BattleState;
       },
       resync(state) {
@@ -541,6 +578,8 @@
         activeSteps = [];
         dyingIds = new Set();
         doomedIds = new Set();
+        // A resync supersedes any local request that was awaiting confirmation.
+        pendingAutoActionUnitId = null;
         battle = state;
       },
     });
@@ -581,6 +620,9 @@
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
     if (replay) return `Replay — ${activeUnit.definition.name}s are acting…`;
+    if (autoBattle && shouldAutomateTurn(activeUnit, true, !!online, localControllerId)) {
+      return `Auto battle — ${activeUnit.definition.name}s are acting…`;
+    }
     if (pendingSpell) {
       const friendly = SPELLS[pendingSpell].friendly;
       return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
@@ -820,6 +862,24 @@
                 </button>
               {/each}
             </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoBattle}
+              class="mb-3 flex w-full items-center justify-between gap-3 rounded bg-slate-800 px-2.5 py-2 text-left hover:bg-slate-700"
+              onclick={toggleAutoBattle}
+            >
+              <span>
+                <span class="block text-sm font-medium text-slate-200">Auto battle</span>
+                <span class="block text-[10px] leading-tight text-slate-400">AI controls your turns</span>
+              </span>
+              <span
+                class="relative h-5 w-9 shrink-0 rounded-full transition-colors {autoBattle ? 'bg-emerald-500' : 'bg-slate-600'}"
+                aria-hidden="true"
+              >
+                <span class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform {autoBattle ? 'translate-x-[18px]' : 'translate-x-0.5'}"></span>
+              </span>
+            </button>
             <button
               type="button"
               class="w-full rounded bg-red-900 px-3 py-1.5 text-sm font-medium text-red-100
