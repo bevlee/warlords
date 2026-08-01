@@ -32,6 +32,7 @@ describe('itemBonuses', () => {
       attack: 0,
       defense: 0,
       initiative: 0,
+      speed: 0,
       luck: 0,
       morale: 0,
     });
