@@ -409,7 +409,15 @@
   // Spellbook panel and the settings popover.
   let spellbookOpen = $state(false);
   let settingsOpen = $state(false);
-  let autoActionPendingId: string | null = null;
+
+  // Co-op actions are authoritative on the server: sending an action does not
+  // immediately advance our local battle state. Until the server echoes that
+  // action, this component still sees the same current unit and its reactive
+  // auto-battle effect may run again (for example after another UI state
+  // change). Remember which unit already has an automated action in flight so
+  // we submit at most one action for that turn. Solo actions update `battle`
+  // immediately and do not need this guard.
+  let pendingAutoActionUnitId: string | null = null;
 
   function toggleAutoBattle() {
     autoBattle = !autoBattle;
@@ -450,7 +458,8 @@
     if (replay || battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || !shouldAutomateTurn(unit, autoBattle, !!online, localControllerId)) return;
-    if (online && autoActionPendingId === unit.id) return;
+    // The server has not confirmed this unit's previously submitted choice yet.
+    if (online && pendingAutoActionUnitId === unit.id) return;
     const timer = setTimeout(() => {
       // Re-check at fire time: the toggle, turn, or battle may have changed.
       const current = battle.units.find(u => u.id === battle.currentUnitId);
@@ -461,7 +470,9 @@
         current.id !== unit.id ||
         !shouldAutomateTurn(current, autoBattle, !!online, localControllerId)
       ) return;
-      if (online) autoActionPendingId = current.id;
+      // Set this before sending because `takeAction` deliberately leaves the
+      // local state unchanged in online mode while it awaits the server echo.
+      if (online) pendingAutoActionUnitId = current.id;
       const controller: SoloController = current.side === 'enemy' || current.isAlly ? 'ai' : 'host';
       takeAction(aiTakeTurn(battle, current.id), controller);
     }, AI_DELAY_MS);
@@ -556,7 +567,9 @@
       async applyRemote(action) {
         const result = applyAction(battle, action);
         await revealAction(result);
-        autoActionPendingId = null;
+        // The authoritative action has arrived and the next turn may now be
+        // automated, even if morale gives the same unit another action.
+        pendingAutoActionUnitId = null;
         return $state.snapshot(battle) as BattleState;
       },
       resync(state) {
@@ -565,7 +578,8 @@
         activeSteps = [];
         dyingIds = new Set();
         doomedIds = new Set();
-        autoActionPendingId = null;
+        // A resync supersedes any local request that was awaiting confirmation.
+        pendingAutoActionUnitId = null;
         battle = state;
       },
     });
