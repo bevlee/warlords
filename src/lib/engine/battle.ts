@@ -257,6 +257,7 @@ export function initBattle(
         attackBuff: (stack.attackBuff ?? 0) + armyBonuses.attack,
         defenseBuff: (stack.defenseBuff ?? 0) + armyBonuses.defense,
         initiativeBonus: armyBonuses.initiative,
+        speedBonus: (stack.speedBonus ?? 0) + armyBonuses.speed,
         morale: clampProc(stack.morale + armyBonuses.morale),
         luck: clampProc(stack.luck + armyBonuses.luck),
       };

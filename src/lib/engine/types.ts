@@ -94,11 +94,12 @@ export interface ArmySlot {
   count: number;
 }
 
-/** Army-wide flat stat bonuses (gauntlet items) applied to player stacks at battle start. */
+/** Army-wide flat stat bonuses applied to player stacks at battle start. */
 export interface ArmyBonuses {
   attack: number;
   defense: number;
   initiative: number;
+  speed: number;
   luck: number;
   morale: number;
 }
