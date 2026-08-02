@@ -385,17 +385,19 @@
     return new Set(getRangeCells(battle.grid, fresh).map(p => `${p.col},${p.row}`));
   });
   // Right-click pins a unit into the info panel. A pin is an explicit request,
-  // so it outranks hover — without it the panel snaps back to the active unit
-  // the moment the cursor leaves the standee, putting its ability tooltips out
-  // of reach. Pin drops automatically once the stack is dead.
+  // so it outranks hover — without it the panel would empty the moment the
+  // cursor left the standee, putting its ability tooltips out of reach. Pin
+  // drops automatically once the stack is dead.
   let selectedId: string | null = $state(null);
   const selectedUnit = $derived(
     selectedId ? (battle.units.find(u => u.id === selectedId && u.count > 0) ?? null) : null
   );
+  // Pinned, else hovered, else nothing. Deliberately no fall back to the active
+  // unit: the dock already describes that stack, and showing it here too meant
+  // the same ability list rendered twice whenever the cursor was at rest.
   const infoUnit = $derived.by(() => {
     if (selectedUnit) return selectedUnit;
-    const fresh = hovered ? battle.units.find(u => u.id === hovered!.id && u.count > 0) : undefined;
-    return fresh ?? activeUnit;
+    return (hovered ? battle.units.find(u => u.id === hovered!.id && u.count > 0) : null) ?? null;
   });
 
   function inspect(unit: UnitStack | null) {
