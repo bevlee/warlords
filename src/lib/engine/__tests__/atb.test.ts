@@ -150,20 +150,46 @@ describe('defend', () => {
   });
 });
 
-describe('initBattle deviation', () => {
-  it('gives every stack a seeded 0–10% head start, deterministic per seed', () => {
-    const a = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: WOLF_RIDER, count: 5 }], { ...mockHero }, 42);
-    const b = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: WOLF_RIDER, count: 5 }], { ...mockHero }, 42);
+describe('initBattle scale start', () => {
+  const armies = () =>
+    [[{ unit: GOBLIN, count: 5 }], [{ unit: WOLF_RIDER, count: 5 }]] as const;
 
-    // deterministic: same seed → same first actor and same atb values
-    expect(a.currentUnitId).not.toBeNull();
-    expect(b.units.map(u => u.atb)).toEqual(a.units.map(u => u.atb));
+  it('starts every stack level, so initiative alone picks the opening actor', () => {
+    const [player, enemy] = armies();
+    const state = initBattle(player, enemy, { ...mockHero }, 42);
 
-    // everyone below one full cycle; the current actor sits at the act point (1.0)
-    for (const u of a.units) {
+    // Wolf Rider 13 beats Goblin 11 and the hero's 10 — no head start to muddy it.
+    const first = state.units.find(u => u.id === state.currentUnitId)!;
+    expect(first.definition.name).toBe('Wolf Rider');
+
+    // The actor is at the act point; everyone else is partway, never past it.
+    for (const u of state.units) {
       expect(u.atb).toBeGreaterThanOrEqual(0);
       expect(u.atb).toBeLessThanOrEqual(1 + 1e-9);
     }
+  });
+
+  it('draws a distinct seeded tiePriority per stack, reproducible per seed', () => {
+    const [player, enemy] = armies();
+    const a = initBattle(player, enemy, { ...mockHero }, 42);
+    const b = initBattle(player, enemy, { ...mockHero }, 42);
+    const c = initBattle(player, enemy, { ...mockHero }, 43);
+
+    const priorities = a.units.map(u => u.tiePriority);
+    expect(priorities.every(p => typeof p === 'number')).toBe(true);
+    expect(new Set(priorities).size).toBe(priorities.length); // no two alike
+
+    expect(b.units.map(u => u.tiePriority)).toEqual(priorities); // replay-safe
+    expect(c.units.map(u => u.tiePriority)).not.toEqual(priorities); // seed matters
+  });
+
+  it('breaks an exact tie by tiePriority rather than by side', () => {
+    const def: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+    // The enemy draws the lower priority, so it acts first despite the side.
+    const player = makeStack(def, { col: 1, row: 1 }, 'player', { id: 'p', tiePriority: 0.9 });
+    const enemy = makeStack(def, { col: 1, row: 3 }, 'enemy', { id: 'e', tiePriority: 0.1 });
+
+    expect(predictTurnOrder([player, enemy], 4)).toEqual(['e', 'p', 'e', 'p']);
   });
 });
 

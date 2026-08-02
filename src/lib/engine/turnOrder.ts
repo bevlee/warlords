@@ -14,9 +14,12 @@ function timeToAct(unit: UnitStack): number {
 function byActOrder(a: UnitStack, b: UnitStack): number {
   const diff = timeToAct(a) - timeToAct(b);
   if (Math.abs(diff) > 1e-9) return diff;
-  // simultaneous: player acts first, then stable by id
-  if (a.side !== b.side) return a.side === 'player' ? -1 : 1;
-  return a.id.localeCompare(b.id);
+  // Exactly simultaneous: settle it with each stack's per-battle seeded draw,
+  // so equal-initiative stacks don't all favour one side, yet the order is
+  // identical every time the same battle is replayed.
+  const priorityDiff = (a.tiePriority ?? 0) - (b.tiePriority ?? 0);
+  if (priorityDiff !== 0) return priorityDiff;
+  return a.id.localeCompare(b.id); // extremely unlikely final fallback
 }
 
 /**
