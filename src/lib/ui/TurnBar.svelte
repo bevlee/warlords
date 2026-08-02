@@ -20,70 +20,79 @@
       .filter((u): u is UnitStack => !!u)
   );
 
-  // Arrow scrolling. The arrows are always part of the ribbon's frame; they
-  // grey out when the whole order already fits, or at whichever end is reached.
-  let scroller = $state<HTMLDivElement>();
-  let overflowing = $state(false);
-  let atStart = $state(true);
-  let atEnd = $state(false);
+  // Paged, not scrolled. Scrolling cost a permanent scrollbar across the
+  // ribbon's full width — space the portraits can use instead — and a hovered
+  // portrait's scale-up could nudge the scroll offset, shifting every other
+  // portrait under the cursor. Paging moves by whole viewport widths, so
+  // nothing drifts.
+  let viewport = $state<HTMLDivElement>();
+  let track = $state<HTMLDivElement>();
+  let page = $state(0);
+  let viewportWidth = $state(0);
+  let contentWidth = $state(0);
+
+  const pageCount = $derived(viewportWidth > 0 ? Math.max(1, Math.ceil(contentWidth / viewportWidth)) : 1);
+  // Clamped to the end of the content, so the last page is a full strip that
+  // overlaps the one before it rather than a near-empty remainder.
+  const offset = $derived(Math.min(page * viewportWidth, Math.max(0, contentWidth - viewportWidth)));
 
   function measure() {
-    const el = scroller;
-    if (!el) return;
-    overflowing = el.scrollWidth - el.clientWidth > 1;
-    atStart = el.scrollLeft <= 1;
-    atEnd = el.scrollLeft >= el.scrollWidth - el.clientWidth - 1;
+    const v = viewport;
+    const t = track;
+    if (!v || !t) return;
+    viewportWidth = v.clientWidth;
+    // Measured off the children's layout offsets rather than the track's
+    // scrollWidth: the track lets its content overflow visibly, so scrollWidth
+    // just reports the track's own width. offsetLeft/offsetWidth also ignore
+    // both the track's translate and a hovered portrait's scale-up.
+    const first = t.firstElementChild as HTMLElement | null;
+    const last = t.lastElementChild as HTMLElement | null;
+    contentWidth = first && last ? last.offsetLeft + last.offsetWidth - first.offsetLeft : 0;
+    if (page > pageCount - 1) page = pageCount - 1;
   }
 
-  /** Scroll by three portraits. Both the portrait width and the gap are read
-   *  off the live DOM so the step tracks --fx instead of guessing at it. */
-  function scrollByPage(direction: -1 | 1) {
-    const el = scroller;
-    if (!el) return;
-    const step = el.querySelector('.portrait')?.clientWidth ?? 64;
-    const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
-    el.scrollBy({ left: direction * (step + gap) * 3, behavior: 'smooth' });
-  }
-
-  // Re-measure whenever the predicted order changes (units die, wait, act) —
-  // the strip can stop overflowing mid-battle — and whenever the ribbon is
-  // resized by the viewport-driven --fx scale.
+  // Stacks die and the predicted order shortens; the ribbon resizes with --fx.
   $effect(() => {
     void entries.length;
     measure();
   });
 
   $effect(() => {
-    const el = scroller;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+    const v = viewport;
+    if (!v || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(v);
     return () => ro.disconnect();
+  });
+
+  // Every turn re-predicts the whole order, so a page further along stops
+  // meaning anything. Snap back to the acting stack, which is always first.
+  $effect(() => {
+    void battleState.currentUnitId;
+    page = 0;
   });
 </script>
 
-<!-- LordsWM-style turns bar: a chevron ribbon holding the round medallion and a
-     scrolling strip of framed portraits, count in the corner. Every dimension
-     is a multiple of --fx — see "Fitting the screen" in Battle.svelte. -->
-<div class="flex justify-center">
-  <div class="atb-ribbon flex max-w-full items-center">
-    <div class="round-medallion" title="Round {battleState.round}">
-      <span class="round-label">RND</span>
-      <span class="round-value">{battleState.round}</span>
-    </div>
+<!-- LordsWM-style turns bar: a chevron ribbon of framed portraits with the
+     round medallion and paging arrows built into its frame. Full width on
+     purpose — a content-sized ribbon visibly narrows as stacks die. Every
+     dimension is a multiple of --fx; see "Fitting the screen" in Battle.svelte. -->
+<div class="atb-ribbon">
+  <button
+    type="button"
+    class="atb-arrow"
+    aria-label="Previous page of turn order"
+    disabled={page === 0}
+    onclick={() => (page -= 1)}
+  >◀</button>
 
-    <button
-      type="button"
-      class="atb-arrow"
-      aria-label="Scroll turn order left"
-      disabled={!overflowing || atStart}
-      onclick={() => scrollByPage(-1)}
-    >◀</button>
+  <div class="round-medallion" title="Round {battleState.round}">
+    <span class="round-label">RND</span>
+    <span class="round-value">{battleState.round}</span>
+  </div>
 
-    <!-- overflow-x-scroll (not auto): the horizontal scrollbar is always there,
-         so entries never shift vertically; overflow-y-hidden + padding keeps the
-         hover scale-up from spawning a vertical scrollbar. -->
-    <div bind:this={scroller} onscroll={measure} class="turnbar-scroll">
+  <div class="atb-viewport" bind:this={viewport}>
+    <div class="atb-track" bind:this={track} style="transform: translateX(-{offset}px)">
       {#each entries as unit, i (`${unit.id}-${i}`)}
         <button
           type="button"
@@ -103,22 +112,22 @@
         {/if}
       {/each}
     </div>
-
-    <button
-      type="button"
-      class="atb-arrow"
-      aria-label="Scroll turn order right"
-      disabled={!overflowing || atEnd}
-      onclick={() => scrollByPage(1)}
-    >▶</button>
   </div>
+
+  <button
+    type="button"
+    class="atb-arrow"
+    aria-label="Next page of turn order"
+    disabled={page >= pageCount - 1}
+    onclick={() => (page += 1)}
+  >▶</button>
 </div>
 
 <style>
   .atb-ribbon {
-    /* Without this the ribbon sits at its min-content width and spills past
-       the viewport instead of clamping and letting the strip scroll. */
-    min-width: 0;
+    display: flex;
+    width: 100%;
+    align-items: center;
     gap: calc(8 * var(--fx));
     padding: calc(5 * var(--fx)) calc(22 * var(--fx));
     background: linear-gradient(180deg, #1c2748 0%, #111a33 60%, #0b1121 100%);
@@ -170,8 +179,8 @@
 
   .atb-arrow {
     flex: none;
-    width: calc(24 * var(--fx));
-    height: calc(46 * var(--fx));
+    width: calc(26 * var(--fx));
+    height: calc(52 * var(--fx));
     border-radius: calc(4 * var(--fx));
     border: 1px solid rgb(148 163 184 / 0.4);
     background: rgb(30 41 59 / 0.9);
@@ -190,19 +199,31 @@
     cursor: default;
   }
 
-  .turnbar-scroll {
-    display: flex;
+  .atb-viewport {
+    flex: 1;
     min-width: 0;
+    overflow: hidden;
+    /* Room for a hovered portrait's scale-up, which would otherwise be clipped
+       by the overflow rule above. */
+    padding: calc(6 * var(--fx)) 0;
+  }
+
+  .atb-track {
+    display: flex;
+    /* Exactly the viewport's width, with the portraits overflowing it — that is
+       what makes translateX(-100%) advance by precisely one page. */
+    width: 100%;
     align-items: flex-end;
+    /* Centred while the whole order fits, flush left once it overflows, so
+       paging always starts from the first portrait. */
+    justify-content: safe center;
     gap: calc(5 * var(--fx));
-    padding: calc(4 * var(--fx)) 0;
-    overflow-x: scroll;
-    overflow-y: hidden;
+    transition: transform 0.2s ease;
   }
 
   .portrait {
-    width: calc(62 * var(--fx));
-    height: calc(74 * var(--fx));
+    width: calc(65 * var(--fx));
+    height: calc(78 * var(--fx));
   }
 
   .portrait.current {
@@ -225,27 +246,7 @@
   .cycle-divider {
     flex: none;
     width: 1px;
-    height: calc(60 * var(--fx));
+    height: calc(64 * var(--fx));
     background: #475569;
   }
-
-  /* Persistent scrollbar even with macOS overlay scrollbars: custom-styled
-     WebKit scrollbars always render. */
-  .turnbar-scroll::-webkit-scrollbar {
-    height: calc(7 * var(--fx));
-  }
-
-  .turnbar-scroll::-webkit-scrollbar-track {
-    background: rgb(30 41 59 / 0.8);
-    border-radius: 4px;
-  }
-
-  .turnbar-scroll::-webkit-scrollbar-thumb {
-    background: #475569;
-    border-radius: 4px;
-  }
-
-  /* No scrollbar-width here: in Chrome the standard property would override
-     and disable the ::-webkit-scrollbar styling above (which is what keeps
-     the bar permanently visible instead of macOS overlay auto-hiding). */
 </style>
