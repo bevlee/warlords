@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artifact Identity System — Design</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:        light-dark(#f8fafc, #0f172a);
+    --panel:     light-dark(#ffffff, #1e293b);
+    --panel-alt: light-dark(#f1f5f9, #172033);
+    --fg:        light-dark(#0f172a, #e2e8f0);
+    --muted:     light-dark(#64748b, #94a3b8);
+    --border:    light-dark(#e2e8f0, #334155);
+    --amber:     light-dark(#b45309, #fbbf24);
+    --sky:       light-dark(#0369a1, #38bdf8);
+    --purple:    light-dark(#7e22ce, #c084fc);
+    --rose:      light-dark(#be123c, #fb7185);
+    --green:     light-dark(#15803d, #4ade80);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 2rem 1.25rem 6rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, system-ui, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1080px; margin: 0 auto; }
+
+  header.doc { border-bottom: 2px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2.5rem; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.15; margin: 0 0 .6rem; letter-spacing: -.02em; }
+  .tagline { color: var(--muted); font-size: 1.05rem; margin: 0 0 1rem; max-width: 62ch; }
+  .meta { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .pill {
+    font: 600 .72rem/1 var(--mono); text-transform: uppercase; letter-spacing: .06em;
+    padding: .45rem .7rem; border-radius: 999px;
+    background: var(--panel-alt); border: 1px solid var(--border); color: var(--muted);
+  }
+
+  h2 {
+    font-size: 1.5rem; margin: 3rem 0 1rem; padding-top: 1.25rem;
+    border-top: 1px solid var(--border); letter-spacing: -.01em;
+  }
+  h2:first-of-type { border-top: 0; padding-top: 0; }
+  h3 { font-size: 1.12rem; margin: 2rem 0 .6rem; color: var(--amber); }
+  p { margin: 0 0 1rem; max-width: 74ch; }
+  ul, ol { max-width: 74ch; padding-left: 1.3rem; }
+  li { margin-bottom: .5rem; }
+  a { color: var(--sky); }
+  code {
+    font: .86em var(--mono); background: var(--panel-alt);
+    padding: .12em .4em; border-radius: 4px; border: 1px solid var(--border);
+  }
+  strong { font-weight: 650; }
+
+  .scroll { overflow-x: auto; margin: 0 0 1.5rem; border-radius: 10px; border: 1px solid var(--border); }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; background: var(--panel); font-size: .92rem; }
+  th, td { text-align: left; padding: .7rem .85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    background: var(--panel-alt); font: 600 .74rem/1.3 var(--mono);
+    text-transform: uppercase; letter-spacing: .05em; color: var(--muted); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num { font: .9rem var(--mono); white-space: nowrap; }
+
+  .faction { font-weight: 700; white-space: nowrap; }
+  .barbarian { color: var(--rose); }
+  .knight    { color: var(--sky); }
+  .wizard    { color: var(--purple); }
+  .necro     { color: var(--green); }
+  .ranger    { color: var(--amber); }
+  .demon     { color: var(--rose); }
+
+  .rarity { font: 600 .68rem/1 var(--mono); text-transform: uppercase; letter-spacing: .05em;
+            padding: .3rem .5rem; border-radius: 4px; border: 1px solid; white-space: nowrap; }
+  .r-common { color: var(--muted);  border-color: var(--border); }
+  .r-rare   { color: var(--sky);    border-color: color-mix(in oklab, var(--sky) 45%, transparent); }
+  .r-epic   { color: var(--purple); border-color: color-mix(in oklab, var(--purple) 45%, transparent); }
+
+  .callout {
+    border-left: 3px solid var(--amber); background: var(--panel);
+    padding: 1rem 1.15rem; border-radius: 0 8px 8px 0; margin: 0 0 1.5rem;
+  }
+  .callout.warn { border-left-color: var(--rose); }
+  .callout.key  { border-left-color: var(--green); }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    display: block; font: 700 .7rem/1 var(--mono); text-transform: uppercase;
+    letter-spacing: .07em; color: var(--muted); margin-bottom: .5rem;
+  }
+
+  pre {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem; overflow-x: auto; font: .84rem/1.55 var(--mono); margin: 0 0 1.5rem;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  .identity-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); margin-bottom: 1.5rem; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem; }
+  .card h4 { margin: 0 0 .3rem; font-size: 1.05rem; }
+  .card .quote { color: var(--muted); font-style: italic; margin: 0 0 .7rem; font-size: .92rem; }
+  .card dl { margin: 0; font-size: .87rem; }
+  .card dt { font: 600 .68rem/1 var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: .6rem; }
+  .card dd { margin: .2rem 0 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .87rem; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <h1>Artifact Identity System</h1>
+  <p class="tagline">
+    Artifacts become the gauntlet's build system. Each faction opens its run with a fixed artifact
+    that <em>is</em> its playstyle, faction-locked artifacts deepen that identity, and a global pool
+    of archetype-enablers lets any faction chase alpha-strike, no-retaliation rush, or pure archer.
+  </p>
+  <div class="meta">
+    <span class="pill">Design</span>
+    <span class="pill">2026-08-02</span>
+    <span class="pill">Supersedes: faction-artifacts stat catalog</span>
+    <span class="pill">Retires: faction talents</span>
+  </div>
+</header>
+
+<h2>The core shift: stat bags → effect hooks</h2>
+
+<p>
+  Today an artifact is <code>Partial&lt;Record&lt;ItemStat, number&gt;&gt;</code>, summed into
+  <code>ArmyBonuses</code> at battle start. That can express <em>“+8 attack”</em> and nothing else —
+  which is exactly why the current catalog is dull. Nothing in it can say <em>“on enemy death, raise
+  a skeleton.”</em>
+</p>
+
+<p>
+  So <code>ItemDef.effects</code> becomes a list of tagged effects over <strong>six hook points</strong>,
+  every one of which already has a working precedent in the engine:
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Hook</th><th>Fires</th><th>Precedent in code</th></tr></thead>
+  <tbody>
+    <tr><td><code>battleStart</code></td><td>Stack construction in <code>initBattle</code></td><td class="num">armyBonuses — battle.ts:255</td></tr>
+    <tr><td><code>roundStart</code></td><td>Each round tick (incl. round 1 only)</td><td class="num">round_start — turnOrder.ts:51</td></tr>
+    <tr><td><code>onDeath</code></td><td>Any stack dies, either side</td><td class="num">Demon Gating — battle.ts:139</td></tr>
+    <tr><td><code>onHit</code></td><td>After damage lands</td><td class="num">slow_on_hit / burn — battle.ts:110</td></tr>
+    <tr><td><code>damageMod</code></td><td>Damage pipeline</td><td class="num">applyOffenseBonus — combat.ts</td></tr>
+    <tr><td><code>runReward</code></td><td>Between battles</td><td class="num">recordBattle — run.ts:217</td></tr>
+  </tbody>
+</table>
+</div>
+
+<pre><code>type ArtifactEffect =
+  | { hook: 'battleStart'; apply: (stack, ctx) =&gt; UnitStack }
+  | { hook: 'roundStart'; round?: number | 'each'; apply: (state, ctx) =&gt; BattleState }
+  | { hook: 'onDeath'; side: 'player' | 'enemy'; apply: (state, dead, ctx) =&gt; BattleState }
+  | { hook: 'onHit'; apply: (striker, victim, ctx) =&gt; { victim; events } }
+  | { hook: 'damageMod'; apply: (damage, ctx) =&gt; number }
+  | { hook: 'runReward'; apply: (run: RunState) =&gt; RunState };</code></pre>
+
+<div class="callout key">
+  <span class="label">Why this is cheap</span>
+  <p>
+    Gating already does <em>“on death, respawn a unit in the same cell.”</em> Corpse Harvest is that
+    same code pointed at the enemy side with a different unit. Adding artifact #40 means adding a
+    catalog entry, not editing <code>combat.ts</code> again. Stat bonuses stay expressible as a
+    trivial <code>battleStart</code> effect, so nothing in the existing catalog is lost.
+  </p>
+</div>
+
+<h2>Faction identities</h2>
+
+<p>One sentence each. If an artifact doesn't serve the sentence, it belongs in the global pool instead.</p>
+
+<div class="identity-grid">
+  <div class="card">
+    <h4 class="barbarian">Barbarian</h4>
+    <p class="quote">“Hit first, hit everything, don't plan for round 5.”</p>
+    <dl>
+      <dt>Fantasy</dt><dd>Rush</dd>
+      <dt>Wins by</dt><dd>Front-loaded power that decays each round</dd>
+      <dt>Loses to</dt><dd>Anything that survives the opening</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h4 class="knight">Knight</h4>
+    <p class="quote">“The line does not move.”</p>
+    <dl>
+      <dt>Fantasy</dt><dd>Attrition</dd>
+      <dt>Wins by</dt><dd>Getting stronger every round it holds formation</dd>
+      <dt>Loses to</dt><dd>Being forced out of position</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h4 class="wizard">Wizard</h4>
+    <p class="quote">“The hero is the army.”</p>
+    <dl>
+      <dt>Fantasy</dt><dd>Spell engine</dd>
+      <dt>Wins by</dt><dd>Mana economy; units are delivery, not damage</dd>
+      <dt>Loses to</dt><dd>Mana starvation, fast pressure</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h4 class="necro">Necromancer</h4>
+    <p class="quote">“The battlefield is your recruitment pool.”</p>
+    <dl>
+      <dt>Fantasy</dt><dd>Corpse economy</dd>
+      <dt>Wins by</dt><dd>Converting enemy deaths into your army</dd>
+      <dt>Loses to</dt><dd>Fights that end too fast to harvest</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h4 class="ranger">Ranger</h4>
+    <p class="quote">“Nothing reaches you.”</p>
+    <dl>
+      <dt>Fantasy</dt><dd>Ranged denial</dd>
+      <dt>Wins by</dt><dd>Shots, range, and movement denial</dd>
+      <dt>Loses to</dt><dd>Getting closed down</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h4 class="demon">Demon</h4>
+    <p class="quote">“Death is a resource, not a loss.”</p>
+    <dl>
+      <dt>Fantasy</dt><dd>Sacrifice</dd>
+      <dt>Wins by</dt><dd>Trading its own stacks for value</dd>
+      <dt>Loses to</dt><dd>Attrition that outlasts the returns</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="callout">
+  <span class="label">Design note</span>
+  <p>
+    Barbarian and Knight are deliberate mirror images — one decays, one compounds. That contrast is
+    the clearest way to teach a player that <em>artifacts</em>, not stats, decide how a run plays.
+  </p>
+</div>
+
+<h2>Starting artifacts</h2>
+
+<p>
+  Fixed per faction, granted in <code>newRun</code>, never drafted (excluded from the offer pool).
+  Picking a faction <em>is</em> picking a playstyle.
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Faction</th><th>Starter</th><th>Effect</th><th>Hook</th></tr></thead>
+  <tbody>
+    <tr><td class="faction barbarian">Barbarian</td><td><strong>Warpaint of the First Charge</strong></td><td>+3 speed to all your stacks during round 1 only</td><td class="num">roundStart (1)</td></tr>
+    <tr><td class="faction knight">Knight</td><td><strong>Oathstone Bulwark</strong></td><td>A stack that didn't move on its turn gains +3 defense, stacking each round it holds (max +15)</td><td class="num">roundStart each</td></tr>
+    <tr><td class="faction wizard">Wizard</td><td><strong>Conduit Sigil</strong></td><td>Your hero's ATB fill rate doubles — the hero acts about twice as often</td><td class="num">battleStart</td></tr>
+    <tr><td class="faction necro">Necromancer</td><td><strong>Corpse Harvest</strong></td><td>When an <em>enemy</em> stack dies, a Skeleton stack rises in its cell under your control</td><td class="num">onDeath (enemy)</td></tr>
+    <tr><td class="faction ranger">Ranger</td><td><strong>Hawkeye Quiver</strong></td><td>+2 shots to every shooting stack; your shooters ignore the melee penalty</td><td class="num">battleStart</td></tr>
+    <tr><td class="faction demon">Demon</td><td><strong>Gatekeeper's Chain</strong></td><td>50% chance a fallen stack of yours returns at 25% of its original count</td><td class="num">onDeath (player)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  Every one of these is a <strong>behaviour the player can watch happen</strong>. That is the whole
+  point — compare “+4 attack”, which nobody has ever noticed firing.
+</p>
+
+<h2>Faction artifacts</h2>
+
+<p>
+  Three per faction, draft-only, rare/epic (never common — these are identity pieces).
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Faction</th><th>Artifact</th><th>Rarity</th><th>Effect</th><th>Serves the identity by</th></tr></thead>
+  <tbody>
+    <tr><td class="faction barbarian" rowspan="3">Barbarian</td>
+        <td><strong>Bloodfury Totem</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>+50% damage in round 1, +25% in round 2, nothing after</td><td>Making the decay explicit and loud</td></tr>
+    <tr><td><strong>Skullcrusher Idol</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Attacks on a stack that hasn't acted yet this round take no retaliation</td><td>Rewarding alpha-strike ordering</td></tr>
+    <tr><td><strong>Rage of the Horde</strong></td><td><span class="rarity r-epic">epic</span></td>
+        <td>Each enemy stack killed gives all your stacks +1 morale (stacks, to +5)</td><td>Snowballing a fast opening into more turns</td></tr>
+
+    <tr><td class="faction knight" rowspan="3">Knight</td>
+        <td><strong>Banner of the Unbroken</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Your stacks retaliate against every attacker, unlimited</td><td>Punishing everything that touches the line</td></tr>
+    <tr><td><strong>Shieldwall Doctrine</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Adjacent friendly stacks grant each other +2 defense</td><td>Making formation a real decision</td></tr>
+    <tr><td><strong>Crusader's Reliquary</strong></td><td><span class="rarity r-epic">epic</span></td>
+        <td>First time each stack would drop below 20% HP it heals to 50% instead (once per stack)</td><td>Surviving the burst that breaks formations</td></tr>
+
+    <tr><td class="faction wizard" rowspan="3">Wizard</td>
+        <td><strong>Manafount</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>+3 mana per round</td><td>The mana economy, replacing Mysticism</td></tr>
+    <tr><td><strong>Arcane Overflow</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Every enemy stack death refunds 3 mana</td><td>Spells that pay for themselves</td></tr>
+    <tr><td><strong>Archmage's Crown</strong></td><td><span class="rarity r-epic">epic</span></td>
+        <td>+50% spell damage; Lightning chains to a second target</td><td>Hero-as-army payoff</td></tr>
+
+    <tr><td class="faction necro" rowspan="3">Necromancer</td>
+        <td><strong>Grave Tide</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Corpse Harvest raises <strong>twice</strong> as many Skeletons</td><td>More bodies per corpse</td></tr>
+    <tr><td><strong>Shroud of Despair</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>−3 morale to <strong>all</strong> stacks; undead ignore morale; <strong>every enemy freeze raises a Skeleton</strong></td><td>Asymmetry your army ignores, paid out in bodies</td></tr>
+    <tr><td><strong>Dragon Crypt</strong></td><td><span class="rarity r-epic">epic</span></td>
+        <td>Corpse Harvest raises <strong>Bone Dragons</strong> instead of Skeletons</td><td>The run-defining ceiling</td></tr>
+
+    <tr><td class="faction ranger" rowspan="3">Ranger</td>
+        <td><strong>Thornward Snare</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Enemies that end movement adjacent to your stacks lose 2 speed next round</td><td>Denial — nothing closes the gap</td></tr>
+    <tr><td><strong>Volley Doctrine</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Grants <code>double_shot</code> to your highest-tier shooter</td><td>Shot-count scaling</td></tr>
+    <tr><td><strong>Heart of the Wildwood</strong></td><td><span class="rarity r-epic">epic</span></td>
+        <td>Stacks that haven't been attacked yet deal +40% damage</td><td>Paying out for perfect kiting</td></tr>
+
+    <tr><td class="faction demon" rowspan="3">Demon</td>
+        <td><strong>Brimstone Pact</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>When one of your stacks dies, all survivors gain +3 attack (stacking)</td><td>Death is literally profit</td></tr>
+    <tr><td><strong>Sacrificial Rite</strong></td><td><span class="rarity r-rare">rare</span></td>
+        <td>Destroy one of your stacks to fully heal another (once per battle)</td><td>Player-authored sacrifice</td></tr>
+    <tr><td><strong>Infernal Crown</strong></td><td><span class="rarity r-epic">epic</span></td>
+        <td>All your stacks apply <code>burn</code> on hit</td><td>Faction-flavour damage floor</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Necromancer walkthrough</h3>
+
+<p>
+  The build, end to end. Corpse Harvest kills an enemy stack → Skeletons rise → those Skeletons are
+  built from the run's <strong>merged</strong> unit def, so every permanent skill you've drafted onto
+  Skeletons (Lifesteal, Bravery, Fleet Footwork) applies to the raised ones too. That's the
+  skeleton-buffing team: reward drafts compound into units you don't recruit, you <em>harvest</em>.
+  Grave Tide doubles the rate, Dragon Crypt swaps the output for Bone Dragons, and Shroud of Despair
+  makes the whole board miserable for everyone but you.
+</p>
+
+<h3>Morale math, and why Shroud of Despair got rewritten</h3>
+
+<p>
+  <code>checkMorale</code> (<code>combat.ts:180</code>) is flat <code>1/24</code> per point. A freeze
+  costs the stack its entire turn (<code>battle.ts:577</code>); a boost grants an entire extra one
+  (<code>battle.ts:764</code>) — symmetric turn economy.
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Morale</th><th>Proc chance</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td class="num">±1</td><td class="num">4.2%</td><td></td></tr>
+    <tr><td class="num">±2</td><td class="num">8.3%</td><td></td></tr>
+    <tr><td class="num">±3</td><td class="num">12.5%</td><td>current <code>clampProc</code> cap</td></tr>
+    <tr><td class="num">±4</td><td class="num">16.7%</td><td>needs cap lift</td></tr>
+    <tr><td class="num">±5</td><td class="num">20.8%</td><td>needs cap lift</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  Per roll that looks minor, which is misleading: it rolls on <em>every turn of every stack</em>.
+  Against 5 enemy stacks over 6 rounds (~30 rolls), −5 deletes ~6.25 enemy turns and −3 deletes
+  ~3.75 — a fifth of the enemy army's total output, comparable to killing a stack outright in round 1.
+</p>
+
+<div class="callout warn">
+  <span class="label">The rewrite</span>
+  <p>
+    The magnitude was never the problem. The problem is that the payoff is <strong>diffuse and
+    invisible</strong>: 30 quiet dice rolls with no moment the player can point at, sitting at epic
+    rarity next to <em>bone dragons</em>. So the card now pays its procs out in bodies — every enemy
+    freeze raises a Skeleton. Each proc becomes a visible event, the aura is welded to the corpse
+    economy instead of being an orphan debuff, and the player gains a reason to want enemies
+    alive-but-frozen rather than merely dead.
+  </p>
+  <p>
+    Two knock-ons: the aura drops to <strong>−3</strong>, so the <code>clampProc</code> lift is no
+    longer needed for this card; and it drops to <strong>rare</strong>, leaving Dragon Crypt as the
+    faction's single epic.
+  </p>
+  <p>
+    If you'd rather keep a pure aura, the honest alternative converts the proc into a standing
+    condition — <em>“−2 morale to enemies; enemy stacks at negative morale cannot retaliate”</em> —
+    trading all the variance for a reliable rule change that combos with the global no-retaliation
+    archetype. Strictly better design, slightly less Necromancer.
+  </p>
+</div>
+
+<h3>Implementation notes this build lives or dies on</h3>
+
+<ol>
+  <li>
+    <strong>Raised stacks must use the merged def.</strong> Spawning the raw <code>SKELETON</code>
+    constant instead of <code>applyUnitSkills(...)</code>'s Skeleton silently breaks the entire
+    archetype — the buffs you drafted just wouldn't apply. This is the single most likely bug in the
+    feature.
+  </li>
+  <li>
+    <strong>Do raised Skeletons persist after the battle?</strong> <code>survivorsFrom</code>
+    (<code>run.ts:206</code>) collapses living player stacks into the run army, so by default they
+    <em>would</em> persist and compound. Recommend <strong>yes</strong> — it's the fantasy, and enemy
+    budget already scales at <code>1.32^n</code>. Flag as the #1 balance watch item; the kill switch
+    is tagging raised stacks so <code>survivorsFrom</code> skips them.
+  </li>
+  <li>
+    <strong>Raise volume needs a cap.</strong> Suggest
+    <code>floor(deadStack.startCount × deadUnit.hp × 0.15 / SKELETON.hp)</code>, capped at 20 per
+    death, and only when the dead stack's cell is free. Dragon Crypt uses the same HP pool against
+    <code>BONE_DRAGON.hp</code> (250), so it naturally yields ~1 dragon per large stack rather than 40.
+  </li>
+</ol>
+
+<h2>Global artifacts</h2>
+
+<p>
+  Available to every faction, drafted from the shared pool. These exist to make named strategies
+  actually assemblable. <strong>No pure stat bags</strong> — every one changes a rule.
+</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Archetype</th><th>Artifact</th><th>Rarity</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="2"><strong>Alpha strike</strong></td>
+        <td>Executioner's Edge</td><td><span class="rarity r-rare">rare</span></td><td>Each stack's <em>first</em> attack of the battle deals double damage</td></tr>
+    <tr><td>Headsman's Wager</td><td><span class="rarity r-rare">rare</span></td><td>+100% damage vs. full-HP stacks; −25% vs. damaged ones</td></tr>
+
+    <tr><td rowspan="2"><strong>No-retaliation</strong></td>
+        <td>Duelist's Cloak</td><td><span class="rarity r-rare">rare</span></td><td>Attacking a stack with lower initiative than yours takes no retaliation</td></tr>
+    <tr><td>Ghoststep Charm</td><td><span class="rarity r-epic">epic</span></td><td>Your stacks take no retaliation on the round they moved 4+ cells</td></tr>
+
+    <tr><td rowspan="2"><strong>Archer</strong></td>
+        <td>Endless Quiver</td><td><span class="rarity r-common">common</span></td><td>+3 shots to all shooting stacks</td></tr>
+    <tr><td>Marksman's Lens</td><td><span class="rarity r-rare">rare</span></td><td>Ranged attacks ignore 50% of the target's defense</td></tr>
+
+    <tr><td rowspan="2"><strong>Speed / tempo</strong></td>
+        <td>Chrono Beads</td><td><span class="rarity r-rare">rare</span></td><td>+2 initiative; your stacks all act before the enemy in round 1</td></tr>
+    <tr><td>Boots of the Vanguard</td><td><span class="rarity r-common">common</span></td><td>+3 speed to all stacks</td></tr>
+
+    <tr><td><strong>Sustain</strong></td>
+        <td>Sanguine Chalice</td><td><span class="rarity r-rare">rare</span></td><td>All melee stacks gain 15% lifesteal</td></tr>
+    <tr><td><strong>Swarm</strong></td>
+        <td>Warlord's Muster</td><td><span class="rarity r-rare">rare</span></td><td>Your smallest stack doubles in count at battle start</td></tr>
+
+    <tr><td rowspan="2"><strong>High risk</strong></td>
+        <td>Glass Cannon Idol</td><td><span class="rarity r-epic">epic</span></td><td>+60% damage dealt, +40% damage taken</td></tr>
+    <tr><td>Last Stand Banner</td><td><span class="rarity r-rare">rare</span></td><td>Stacks below 25% of starting count deal double damage</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  <strong>Ghoststep + Boots + Chrono Beads</strong> is the no-retaliation speed rush.
+  <strong>Endless Quiver + Marksman's Lens + Hawkeye Quiver</strong> is the archer deck.
+  <strong>Executioner's Edge + Glass Cannon + Bloodfury Totem</strong> is Barbarian one-shot.
+  Each archetype has at least one common so it's reachable early, and at least one epic so it has a
+  ceiling.
+</p>
+
+<h2>Retiring faction talents</h2>
+
+<p><code>FACTION_SKILL_DEFS</code> goes away. Every talent's job is absorbed:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Talent</th><th>Absorbed by</th></tr></thead>
+  <tbody>
+    <tr><td>Offense, Armorer, Leadership</td><td>Global artifacts + Barbarian/Knight faction sets</td></tr>
+    <tr><td>Tactics (Knight)</td><td>Oathstone Bulwark's hold-the-line loop</td></tr>
+    <tr><td>Necromancy (Necromancer)</td><td>Corpse Harvest — in-battle, visible, better</td></tr>
+    <tr><td>Gating (Demon)</td><td>Gatekeeper's Chain — same mechanic, bigger, all units</td></tr>
+    <tr><td>Archery, Logistics, Nature's Luck</td><td>Hawkeye Quiver + Boots + globals</td></tr>
+    <tr><td>Sorcery, Intelligence, Mysticism</td><td>Conduit Sigil + Manafount + Archmage's Crown</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  <strong>Assumption (flip if you disagree): scope the removal to the gauntlet.</strong> Gauntlet
+  heroes enter battle with <code>factionSkills: []</code>; campaign and co-op keep talents.
+  <code>factionSkills</code> is read from ~12 sites across <code>combat.ts</code>,
+  <code>battle.ts</code>, <code>initBattle</code> and <code>campaign/+page.svelte</code>, so an
+  engine-wide rip-out rebalances campaign mode as collateral. One line in the gauntlet battle path
+  buys the same gauntlet experience at a fraction of the risk. Delete the module later, once
+  artifacts have proven out.
+</p>
+
+<div class="callout warn">
+  <span class="label">The most important number in this document</span>
+  <p>
+    With talents gone, a gauntlet level-up is just +1 attack / +1 defense
+    (<code>run.ts:220-225</code>), which is nothing. Compensate by raising artifact cadence from
+    <strong>every 3 wins to every 2</strong> (<code>run.ts:240</code>): a 10-node run then yields
+    5 drafted artifacts plus the starter instead of 3 — enough to actually assemble a build.
+  </p>
+</div>
+
+<h2>Open assumptions</h2>
+
+<p>Four calls made here, each one constant to change:</p>
+
+<ol>
+  <li><strong>Talent removal is gauntlet-scoped</strong>, not engine-wide (above).</li>
+  <li>
+    <strong><code>undead</code> becomes mechanically real</strong> — undead stacks ignore morale
+    entirely. Today the ability is <em>decorative</em>: it appears on 8 unit defs and nothing in the
+    engine reads it. Shroud of Despair is only a Necromancer <em>strength</em> if their own army is
+    immune; otherwise it's a symmetric debuff that hurts you back. ~5 lines in
+    <code>checkMorale</code>, and it buffs Necromancer across every mode.
+  </li>
+  <li>
+    <strong><code>clampProc</code> rises from ±3 to ±5</strong> (<code>battle.ts:230</code>) — now
+    optional. With Shroud rewritten to −3 this is only needed to make Rage of the Horde's +5
+    reachable (20.8% chance of a free turn per turn, on stacks you've invested in — strong enough it
+    may want to be +4). Without the lift, any card printing a number above 3 silently clamps and lies
+    about itself.
+  </li>
+  <li>
+    <strong>Starters are fixed, not chosen.</strong> A 1-of-3 starter pick would triple replayability
+    at the cost of designing and balancing 18 bespoke effects up front instead of 6 — worth doing
+    later, once the six identities have proven out in play.
+  </li>
+</ol>
+
+<h2>Pooling</h2>
+
+<p>
+  Unchanged from the faction-artifacts design: one merged candidate list, one rarity-weighted roll,
+  <code>FACTION_AFFINITY = 3</code> so the small faction sub-pool isn't buried by the global one.
+  Two additions:
+</p>
+
+<ul>
+  <li>
+    The faction's <strong>starter is excluded</strong> from the offer pool — it's already owned, so
+    the existing <code>owned</code> filter handles it for free once <code>newRun</code> seeds
+    <code>items: [STARTER[faction]]</code>.
+  </li>
+  <li>
+    <strong>Rarity is re-read as impact, not stat budget.</strong> Behaviour artifacts have no stat
+    total to scale: common = archetype enabler, rare = build-defining, epic = run-defining. The
+    existing <code>isDeadPick</code> capped-stat exclusion only applies to artifacts with stat
+    effects; behaviour artifacts are never dead picks.
+  </li>
+</ul>
+
+<h2>Testing</h2>
+
+<ul>
+  <li><strong>Hook dispatch</strong> — each of the six hooks fires at its site, once per active artifact, in catalog order; an empty artifact list is a no-op (guards non-gauntlet battles).</li>
+  <li><strong>Corpse Harvest</strong> — an enemy stack death spawns a player Skeleton stack in the freed cell; count matches the HP formula; no spawn when the cell is occupied; <strong>the spawned def carries the run's granted unit skills</strong> (the regression that would silently kill the archetype).</li>
+  <li><strong>Dragon Crypt / Grave Tide</strong> — same harvest event, different output unit and multiplier; the two compose.</li>
+  <li><strong>Round-scoped effects</strong> — Warpaint grants +3 speed on round 1 and the bonus is <em>gone</em> on round 2; Bloodfury's multiplier steps 1.5 → 1.25 → 1.0.</li>
+  <li><strong>Oathstone</strong> — defense accrues only on rounds the stack didn't move, and caps at +15.</li>
+  <li><strong>Undead morale immunity</strong> — an undead stack under Shroud never freezes; a living stack does; each enemy freeze under Shroud raises exactly one Skeleton.</li>
+  <li><strong>Starters</strong> — <code>newRun(faction)</code> grants exactly the right artifact, and it never appears in a subsequent draft offer.</li>
+  <li><strong>Talent removal</strong> — gauntlet battles run with <code>factionSkills: []</code>; campaign battles are untouched (existing <code>newFactionSkills.test.ts</code> must still pass).</li>
+</ul>
+
+<footer>
+  Warlords — gauntlet design. Companion to
+  <code>2026-08-02-artifact-identity-system.md</code> and
+  <code>2026-08-02-faction-artifacts-design.md</code>.
+</footer>
+
+</main>
+</body>
+</html>
