@@ -898,15 +898,21 @@
       {/if}
     </div>
 
-    <!-- Right rail: whatever is hovered or pinned, at full height. -->
+    <!-- Right rail: whatever is hovered or pinned, at full height. The panel
+         itself only exists while there is something to show, but its gutter is
+         always reserved — the board is sized by height, so it cannot grow into
+         reclaimed width and would instead re-centre, sliding out from under the
+         cursor that triggered the hover. -->
     <div class="info-rail">
-      <UnitInfo
-        unit={infoUnit}
-        hero={infoUnit ? heroFor(battle, infoUnit) : battle.hero}
-        pinned={!!selectedUnit}
-        onunpin={() => (selectedId = null)}
-        size="rail"
-      />
+      {#if infoUnit}
+        <UnitInfo
+          unit={infoUnit}
+          hero={heroFor(battle, infoUnit)}
+          pinned={!!selectedUnit}
+          onunpin={() => (selectedId = null)}
+          size="rail"
+        />
+      {/if}
     </div>
   </div>
 

@@ -129,9 +129,7 @@
           aria-label="Unpin unit info"
           onclick={() => onunpin?.()}
         >×</button>
-      {:else if unit}
-        <!-- Only worth saying while there is something to pin; the empty state
-             below already explains the panel when it is at rest. -->
+      {:else}
         <span class="rail-hint">RMB to pin</span>
       {/if}
     </div>
