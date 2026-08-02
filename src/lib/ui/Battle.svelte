@@ -676,20 +676,69 @@
 
 <svelte:window onkeydown={handleKeydown} onresize={measureFit} />
 
-<!-- Three horizontal bands, each answering one question: whose turn is it (ATB
-     ribbon), where is everyone (flank · battlefield · creature rail), and what
-     can the acting stack do (action dock · battle log). The screen claims the
-     space left below whichever page header hosts it, and everything inside is
-     sized in multiples of --fx so the proportions hold at any resolution. -->
+<!-- Horizontal bands, each answering one question: whose turn is it (ATB
+     ribbon), what should I do now (status strip), where is everyone (flank ·
+     battlefield · creature rail), and what can the acting stack do (action
+     dock · battle log). The screen claims the space left below whichever page
+     header hosts it, and everything inside is sized in multiples of --fx so
+     the proportions hold at any resolution. -->
 <div bind:this={screenEl} class="battle-screen" style="--fx: {fx}px; height: {availableH}px">
   <!-- ══ Band 1: ATB turn ribbon ══ -->
   <div class="atb-band">
     <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
   </div>
 
-  <!-- ══ Band 2: flank · battlefield · creature info ══ -->
+  <!-- ══ Band 2: status strip ══ -->
+  <!-- The current prompt, spanning the full width so the flank and the board
+       share one box below it — that is what lets the hero standee sit on the
+       board's centreline without a magic offset. Fixed height: content changes
+       must never reflow the board. z-40 because the tilted board's projection
+       overflows upward over this strip, and without a stacking context its
+       buttons would be unclickable. -->
+  <div class="status-band">
+    {#if inDeploy}
+      <div class="status-card deploy">
+        {#if selectedDeployUnit && selectedDeployUnit.count > 1}
+          <span class="status-note">{selectedDeployUnit.definition.name}: split off</span>
+          <input
+            type="range"
+            min="1"
+            max={selectedDeployUnit.count - 1}
+            bind:value={splitAmount}
+            class="w-28 accent-amber-400"
+            aria-label="split amount"
+          />
+          <span class="status-amount font-mono text-amber-200">{splitAmount}</span>
+          <button
+            type="button"
+            class="status-button {splitArmed ? 'armed' : ''}"
+            onclick={() => (splitArmed = !splitArmed)}
+          >
+            {splitArmed ? 'Click a cell…' : 'Split'}
+          </button>
+        {:else}
+          <p class="status-text text-sm font-medium text-slate-100">
+            Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
+          </p>
+        {/if}
+        {#if !online}
+          <button type="button" class="status-button ml-auto" onclick={resetDeploy}>Reset</button>
+        {/if}
+        <button type="button" class="status-button primary" onclick={beginBattle}>
+          {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
+        </button>
+      </div>
+    {:else}
+      <div class="status-card">
+        <p class="status-text text-sm font-medium text-slate-100">{statusText}</p>
+      </div>
+    {/if}
+  </div>
+
+  <!-- ══ Band 3: flank · battlefield · creature info ══ -->
   <div class="battle-middle">
-    <!-- Left flank: battle controls at the top, hero standee at the foot. -->
+    <!-- Left flank: battle controls at the top, hero standee centred on the
+         battlefield beside it. -->
     <div class="flank">
       {#if !replay}
         <div class="flank-top">
@@ -767,53 +816,8 @@
       {/if}
     </div>
 
-    <!-- Battlefield stage: the status strip and every battle overlay live here. -->
+    <!-- Battlefield stage: the board plus every overlay that covers it. -->
     <div class="board-column">
-      <!-- Combat indicator: the current status/prompt above the battlefield.
-           Full event history lives in the battle log at bottom-right.
-           Fixed height: content changes must never reflow the board below.
-           z-40: the tilted board viewport's projection overflows upward over
-           this strip; without a stacking context its buttons are unclickable. -->
-      <div class="status-band">
-        {#if inDeploy}
-          <div class="status-card deploy">
-            {#if selectedDeployUnit && selectedDeployUnit.count > 1}
-              <span class="status-note">{selectedDeployUnit.definition.name}: split off</span>
-              <input
-                type="range"
-                min="1"
-                max={selectedDeployUnit.count - 1}
-                bind:value={splitAmount}
-                class="w-28 accent-amber-400"
-                aria-label="split amount"
-              />
-              <span class="status-amount font-mono text-amber-200">{splitAmount}</span>
-              <button
-                type="button"
-                class="status-button {splitArmed ? 'armed' : ''}"
-                onclick={() => (splitArmed = !splitArmed)}
-              >
-                {splitArmed ? 'Click a cell…' : 'Split'}
-              </button>
-            {:else}
-              <p class="status-text text-sm font-medium text-slate-100">
-                Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
-              </p>
-            {/if}
-            {#if !online}
-              <button type="button" class="status-button ml-auto" onclick={resetDeploy}>Reset</button>
-            {/if}
-            <button type="button" class="status-button primary" onclick={beginBattle}>
-              {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
-            </button>
-          </div>
-        {:else}
-          <div class="status-card">
-            <p class="status-text text-sm font-medium text-slate-100">{statusText}</p>
-          </div>
-        {/if}
-      </div>
-
       <!-- The board is width-driven (a 12×9 grid of square cells projected to
            ~0.68 × its width). Giving the wrapper that aspect ratio at full
            height lets the board grow to fill whatever the bands leave over —
@@ -904,7 +908,7 @@
     </div>
   </div>
 
-  <!-- ══ Band 3: action dock + battle log ══ -->
+  <!-- ══ Band 4: action dock + battle log ══ -->
   <div class="dock-band">
     <div class="dock-slot">
       <ActionDock
@@ -1119,14 +1123,19 @@
     cursor: not-allowed;
   }
 
+  /* Centred on the flank, which shares its box with the battlefield now that
+     the status strip is its own band — so this lands on the board's own
+     centreline. Absolute so a long artifact strip can't push the hero down. */
   .hero-standee {
-    position: relative;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
     display: flex;
-    width: 100%;
-    margin-top: auto;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
+    /* Room for the shadow and the active-turn arc, which hang below the feet. */
     padding-bottom: calc(18 * var(--fx));
     transition: filter 0.15s ease;
   }
@@ -1176,7 +1185,6 @@
     display: flex;
     flex: none;
     justify-content: center;
-    margin-bottom: calc(4 * var(--fx));
   }
 
   .status-card {
