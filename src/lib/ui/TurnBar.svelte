@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { BattleState, UnitStack } from '$lib/engine/types';
-  import { predictTurnOrder } from '$lib/engine/turnOrder';
+  import { predictTurnSchedule } from '$lib/engine/turnOrder';
   import Sprite from './Sprite.svelte';
 
   interface Props {
@@ -14,11 +14,19 @@
 
   const ENTRIES = 16;
 
-  const entries = $derived(
-    predictTurnOrder(battleState.units, ENTRIES)
-      .map(id => battleState.units.find(u => u.id === id))
-      .filter((u): u is UnitStack => !!u)
-  );
+  // Each entry carries the round it falls in, so the strip can break itself
+  // into rounds inline — `startsRound` is set on the first turn of each new
+  // one, which is where the marker goes.
+  const entries = $derived.by(() => {
+    const slots = predictTurnSchedule(battleState.units, ENTRIES, battleState.battleTime);
+    return slots
+      .map((slot, i) => ({
+        unit: battleState.units.find(u => u.id === slot.unitId),
+        round: slot.round,
+        startsRound: i > 0 && slot.round !== slots[i - 1].round,
+      }))
+      .filter((e): e is { unit: UnitStack; round: number; startsRound: boolean } => !!e.unit);
+  });
 
   // Paged, not scrolled. Scrolling cost a permanent scrollbar across the
   // ribbon's full width — space the portraits can use instead — and a hovered
@@ -93,23 +101,25 @@
 
   <div class="atb-viewport" bind:this={viewport}>
     <div class="atb-track" bind:this={track} style="transform: translateX(-{offset}px)">
-      {#each entries as unit, i (`${unit.id}-${i}`)}
+      {#each entries as entry, i (`${entry.unit.id}-${i}`)}
+        {#if entry.startsRound}
+          <div class="round-marker" role="separator" aria-label="Round {entry.round} begins">
+            {entry.round}
+          </div>
+        {/if}
         <button
           type="button"
           class="portrait relative shrink-0 overflow-hidden rounded-sm border-2 transition-transform
-            {unit.side === 'player' ? 'border-sky-400 bg-sky-950' : 'border-red-500 bg-red-950'}
+            {entry.unit.side === 'player' ? 'border-sky-400 bg-sky-950' : 'border-red-500 bg-red-950'}
             {i === 0 ? 'current ring-2 ring-amber-300' : ''}
-            {unit.id === hoveredId ? 'scale-110 brightness-125' : ''}"
-          aria-label="turn {i + 1}: {unit.definition.name} ×{unit.count}"
-          onmouseenter={() => onhover(unit)}
+            {entry.unit.id === hoveredId ? 'scale-110 brightness-125' : ''}"
+          aria-label="turn {i + 1}: {entry.unit.definition.name} ×{entry.unit.count}"
+          onmouseenter={() => onhover(entry.unit)}
           onmouseleave={() => onhover(null)}
         >
-          <Sprite name={unit.definition.name} class="h-full w-full" />
-          <span class="count-plate">{unit.count}</span>
+          <Sprite name={entry.unit.definition.name} class="h-full w-full" />
+          <span class="count-plate">{entry.unit.count}</span>
         </button>
-        {#if i === 0}
-          <div class="cycle-divider" aria-hidden="true"></div>
-        {/if}
       {/each}
     </div>
   </div>
@@ -243,10 +253,22 @@
     color: #fcd34d;
   }
 
-  .cycle-divider {
+  /* Inline round break: the strip reads as one continuous timeline, with these
+     marking where one round hands over to the next. */
+  .round-marker {
+    display: flex;
     flex: none;
-    width: 1px;
-    height: calc(64 * var(--fx));
-    background: #475569;
+    align-self: stretch;
+    align-items: center;
+    justify-content: center;
+    width: calc(26 * var(--fx));
+    border-left: 1px solid rgb(203 168 92 / 0.5);
+    border-right: 1px solid rgb(203 168 92 / 0.5);
+    background: rgb(203 168 92 / 0.08);
+    font-family: ui-monospace, monospace;
+    font-size: calc(13 * var(--fx));
+    font-weight: 700;
+    line-height: 1;
+    color: rgb(245 217 139 / 0.9);
   }
 </style>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
-import { advanceTurn, predictTurnOrder } from '../turnOrder';
+import { advanceTurn, predictTurnOrder, predictTurnSchedule } from '../turnOrder';
 import { calculateDamage } from '../combat';
 import { initBattle, applyAction } from '../battle';
 import { GOBLIN, WOLF_RIDER, THUNDERBIRD, OGRE } from '../barbarian';
@@ -186,5 +186,58 @@ describe('predictTurnOrder', () => {
 
     const order = predictTurnOrder([alive, dead], 3);
     expect(order).toEqual([alive.id, alive.id, alive.id]);
+  });
+});
+
+describe('predictTurnSchedule', () => {
+  it('tags each turn with the round it falls in', () => {
+    // Initiative 10 is exactly one turn per round. From a cold scale (atb 0)
+    // the first turn costs a full cycle, so it already lands in round 2 —
+    // the same reason advanceTurn bumps an Ogre to round 2 on its first turn.
+    const evenDef: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+    const cold = makeStack(evenDef, { col: 1, row: 1 }, 'player');
+    expect(predictTurnSchedule([cold], 3).map(s => s.round)).toEqual([2, 3, 4]);
+
+    // A stack already at the act point, as the current actor always is, acts
+    // now — in the round the battle is already in.
+    const acting = makeStack(evenDef, { col: 1, row: 1 }, 'player', { atb: 1 });
+    expect(predictTurnSchedule([acting], 3).map(s => s.round)).toEqual([1, 2, 3]);
+  });
+
+  it('agrees with advanceTurn about which round a turn lands in', () => {
+    const fastDef: UnitDef = { ...GOBLIN, name: 'Fast', initiative: 20 };
+    const slowDef: UnitDef = { ...GOBLIN, name: 'Slow', initiative: 7 };
+    let state = makeState([
+      makeStack(fastDef, { col: 1, row: 1 }, 'player'),
+      makeStack(slowDef, { col: 1, row: 3 }, 'enemy'),
+    ]);
+
+    const predicted = predictTurnSchedule(state.units, 6, state.battleTime);
+
+    for (const slot of predicted) {
+      state = advanceTurn(state);
+      expect(state.currentUnitId).toBe(slot.unitId);
+      expect(state.round).toBe(slot.round);
+      // Re-enter at 0, which is what the prediction assumes.
+      state = {
+        ...state,
+        units: state.units.map(u => (u.id === state.currentUnitId ? { ...u, atb: 0 } : u)),
+      };
+    }
+  });
+
+  it('re-shapes the whole prediction when a stack gains initiative mid-battle', () => {
+    const def: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+    const a = makeStack(def, { col: 1, row: 1 }, 'player', { id: 'a' });
+    const b = makeStack(def, { col: 1, row: 3 }, 'enemy', { id: 'b' });
+
+    // Identical stacks alternate, player first on ties.
+    expect(predictTurnSchedule([a, b], 4).map(s => s.unitId)).toEqual(['a', 'b', 'a', 'b']);
+
+    // Doubling b's fill rate rewrites the order from the very next turn — no
+    // turn has to elapse first for the change to show up. b takes 3 of the 4
+    // slots instead of 2, and now leads.
+    const hasted = { ...b, initiativeBonus: 10 };
+    expect(predictTurnSchedule([a, hasted], 4).map(s => s.unitId)).toEqual(['b', 'a', 'b', 'b']);
   });
 });
