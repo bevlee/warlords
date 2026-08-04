@@ -196,10 +196,14 @@
 </script>
 
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
-  <div class="mb-4 flex items-center gap-4">
-    <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
-    <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
-  </div>
+  <!-- Hidden during a battle: the battle screen wants the height, and its
+       settings cog carries the way out instead. -->
+  {#if !inBattle}
+    <div class="mb-4 flex items-center gap-4">
+      <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
+      <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
+    </div>
+  {/if}
 
   {#if !loaded}
     <p class="text-slate-400">Loading…</p>

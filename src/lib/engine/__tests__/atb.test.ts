@@ -4,7 +4,7 @@ import { advanceTurn, predictTurnOrder, predictTurnSchedule } from '../turnOrder
 import { calculateDamage } from '../combat';
 import { initBattle, applyAction } from '../battle';
 import { GOBLIN, WOLF_RIDER, THUNDERBIRD, OGRE } from '../barbarian';
-import type { BattleState, Hero, UnitDef, UnitStack, Pos } from '../types';
+import type { ArmySlot, BattleState, Hero, UnitDef, UnitStack, Pos } from '../types';
 
 const mockHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] };
 
@@ -151,8 +151,10 @@ describe('defend', () => {
 });
 
 describe('initBattle scale start', () => {
-  const armies = () =>
-    [[{ unit: GOBLIN, count: 5 }], [{ unit: WOLF_RIDER, count: 5 }]] as const;
+  const armies = (): [ArmySlot[], ArmySlot[]] => [
+    [{ unit: GOBLIN, count: 5 }],
+    [{ unit: WOLF_RIDER, count: 5 }],
+  ];
 
   it('starts every stack level, so initiative alone picks the opening actor', () => {
     const [player, enemy] = armies();

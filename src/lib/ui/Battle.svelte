@@ -787,6 +787,11 @@
               >
                 🏳️ Resign battle
               </button>
+              <!-- The way out of the battle screen, which no longer has a page
+                   header above it. A link, not a button: the run keeps its
+                   server-side save, so this is plain navigation. Resign above
+                   is still how you deliberately lose the fight. -->
+              <a href="/" class="settings-leave">← Main game</a>
             </div>
           {:else}
             <!-- Active artifacts: army-wide bonuses in play, tucked under the cog. -->
@@ -1129,6 +1134,19 @@
   .settings-resign:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .settings-leave {
+    display: block;
+    margin-top: calc(7 * var(--fx));
+    text-align: center;
+    font-size: calc(12 * var(--fx));
+    color: #94a3b8;
+  }
+
+  .settings-leave:hover {
+    color: #e2e8f0;
+    text-decoration: underline;
   }
 
   /* Centred on the flank, which shares its box with the battlefield now that
