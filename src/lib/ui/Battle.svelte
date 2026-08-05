@@ -36,6 +36,7 @@
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
   import ActionDock from './ActionDock.svelte';
+  import { shouldAutomateTurn } from './battleAutomation';
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
