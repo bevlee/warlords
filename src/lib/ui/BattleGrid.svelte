@@ -461,7 +461,7 @@
           aria-label={cell.blocked
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant
-              ? `${occupant.definition.name} ×${occupant.count}/${occupant.startCount} current/starting at ${cell.col},${cell.row}${isExplicitOrigin ? ' — attack from here' : ''}`
+              ? `${occupant.definition.name} ×${occupant.count} at ${cell.col},${cell.row}${isExplicitOrigin ? ' — attack from here' : ''}`
               : `cell ${cell.col},${cell.row}${isExplicitOrigin ? ' — attack from here' : ''}`}
           aria-pressed={isExplicitTarget || undefined}
           onclick={e => handleClick(cell.col, cell.row, e.shiftKey)}

@@ -7,7 +7,11 @@ export const STAT_META = {
   level: { icon: attributeIconFor('level'), title: 'Level', label: 'Level' },
   mana: { icon: attributeIconFor('mana'), title: 'Mana — spent casting spells', label: 'Mana' },
   xp: { icon: attributeIconFor('xp'), title: 'Experience points', label: 'Experience' },
-  count: { icon: attributeIconFor('count'), title: 'Count — creatures remaining in this stack', label: 'Count' },
+  count: {
+    icon: attributeIconFor('count'),
+    title: 'Units — alive now / battle-start maximum (revive limit)',
+    label: 'Units',
+  },
   hp: { icon: attributeIconFor('hp'), title: 'Hit points — current / max per creature', label: 'HP' },
   attack: { icon: attributeIconFor('attack'), title: 'Attack — raises damage dealt', label: 'Attack' },
   defense: { icon: attributeIconFor('defense'), title: 'Defense — reduces damage taken', label: 'Defense' },
