@@ -27,7 +27,7 @@
 
   // Top-creature HP, the same figure UnitInfo shows.
   const hpFraction = $derived(
-    unit && unit.definition.hp > 0 ? Math.max(0, Math.min(1, unit.hp / unit.definition.hp)) : 0
+    unit ? Math.max(0, Math.min(1, unit.hp / unit.definition.hp)) : 0
   );
 
   const passives = $derived(
@@ -54,11 +54,12 @@
         <p class="active-name {unit.side === 'player' ? 'text-sky-300' : 'text-red-300'}">
           {unit.isHero ? 'Hero' : unit.definition.name}
         </p>
-        {#if !unit.isHero}<p class="active-count">×{unit.count}</p>{/if}
-        <div class="hp-track">
-          <div class="hp-fill" style="width: {hpFraction * 100}%"></div>
-        </div>
-        <span class="hp-text">{unit.hp} / {unit.definition.hp} HP</span>
+        {#if !unit.isHero}<p class="active-count">×{unit.count}</p>
+          <div class="hp-track">
+            <div class="hp-fill" style="width: {hpFraction * 100}%"></div>
+          </div>
+          <span class="hp-text">{unit.hp} / {unit.definition.hp} HP</span>
+        {/if}
       </div>
     {:else}
       <p class="empty-note">No active stack.</p>
