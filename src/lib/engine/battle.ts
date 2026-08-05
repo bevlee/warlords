@@ -328,10 +328,12 @@ export function initBattle(
       }
     : null;
 
-  // LordsWM-style start: every stack gets a seeded random 0–10% head start.
+  // Everyone starts level at 0, so initiative alone decides the opening order.
+  // The only randomness is `tiePriority`, drawn once per stack and used solely
+  // to settle exact ties — seeded, so a replay reproduces the same order.
   const rng = mulberry32(seed);
   const allUnits = [...playerUnits, ...allyUnits, ...enemyUnits, heroStack, ...(allyHeroStack ? [allyHeroStack] : [])]
-    .map(u => ({ ...u, atb: rng() * 0.1 }));
+    .map(u => ({ ...u, atb: 0, tiePriority: rng() }));
 
   grid = placeUnits(grid, allUnits);
 
@@ -452,6 +454,10 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
     morale: unit.morale,
     luck: unit.luck,
     atb: 0,
+    // Split off during deployment, so it needs its own tie-break draw. Seeded
+    // on the battle seed plus the id it is about to take, which keeps it
+    // deterministic without threading an rng through the deploy ops.
+    tiePriority: mulberry32(state.seed + state.nextId)(),
     isDefending: false,
     ...(unit.isAlly ? { isAlly: true } : {}),
     ...(unit.controllerId ? { controllerId: unit.controllerId } : {}),

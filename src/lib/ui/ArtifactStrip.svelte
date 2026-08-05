@@ -21,7 +21,7 @@
 </script>
 
 {#if items.length > 0}
-  <div class="flex items-center gap-1.5" role="list" aria-label="Active artifacts">
+  <div class="flex flex-wrap items-center justify-center gap-1.5" role="list" aria-label="Active artifacts">
     {#each items as id (id)}
       {@const item = ITEMS[id]}
       <div class="group relative" role="listitem">

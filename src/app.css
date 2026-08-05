@@ -5,3 +5,11 @@
 html {
   scrollbar-gutter: stable;
 }
+
+/* The battle screen's scaled pixel: it overrides this per-viewport on its own
+   root, and every length in that screen is written as calc(N * var(--fx)).
+   Declared here so the components consuming it don't each carry a fallback.
+   See "Fitting the screen" in src/lib/ui/Battle.svelte. */
+:root {
+  --fx: 1px;
+}
