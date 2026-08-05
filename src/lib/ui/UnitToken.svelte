@@ -18,7 +18,10 @@
 </script>
 
 <!-- Transparent standee: sprite + count plate, LordsWM-style (no card chrome). -->
-<div class="relative flex h-full w-full items-end justify-center" title="{unit.definition.name} ×{unit.count}">
+<div
+  class="relative flex h-full w-full items-end justify-center"
+  title="{unit.definition.name} ×{unit.count}/{unit.startCount} (current/starting)"
+>
   <Sprite
     name={unit.definition.name}
     pose={dying ? 'death' : 'idle'}
@@ -31,7 +34,7 @@
       {small ? 'text-[11px]' : 'text-[13px]'}
       {CONTROLLER_STYLE[controllerOf(unit)].badge}"
   >
-    {unit.count}
+    {unit.count}/{unit.startCount}
   </span>
 
   {#if unit.attackBuff || unit.defenseBuff}

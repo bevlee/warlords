@@ -93,7 +93,7 @@
     // buffs stay separate as the green (+N).
     const heroAttack = !unit.isHero && unit.side === 'player' && hero ? hero.attack : 0;
     return [
-      { key: 'count', value: `${unit.count}` },
+      { key: 'count', value: `${unit.count}/${unit.startCount}` },
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
       { key: 'attack', value: `${d.attack + heroAttack + (unit.attackBuff ?? 0)}`, buff: unit.attackBuff ?? 0 },
       { key: 'defense', value: `${d.defense + (unit.defenseBuff ?? 0)}`, buff: unit.defenseBuff ?? 0 },
@@ -155,7 +155,7 @@
               title="Read about {unit.definition.name} in the compendium"
               class="hover:underline">{unit.definition.name}</a
             >
-            <span class="info-count ml-1 font-mono text-slate-400 {sz.count}">×{unit.count}</span>
+            <span class="info-count ml-1 font-mono text-slate-400 {sz.count}">×{unit.count}/{unit.startCount}</span>
           {/if}
         </span>
         {#if pinned && !isRail}

@@ -113,12 +113,12 @@
             {entry.unit.side === 'player' ? 'border-sky-400 bg-sky-950' : 'border-red-500 bg-red-950'}
             {i === 0 ? 'current ring-2 ring-amber-300' : ''}
             {entry.unit.id === hoveredId ? 'scale-110 brightness-125' : ''}"
-          aria-label="turn {i + 1}: {entry.unit.definition.name} ×{entry.unit.count}"
+          aria-label="turn {i + 1}: {entry.unit.definition.name} ×{entry.unit.count}/{entry.unit.startCount} current/starting"
           onmouseenter={() => onhover(entry.unit)}
           onmouseleave={() => onhover(null)}
         >
           <Sprite name={entry.unit.definition.name} class="h-full w-full" />
-          <span class="count-plate">{entry.unit.count}</span>
+          <span class="count-plate">{entry.unit.count}/{entry.unit.startCount}</span>
         </button>
       {/each}
     </div>

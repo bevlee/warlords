@@ -428,7 +428,7 @@ export function deployMove(state: BattleState, unitId: string, to: Pos, controll
 /** Peel `amount` creatures off a player stack into a new same-unit stack at an
  *  empty in-zone cell `to`. No-op if amount is out of (0, count), `to` isn't an
  *  empty in-zone cell, or the field-stack cap is reached. Battle-scoped —
- *  survivorsFrom merges same-unit stacks back into the persistent army. */
+ *  gauntlet persistence ignores battle casualties and deployment splits. */
 export function splitStack(state: BattleState, unitId: string, amount: number, to: Pos, controllerId?: string): BattleState {
   const unit = state.units.find(u => u.id === unitId);
   if (!isDeployable(unit, controllerId)) return state;
