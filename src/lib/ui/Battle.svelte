@@ -39,6 +39,7 @@
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
+  import { shouldAutomateTurn } from './battleAutomation';
 
   interface Props {
     playerArmy: ArmySlot[];
