@@ -32,7 +32,6 @@
           pad: 'px-4 py-3 gap-2.5',
           sprite: 'h-24 w-20',
           name: 'text-[27px]',
-          count: 'text-[21px]',
           stat: 'text-[21px] gap-y-2',
           statGrid: 'grid-cols-2',
           ability: 'text-[21px]',
@@ -47,7 +46,6 @@
             pad: '',
             sprite: 'rail-sprite',
             name: '',
-            count: '',
             stat: '',
             statGrid: 'grid-cols-1',
             ability: '',
@@ -58,7 +56,6 @@
             pad: 'px-3 py-2 gap-1.5',
             sprite: 'h-16 w-14',
             name: 'text-[21px]',
-            count: 'text-lg',
             stat: 'text-lg gap-y-1.5',
             statGrid: 'grid-cols-2',
             ability: 'text-[16.5px]',
@@ -93,7 +90,7 @@
     // buffs stay separate as the green (+N).
     const heroAttack = !unit.isHero && unit.side === 'player' && hero ? hero.attack : 0;
     return [
-      { key: 'count', value: `${unit.count}` },
+      { key: 'count', value: `${unit.count} / ${unit.startCount}` },
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
       { key: 'attack', value: `${d.attack + heroAttack + (unit.attackBuff ?? 0)}`, buff: unit.attackBuff ?? 0 },
       { key: 'defense', value: `${d.defense + (unit.defenseBuff ?? 0)}`, buff: unit.defenseBuff ?? 0 },
@@ -135,7 +132,7 @@
     </div>
   {/if}
 
-  <!-- info-name, info-count, stat-grid, ability-list, ability-label,
+  <!-- info-name, stat-grid, ability-list, ability-label,
        ability-desc and empty-hint are style hooks for the .rail rules at the
        bottom of this file — renaming one silently unsizes the rail variant. -->
   <div class="{isRail ? 'rail-body' : 'contents'}">
@@ -155,7 +152,6 @@
               title="Read about {unit.definition.name} in the compendium"
               class="hover:underline">{unit.definition.name}</a
             >
-            <span class="info-count ml-1 font-mono text-slate-400 {sz.count}">×{unit.count}</span>
           {/if}
         </span>
         {#if pinned && !isRail}
@@ -301,10 +297,6 @@
 
   .rail .info-name {
     font-size: calc(16 * var(--fx));
-  }
-
-  .rail .info-count {
-    font-size: calc(12 * var(--fx));
   }
 
   .rail .stat-grid {
