@@ -14,9 +14,12 @@ function timeToAct(unit: UnitStack): number {
 function byActOrder(a: UnitStack, b: UnitStack): number {
   const diff = timeToAct(a) - timeToAct(b);
   if (Math.abs(diff) > 1e-9) return diff;
-  // simultaneous: player acts first, then stable by id
-  if (a.side !== b.side) return a.side === 'player' ? -1 : 1;
-  return a.id.localeCompare(b.id);
+  // Exactly simultaneous: settle it with each stack's per-battle seeded draw,
+  // so equal-initiative stacks don't all favour one side, yet the order is
+  // identical every time the same battle is replayed.
+  const priorityDiff = (a.tiePriority ?? 0) - (b.tiePriority ?? 0);
+  if (priorityDiff !== 0) return priorityDiff;
+  return a.id.localeCompare(b.id); // extremely unlikely final fallback
 }
 
 /**
@@ -63,23 +66,51 @@ export function advanceTurn(state: BattleState): BattleState {
   return { ...state, units: finalUnits, battleTime, round, log, currentUnitId: actor.id };
 }
 
+/** One predicted turn: who acts, and which round it falls in. */
+export interface TurnSlot {
+  unitId: string;
+  /** Same clock as BattleState.round, so slot 0 always matches it. */
+  round: number;
+}
+
 /**
- * The next `n` actors from current scale positions, assuming everyone
- * re-enters at 0 (waits and deaths aren't predicted, as in LordsWM's bar).
- * Fast stacks appear more than once.
+ * The next `n` turns from current scale positions, each tagged with its round.
+ *
+ * This runs the real ATB maths, so it is exact for everything the scale knows
+ * about — including initiative: `rate()` reads `initiativeBonus`, so buffing a
+ * stack mid-battle re-shapes the whole prediction immediately. What it cannot
+ * know, and deliberately does not guess at (the same choices LordsWM's bar
+ * makes), is anything decided later by a player or a die:
+ *
+ *  - **Wait** re-enters at 0.5 rather than 0, so a waiter acts sooner than
+ *    shown. Everyone here is assumed to re-enter at 0.
+ *  - **Deaths** remove a stack and every later turn it had.
+ *  - **Morale** is rolled at the moment a stack acts, not scheduled: a boost
+ *    grants an immediate extra turn, a freeze forfeits one. Neither changes
+ *    ATB rate, so neither is visible here.
+ *
+ * Pass `startTime` as the battle's current `battleTime` for absolute rounds.
  */
-export function predictTurnOrder(units: UnitStack[], n: number): string[] {
+export function predictTurnSchedule(units: UnitStack[], n: number, startTime = 0): TurnSlot[] {
   const sim = units.filter(u => u.count > 0).map(u => ({ unit: { ...u }, id: u.id }));
   if (sim.length === 0) return [];
 
-  const order: string[] = [];
-  while (order.length < n) {
+  const slots: TurnSlot[] = [];
+  let time = startTime;
+  while (slots.length < n) {
     sim.sort((a, b) => byActOrder(a.unit, b.unit));
     const next = sim[0];
     const dt = Math.max(0, timeToAct(next.unit));
     for (const s of sim) s.unit.atb += dt * rate(s.unit);
+    time += dt;
     next.unit.atb = 0;
-    order.push(next.id);
+    // Same derivation advanceTurn uses, so the two never disagree.
+    slots.push({ unitId: next.id, round: Math.floor(time) + 1 });
   }
-  return order;
+  return slots;
+}
+
+/** Just the actors, for callers that don't care when the rounds fall. */
+export function predictTurnOrder(units: UnitStack[], n: number): string[] {
+  return predictTurnSchedule(units, n).map(slot => slot.unitId);
 }

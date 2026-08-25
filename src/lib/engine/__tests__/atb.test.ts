@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
-import { advanceTurn, predictTurnOrder } from '../turnOrder';
+import { advanceTurn, predictTurnOrder, predictTurnSchedule } from '../turnOrder';
 import { calculateDamage } from '../combat';
 import { initBattle, applyAction } from '../battle';
 import { GOBLIN, WOLF_RIDER, THUNDERBIRD, OGRE } from '../barbarian';
-import type { BattleState, Hero, UnitDef, UnitStack, Pos } from '../types';
+import type { ArmySlot, BattleState, Hero, UnitDef, UnitStack, Pos } from '../types';
 
 const mockHero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] };
 
@@ -150,20 +150,48 @@ describe('defend', () => {
   });
 });
 
-describe('initBattle deviation', () => {
-  it('gives every stack a seeded 0–10% head start, deterministic per seed', () => {
-    const a = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: WOLF_RIDER, count: 5 }], { ...mockHero }, 42);
-    const b = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: WOLF_RIDER, count: 5 }], { ...mockHero }, 42);
+describe('initBattle scale start', () => {
+  const armies = (): [ArmySlot[], ArmySlot[]] => [
+    [{ unit: GOBLIN, count: 5 }],
+    [{ unit: WOLF_RIDER, count: 5 }],
+  ];
 
-    // deterministic: same seed → same first actor and same atb values
-    expect(a.currentUnitId).not.toBeNull();
-    expect(b.units.map(u => u.atb)).toEqual(a.units.map(u => u.atb));
+  it('starts every stack level, so initiative alone picks the opening actor', () => {
+    const [player, enemy] = armies();
+    const state = initBattle(player, enemy, { ...mockHero }, 42);
 
-    // everyone below one full cycle; the current actor sits at the act point (1.0)
-    for (const u of a.units) {
+    // Wolf Rider 13 beats Goblin 11 and the hero's 10 — no head start to muddy it.
+    const first = state.units.find(u => u.id === state.currentUnitId)!;
+    expect(first.definition.name).toBe('Wolf Rider');
+
+    // The actor is at the act point; everyone else is partway, never past it.
+    for (const u of state.units) {
       expect(u.atb).toBeGreaterThanOrEqual(0);
       expect(u.atb).toBeLessThanOrEqual(1 + 1e-9);
     }
+  });
+
+  it('draws a distinct seeded tiePriority per stack, reproducible per seed', () => {
+    const [player, enemy] = armies();
+    const a = initBattle(player, enemy, { ...mockHero }, 42);
+    const b = initBattle(player, enemy, { ...mockHero }, 42);
+    const c = initBattle(player, enemy, { ...mockHero }, 43);
+
+    const priorities = a.units.map(u => u.tiePriority);
+    expect(priorities.every(p => typeof p === 'number')).toBe(true);
+    expect(new Set(priorities).size).toBe(priorities.length); // no two alike
+
+    expect(b.units.map(u => u.tiePriority)).toEqual(priorities); // replay-safe
+    expect(c.units.map(u => u.tiePriority)).not.toEqual(priorities); // seed matters
+  });
+
+  it('breaks an exact tie by tiePriority rather than by side', () => {
+    const def: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+    // The enemy draws the lower priority, so it acts first despite the side.
+    const player = makeStack(def, { col: 1, row: 1 }, 'player', { id: 'p', tiePriority: 0.9 });
+    const enemy = makeStack(def, { col: 1, row: 3 }, 'enemy', { id: 'e', tiePriority: 0.1 });
+
+    expect(predictTurnOrder([player, enemy], 4)).toEqual(['e', 'p', 'e', 'p']);
   });
 });
 
@@ -186,5 +214,58 @@ describe('predictTurnOrder', () => {
 
     const order = predictTurnOrder([alive, dead], 3);
     expect(order).toEqual([alive.id, alive.id, alive.id]);
+  });
+});
+
+describe('predictTurnSchedule', () => {
+  it('tags each turn with the round it falls in', () => {
+    // Initiative 10 is exactly one turn per round. From a cold scale (atb 0)
+    // the first turn costs a full cycle, so it already lands in round 2 —
+    // the same reason advanceTurn bumps an Ogre to round 2 on its first turn.
+    const evenDef: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+    const cold = makeStack(evenDef, { col: 1, row: 1 }, 'player');
+    expect(predictTurnSchedule([cold], 3).map(s => s.round)).toEqual([2, 3, 4]);
+
+    // A stack already at the act point, as the current actor always is, acts
+    // now — in the round the battle is already in.
+    const acting = makeStack(evenDef, { col: 1, row: 1 }, 'player', { atb: 1 });
+    expect(predictTurnSchedule([acting], 3).map(s => s.round)).toEqual([1, 2, 3]);
+  });
+
+  it('agrees with advanceTurn about which round a turn lands in', () => {
+    const fastDef: UnitDef = { ...GOBLIN, name: 'Fast', initiative: 20 };
+    const slowDef: UnitDef = { ...GOBLIN, name: 'Slow', initiative: 7 };
+    let state = makeState([
+      makeStack(fastDef, { col: 1, row: 1 }, 'player'),
+      makeStack(slowDef, { col: 1, row: 3 }, 'enemy'),
+    ]);
+
+    const predicted = predictTurnSchedule(state.units, 6, state.battleTime);
+
+    for (const slot of predicted) {
+      state = advanceTurn(state);
+      expect(state.currentUnitId).toBe(slot.unitId);
+      expect(state.round).toBe(slot.round);
+      // Re-enter at 0, which is what the prediction assumes.
+      state = {
+        ...state,
+        units: state.units.map(u => (u.id === state.currentUnitId ? { ...u, atb: 0 } : u)),
+      };
+    }
+  });
+
+  it('re-shapes the whole prediction when a stack gains initiative mid-battle', () => {
+    const def: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+    const a = makeStack(def, { col: 1, row: 1 }, 'player', { id: 'a' });
+    const b = makeStack(def, { col: 1, row: 3 }, 'enemy', { id: 'b' });
+
+    // Identical stacks alternate, player first on ties.
+    expect(predictTurnSchedule([a, b], 4).map(s => s.unitId)).toEqual(['a', 'b', 'a', 'b']);
+
+    // Doubling b's fill rate rewrites the order from the very next turn — no
+    // turn has to elapse first for the change to show up. b takes 3 of the 4
+    // slots instead of 2, and now leads.
+    const hasted = { ...b, initiativeBonus: 10 };
+    expect(predictTurnSchedule([a, hasted], 4).map(s => s.unitId)).toEqual(['b', 'a', 'b', 'b']);
   });
 });

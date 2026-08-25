@@ -1,4 +1,4 @@
-import type { ArmySlot, FactionClass, Hero, UnitStack } from '../engine/types';
+import type { ArmySlot, FactionClass, Hero } from '../engine/types';
 import { FACTION_UNITS, FACTION_INFO } from '../engine/factions';
 import { UNIT_COSTS } from '../engine/recruit';
 import { updateFactionSkills } from '../engine/factionSkills';
@@ -199,22 +199,9 @@ export function applySkillPick(run: RunState, skillId: SkillId, unitName: string
   };
 }
 
-/** Living player stacks (minus the hero) from a finished battle. */
-/** Living player stacks (minus the hero and summoned allies) collapsed to one
- *  slot per unit type — so battle-time stack splits don't permanently fragment
- *  the persistent army. Preserves first-seen unit order. */
-export function survivorsFrom(units: UnitStack[]): ArmySlot[] {
-  const byUnit = new Map<string, ArmySlot>();
-  for (const u of units) {
-    if (u.side !== 'player' || u.isHero || u.isAlly || u.count <= 0) continue;
-    const existing = byUnit.get(u.definition.name);
-    if (existing) existing.count += u.count;
-    else byUnit.set(u.definition.name, { unit: u.definition, count: u.count });
-  }
-  return [...byUnit.values()];
-}
-
-export function recordBattle(run: RunState, won: boolean, survivors: ArmySlot[]): RunState {
+/** Record a completed encounter. Gauntlet casualties are battle-scoped: every
+ *  persistent army slot returns at full strength for the next encounter. */
+export function recordBattle(run: RunState, won: boolean): RunState {
   if (!won) return { ...run, status: 'lost' };
 
   const hero = updateFactionSkills({
@@ -226,7 +213,7 @@ export function recordBattle(run: RunState, won: boolean, survivors: ArmySlot[])
   const next: RunState = {
     ...run,
     hero,
-    army: survivors,
+    army: run.army,
     battlesWon: run.battlesWon + 1,
     encounterIndex: run.encounterIndex + 1,
     endlessDepth: run.encounterIndex >= RUN_LENGTH ? run.endlessDepth + 1 : 0,

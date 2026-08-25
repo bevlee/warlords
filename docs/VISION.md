@@ -13,6 +13,10 @@ and play like LordsWM's. This doc is the durable checklist; dated docs in
 - **Initiative bar ("ATB scale")**, bottom-center: *continuous* — units are
   positioned along a scale by initiative; faster units act more often and can
   appear twice per cycle. Combat starts with a random 0–10% deviation.
+  (*We deliberately differ here*: every stack starts level at 0 so initiative
+  alone decides the opening order. Exact ties are settled by a seeded
+  per-stack `tiePriority` instead, which keeps replays reproducible without
+  making the opening order itself random.)
   **Wait** pushes a stack back half a cycle (a delay, not a skip). Stack frame
   colour = owning player. Hovering a stack highlights it on both the bar and
   the battlefield. Spells can shift bar positions.
@@ -38,7 +42,7 @@ range, with a hover overlay: enemies show movement reach, own shooters
 their full-damage range) · player-chosen attack-from tile with ⚔️/🏹
 indicators · owner colours · combat log · 2.5D perspective board ·
 **ATB initiative bar** (continuous scale, repeat turns, wait = half-cycle,
-0–10% start deviation, bottom strip with two-way hover sync) ·
+paged top ribbon with inline round breaks and two-way hover sync) ·
 **shooter melee-block** (adjacent enemy disables shooting; Shift-click forces
 melee) · **Defend** (+30% defense until own next turn, 🛡️ badge) ·
 **obstacles** (seeded rocks in the middle columns) · **hero as an actor**

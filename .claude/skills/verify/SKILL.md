@@ -53,28 +53,47 @@ Useful hooks in the battle UI:
   melee. A damage forecast (`.preview`, 💀 kills / 💥 damage) floats by the
   hovered target.
 - All cells have aria-labels: `"<Unit> ×<count> at col,row"` or `"cell col,row"`.
-- **Tall tokens overlap the cell above them.** A rock or unit standing at
-  `col,row` covers the lower ~half of `col,row-1`, so a click aimed at a
-  stack's rect centre can land on the token below it and do nothing. Probe
-  with `document.elementFromPoint(...).closest('button')` and click the
-  topmost point that still resolves to the intended cell.
-- Actions are large circular buttons in a rail to the RIGHT of the board:
-  `Wait` ⏳, `Defend` 🛡️, `Spellbook` 📖 (hero turn only; opens the book panel —
+- **Layout is three horizontal bands** inside `div.battle-screen`, which sizes
+  itself to the space left below the page header and publishes `--fx` (a
+  viewport-derived "scaled pixel"). Everything is a multiple of `--fx`, so
+  never assert absolute pixel sizes.
+  1. `.atb-band` — the ATB ribbon (see below).
+  2. `.battle-middle` — `.flank` (settings/auto-battle/hero) · `.board-column`
+     (status strip + board + overlays) · `.info-rail` (creature info).
+  3. `.dock-band` — `.dock` (action dock) + `.log-slot` (battle log).
+- Action dock (`div.dock`, bottom-left): the active stack's portrait, name,
+  ×count and HP bar; then `Wait` ⏳ and `Defend` 🛡️
+  (`button[aria-label="Wait"|"Defend"]`); then three circular active-ability
+  slots — all dashed placeholders for a normal stack, with the first becoming
+  `button[aria-label="Spellbook"]` on the hero's turn (opens the book panel —
   role=dialog 'Spellbook', spells are `Cast <Name>` buttons with hover
-  role=tooltip descriptions, ✕ is 'Close spellbook', backdrop click closes).
-  A ⚙️ `Settings` cog at the top-left opens a popover with the combat-speed
-  pills and `Resign`. The hero is a bare sprite on the left flank
-  (`button[aria-label^="Hero"]`); hovering it fills the bottom-right info
-  panel with hero rows (Level, Mana x/y, XP…).
-  top-center strip (`p.text-sm.font-medium.text-slate-100` is the status
-  now); the full BattleLog panel is gone.
-- Unit info panel: the sidebar `dl` — hover any unit's cell to populate it
-  (count, HP, attack, defense, damage, speed, initiative, range, shots).
-- ATB turn bar: horizontal strip under the board; entries are
-  `button[aria-label^="turn "]` ("turn N: <Unit> ×<count>"), current unit
-  first. Fast units repeat. Hovering an entry glows the matching field token
-  (`div.token-standing.hover-glow`). Waiting re-enters at half a cycle —
-  the waiter drops down the bar, it doesn't just go to the back.
+  role=tooltip descriptions, ✕ is 'Close spellbook', backdrop click closes);
+  then the active stack's passive abilities in `.passive-list`, which scrolls
+  while its `PASSIVE ABILITIES` caption stays pinned to the dock's bottom edge.
+- Left flank: a ⚙️ `button[aria-label="Settings"]` opens a popover
+  (`.settings-popover`) with the combat-speed pills and `Resign`, and a
+  permanently-disabled `button[aria-label="Auto battle"]` sits beside it (a
+  placeholder — nothing is wired to it). The hero is a bare sprite at the foot
+  of the same column (`button[aria-label^="Hero"]`); hovering it fills the
+  creature rail with hero rows (Level, Mana x/y, XP…).
+- Status line: `p.status-text` (still carries `.text-sm.font-medium.text-slate-100`)
+  in the strip above the board.
+- Creature-info rail (`.info-rail`, right of the board): hover any unit's cell
+  to populate it (count, HP, attack, defense, damage, speed, initiative, range,
+  shots) — single-column rows. Right-click pins it (amber border + × unpin);
+  Esc unpins.
+- Battle log (`.log-slot`, bottom-right, hidden under 1024px): recent lines,
+  sticks to the bottom. Its `Expand` button opens the full history in a modal
+  (`div[role=dialog][aria-label="Battle log"]`); backdrop click, the × button,
+  or Esc closes it.
+- ATB turn bar: the chevron ribbon at the TOP of the screen, with a round
+  medallion (`RND` / number) on the left and `button[aria-label^="Scroll turn
+  order "]` arrows at both ends — always rendered, disabled when the strip
+  already fits. Entries are `button[aria-label^="turn "]`
+  ("turn N: <Unit> ×<count>"), current unit first. Fast units repeat. Hovering
+  an entry glows the matching field token (`div.token-standing.hover-glow`).
+  Waiting re-enters at half a cycle — the waiter drops down the bar, it
+  doesn't just go to the back.
 - Shooters with an adjacent living enemy can't shoot (status says
   "Shooting blocked — enemy adjacent!"; their targets show ⚔️ not 🏹).
 - `Defend` button next to Wait: logs "brace for defense", shows a 🛡️ badge
@@ -86,8 +105,8 @@ Flows worth driving: move a unit, wait, attack an adjacent enemy (check the
 retaliation log line), shoot with Orcs, play to Victory (AI acts every 450 ms;
 poll status ~every 300 ms, a full battle finishes in ~1–2 min), restart.
 
-- Hero: flank portrait `button[aria-label^="Hero"]` left of the board (mana
-  in `span.text-sky-300`); on "Your hero's turn" every enemy is a target —
+- Hero: flank portrait `button[aria-label^="Hero"]` at the foot of the left
+  column; on "Your hero's turn" every enemy is a target —
   click one to strike, or use the violet spell buttons (Lightning/Bloodlust/
   Stoneskin by role=button name) then click a highlighted stack to cast.
 

@@ -20,7 +20,6 @@
     applyItemPick,
     applySkillPick,
     generateGauntletEnemy,
-    survivorsFrom,
     encounterBudget,
     actOf,
     BOSS_NODES,
@@ -115,9 +114,9 @@
     inBattle = true;
   }
 
-  function handleResult(result: 'player_wins' | 'enemy_wins', finalUnits: UnitStack[]) {
+  function handleResult(result: 'player_wins' | 'enemy_wins', _finalUnits: UnitStack[]) {
     if (!run) return;
-    run = recordBattle(run, result === 'player_wins', survivorsFrom(finalUnits));
+    run = recordBattle(run, result === 'player_wins');
     void saveRun(run);
   }
 
@@ -196,10 +195,14 @@
 </script>
 
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
-  <div class="mb-4 flex items-center gap-4">
-    <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
-    <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
-  </div>
+  <!-- Hidden during a battle: the battle screen wants the height, and its
+       settings cog carries the way out instead. -->
+  {#if !inBattle}
+    <div class="mb-4 flex items-center gap-4">
+      <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
+      <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
+    </div>
+  {/if}
 
   {#if !loaded}
     <p class="text-slate-400">Loading…</p>
@@ -222,8 +225,8 @@
     <div class="mx-auto max-w-5xl">
       <h2 class="mb-2 text-3xl font-bold text-amber-200">Choose your faction</h2>
       <p class="mb-8 text-lg text-slate-300">
-        Fight 10 escalating battles, then continue forever in Endless. Losses persist —
-        draft reinforcements and army-wide artifacts after each victory.
+        Fight 10 escalating battles, then continue forever in Endless. Your army fully recovers
+        between battles, and each victory offers reinforcements and permanent upgrades.
       </p>
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {#each Object.entries(FACTION_INFO) as [id, info] (id)}

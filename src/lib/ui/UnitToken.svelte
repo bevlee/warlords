@@ -18,7 +18,10 @@
 </script>
 
 <!-- Transparent standee: sprite + count plate, LordsWM-style (no card chrome). -->
-<div class="relative flex h-full w-full items-end justify-center" title="{unit.definition.name} ×{unit.count}">
+<div
+  class="relative flex h-full w-full items-end justify-center"
+  title="{unit.definition.name} ×{unit.count}"
+>
   <Sprite
     name={unit.definition.name}
     pose={dying ? 'death' : 'idle'}

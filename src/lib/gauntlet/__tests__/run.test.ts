@@ -9,14 +9,12 @@ import {
   applyItemPick,
   applySkillPick,
   recordBattle,
-  survivorsFrom,
   mixSeed,
 } from '../run';
 import { itemDraftOptions } from '../items';
 import { skillDraftOptions, canLearnSkill } from '../skills';
 import { armyCost, UNIT_COSTS } from '../../engine/recruit';
 import { FACTION_UNITS } from '../../engine/factions';
-import type { UnitStack } from '../../engine/types';
 
 describe('gauntlet run', () => {
   it('newRun starts a level-1 faction hero with a ~90-power T1/T2 army', () => {
@@ -106,37 +104,36 @@ describe('gauntlet run', () => {
     expect(stack.count).toBe(existing.count + 10);
   });
 
-  it('recordBattle: win levels the hero, keeps survivors, and queues a draft', () => {
+  it('recordBattle: win levels the hero, fully restores the army, and queues a draft', () => {
     const run = newRun('barbarian', 9);
-    const survivors = [{ unit: run.army[0].unit, count: 2 }];
 
-    const next = recordBattle(run, true, survivors);
+    const next = recordBattle(run, true);
 
     expect(next.battlesWon).toBe(1);
     expect(next.hero.level).toBe(2);
     expect(next.encounterIndex).toBe(2);
-    expect(next.army).toEqual(survivors); // losses persist
+    expect(next.army).toEqual(run.army);
     expect(next.status).toBe('draft');
     const poolSize = FACTION_UNITS.barbarian.filter(u => u.tier <= 2).length; // node 2: T1-T2
     expect(next.pendingDraft).toHaveLength(Math.min(3, poolSize));
   });
 
   it('recordBattle: losing ends the run anywhere; winning never ends it', () => {
-    expect(recordBattle(newRun('barbarian', 9), false, []).status).toBe('lost');
+    expect(recordBattle(newRun('barbarian', 9), false).status).toBe('lost');
     const run = { ...newRun('barbarian', 9), encounterIndex: 10 };
-    expect(recordBattle(run, true, run.army).status).not.toBe('won');
+    expect(recordBattle(run, true).status).not.toBe('won');
   });
 
   it('recordBattle past node 10 increments endlessDepth and keeps drafting', () => {
     const run = { ...newRun('barbarian', 9), encounterIndex: 10 };
-    const next = recordBattle(run, true, run.army);
+    const next = recordBattle(run, true);
 
     expect(next.status).not.toBe('won');
     expect(next.status).toBe('draft');
     expect(next.encounterIndex).toBe(11);
     expect(next.endlessDepth).toBe(1);
 
-    const next2 = recordBattle(next, true, next.army);
+    const next2 = recordBattle(next, true);
     expect(next2.endlessDepth).toBe(2);
     expect(next2.encounterIndex).toBe(12);
   });
@@ -144,7 +141,7 @@ describe('gauntlet run', () => {
   it('recordBattle offers items on every 3rd win, units-only otherwise', () => {
     let run = newRun('barbarian', 9);
     for (let i = 1; i <= 6; i++) {
-      run = recordBattle(run, true, run.army);
+      run = recordBattle(run, true);
       if (i % 3 === 0) {
         expect(run.pendingItems).toHaveLength(2);
       } else {
@@ -186,7 +183,7 @@ describe('gauntlet run', () => {
 
   it('a units-only draft (no item offer) still returns to the map on one pick', () => {
     let run = newRun('barbarian', 9);
-    run = recordBattle(run, true, run.army); // 1st win: no items
+    run = recordBattle(run, true); // 1st win: no items
     expect(run.pendingItems).toBeNull();
 
     const next = applyPick(run, run.pendingDraft![0]);
@@ -194,58 +191,13 @@ describe('gauntlet run', () => {
     expect(next.pendingDraft).toBeNull();
   });
 
-  it('survivorsFrom keeps living player stacks, drops the hero and the dead', () => {
-    const run = newRun('barbarian', 4);
-    const mk = (name: string, count: number, side: 'player' | 'enemy', isHero = false) =>
-      ({
-        definition: FACTION_UNITS.barbarian.find(u => u.name === name) ?? { name },
-        count,
-        side,
-        isHero,
-      }) as unknown as UnitStack;
-
-    const units = [
-      mk('Goblin', 7, 'player'),
-      mk('Orc', 0, 'player'),
-      mk('Hero', 1, 'player', true),
-      mk('Imp', 5, 'enemy'),
-    ];
-
-    const survivors = survivorsFrom(units);
-    expect(survivors).toHaveLength(1);
-    expect(survivors[0].unit.name).toBe('Goblin');
-    expect(survivors[0].count).toBe(7);
-  });
-
-  it('survivorsFrom merges split same-unit stacks back into one slot and drops allies', () => {
-    const mk = (name: string, count: number, side: 'player' | 'enemy', extra: Record<string, unknown> = {}) =>
-      ({
-        definition: FACTION_UNITS.barbarian.find(u => u.name === name) ?? { name },
-        count,
-        side,
-        ...extra,
-      }) as unknown as UnitStack;
-
-    const units = [
-      mk('Goblin', 4, 'player'),                       // a split half
-      mk('Goblin', 6, 'player'),                       // the other half
-      mk('Wolf Rider', 3, 'player', { isAlly: true }), // summoned ally — not kept
-      mk('Wolf Rider', 2, 'player'),
-    ];
-
-    const survivors = survivorsFrom(units);
-    const goblin = survivors.filter(s => s.unit.name === 'Goblin');
-    expect(goblin).toHaveLength(1);
-    expect(goblin[0].count).toBe(10); // 4 + 6 merged back
-    expect(survivors.find(s => s.unit.name === 'Wolf Rider')!.count).toBe(2); // ally dropped
-  });
 });
 
 describe('skill offers', () => {
   it('recordBattle offers skills on battles 2, 5, 8 — never colliding with items', () => {
     let run = newRun('barbarian', 9);
     for (let i = 1; i <= 8; i++) {
-      run = recordBattle(run, true, run.army);
+      run = recordBattle(run, true);
       if (i % 3 === 2) expect(run.pendingSkills).toHaveLength(3);
       else expect(run.pendingSkills).toBeNull();
       if (run.pendingSkills) expect(run.pendingItems).toBeNull(); // no double-offer battles

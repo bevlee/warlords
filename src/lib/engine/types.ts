@@ -35,6 +35,10 @@ export interface UnitStack {
   morale: number;      // -3..3
   luck: number;        // -3..3
   atb: number;         // position on the initiative scale; acts at 1
+  // Settles exact ties in act order. Drawn once per stack from the battle seed,
+  // so the order stays deterministic across replays. Optional only so test
+  // fixtures can omit it; initBattle and splitStack always set it.
+  tiePriority?: number;
   isDefending: boolean; // defensive stance until the start of its own next turn
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
   isAlly?: boolean;    // summoned ally stack: fights on the player side, AI-controlled
