@@ -3,6 +3,7 @@ import { stepsFromLogEntry, applyLogEntry, deathIdsIn } from '../animSteps';
 import { createGrid, placeUnits } from '$lib/engine/grid';
 import { GOBLIN } from '$lib/engine/barbarian';
 import type { BattleEvent, BattleState, UnitDef, UnitStack, Pos } from '$lib/engine/types';
+import { statusIconFor } from '../statusIcons';
 
 function makeStack(def: UnitDef, pos: Pos, side: 'player' | 'enemy', overrides: Partial<UnitStack> = {}): UnitStack {
   return {
@@ -175,7 +176,9 @@ describe('stepsFromLogEntry: death and status', () => {
       data: { effect: 'burn_apply', unitId: 't1' },
     };
 
-    expect(stepsFromLogEntry(entry)).toEqual([{ unitId: 't1', kind: 'status', icon: '🔥' }]);
+    expect(stepsFromLogEntry(entry)).toEqual([
+      { unitId: 't1', kind: 'status', icon: statusIconFor('burn') },
+    ]);
   });
 
   it('maps an unrecognized status effect to no steps rather than throwing', () => {
@@ -199,16 +202,16 @@ describe('stepsFromLogEntry: death and status', () => {
 
   it('floats an icon for a morale roll firing either way', () => {
     expect(stepsFromLogEntry({ type: 'morale_boost', data: { unitId: 't1' } }))
-      .toEqual([{ unitId: 't1', kind: 'status', icon: '🎺' }]);
+      .toEqual([{ unitId: 't1', kind: 'status', icon: statusIconFor('morale_boost') }]);
     expect(stepsFromLogEntry({ type: 'morale_freeze', data: { unitId: 't1' } }))
-      .toEqual([{ unitId: 't1', kind: 'status', icon: '❄️' }]);
+      .toEqual([{ unitId: 't1', kind: 'status', icon: statusIconFor('morale_freeze') }]);
   });
 
   it('distinguishes good and bad luck', () => {
     expect(stepsFromLogEntry({ type: 'luck', data: { unitId: 't1', kind: 'good' } }))
-      .toEqual([{ unitId: 't1', kind: 'status', icon: '🍀' }]);
+      .toEqual([{ unitId: 't1', kind: 'status', icon: statusIconFor('good_luck') }]);
     expect(stepsFromLogEntry({ type: 'luck', data: { unitId: 't1', kind: 'bad' } }))
-      .toEqual([{ unitId: 't1', kind: 'status', icon: '💢' }]);
+      .toEqual([{ unitId: 't1', kind: 'status', icon: statusIconFor('bad_luck') }]);
   });
 });
 

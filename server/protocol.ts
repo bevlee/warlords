@@ -1,4 +1,5 @@
 import type { BattleAction, Pos, SpellId } from '../src/lib/engine/types.ts';
+import { UNIT_ABILITIES } from '../src/lib/engine/unitAbilities.ts';
 import type {
   ClientMessage,
   CoopLoadout,
@@ -91,6 +92,12 @@ function parseBattleAction(value: unknown): BattleAction | null {
     case 'cast':
       return isSpellId(value.spell) && isNonEmptyString(value.targetId)
         ? { type: 'cast', spell: value.spell, targetId: value.targetId }
+        : null;
+    case 'ability':
+      // Shape check only — whether this stack may use it right now is
+      // isLegalAction's job, against the authoritative state.
+      return isNonEmptyString(value.abilityId) && value.abilityId in UNIT_ABILITIES
+        ? { type: 'ability', abilityId: value.abilityId }
         : null;
     case 'defend':
       return { type: 'defend' };

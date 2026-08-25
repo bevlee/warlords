@@ -58,11 +58,84 @@ export function kindOfTab(tab: string | null): EntryKind {
   return (tab && KIND_OF_TAB.get(tab)) || 'unit';
 }
 
-/** Canonical URL for an entry. The page derives its whole state from the query
- *  string, so a plain <a href> gives in-place panel swaps, working back/forward,
- *  and cmd-click-to-new-tab without any extra handling. */
+/** Canonical URL for an entry, with no filters. Used by links from elsewhere in
+ *  the game, which have no browsing context to preserve. The page derives its
+ *  whole state from the query string, so a plain <a href> gives in-place panel
+ *  swaps, working back/forward, and cmd-click-to-new-tab with no extra handling. */
 export function entryHref(kind: EntryKind, id: string): string {
   return `/compendium?tab=${TAB_OF[kind]}&entry=${encodeURIComponent(id)}`;
+}
+
+/** Grid filters, all optional. Absent or empty means "don't filter on this". */
+export interface EntryFilters {
+  faction?: string | null;
+  tier?: number | null;
+  search?: string | null;
+}
+
+/**
+ * The single filter predicate, shared by the grid and by link building — so a
+ * link can never send you to an entry the grid would then hide.
+ *
+ * A filter only applies to kinds it means something for: tier is a unit
+ * concept, faction belongs to units, factions, and faction skills. Applying
+ * them blindly would empty the Items tab the moment a tier was selected.
+ */
+export function matchesFilters(entry: CompendiumEntry, filters: EntryFilters): boolean {
+  const search = filters.search?.trim().toLowerCase();
+  if (search && !entry.name.toLowerCase().includes(search)) return false;
+  if (filters.faction && 'faction' in entry && entry.faction !== filters.faction) return false;
+  if (filters.tier && entry.kind === 'unit' && entry.tier !== filters.tier) return false;
+  return true;
+}
+
+/** Filters that survive navigation from one entry to the next. Search is not
+ *  one of them: it is transient typing, not a browsing mode. */
+const STICKY_FILTERS = ['faction', 'tier'] as const;
+
+function filtersFrom(params: URLSearchParams): EntryFilters {
+  return {
+    faction: params.get('faction'),
+    tier: Number(params.get('tier')) || null,
+  };
+}
+
+/**
+ * URL for an entry that keeps the filters currently in force, so picking a
+ * Knight while filtered to Knight leaves the list filtered.
+ *
+ * A filter that would hide the destination is dropped instead — following a
+ * cross-reference out of the current faction (a shared ability, say) should
+ * take you there rather than to a grid that excludes it.
+ */
+export function entryHrefFrom(
+  params: URLSearchParams,
+  kind: EntryKind,
+  id: string,
+  heroLevel = SAMPLE_HERO_LEVEL,
+): string {
+  const next = new URLSearchParams({ tab: TAB_OF[kind], entry: id });
+  const target = findEntry(kind, id, heroLevel);
+  for (const key of STICKY_FILTERS) {
+    const value = params.get(key);
+    if (!value) continue;
+    const only: EntryFilters = key === 'tier' ? { tier: Number(value) || null } : { faction: value };
+    if (target && !matchesFilters(target, only)) continue;
+    next.set(key, value);
+  }
+  return `/compendium?${next}`;
+}
+
+/** URL for a tab, carrying the active filters across. They stay in force until
+ *  explicitly cleared, and inapplicable ones lie dormant rather than emptying
+ *  the list. Any selected entry is dropped — it belongs to the old tab. */
+export function tabHrefFrom(params: URLSearchParams, kind: EntryKind): string {
+  const next = new URLSearchParams({ tab: TAB_OF[kind] });
+  for (const key of STICKY_FILTERS) {
+    const value = params.get(key);
+    if (value) next.set(key, value);
+  }
+  return `/compendium?${next}`;
 }
 
 interface BaseEntry {

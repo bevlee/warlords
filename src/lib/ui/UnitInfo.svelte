@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { effectiveAttack, effectiveDefense } from '$lib/engine/combat';
   import { abilityInfo } from './abilities';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { skillIconFor, skillGlyph } from './skillIcons';
@@ -26,19 +27,25 @@
     size === 'large'
       ? {
           pad: 'px-4 py-3 gap-2.5',
-          sprite: 'h-16 w-14',
-          name: 'text-lg',
-          count: 'text-sm',
-          stat: 'text-sm gap-y-1.5',
-          ability: 'text-sm',
+          sprite: 'h-24 w-20',
+          name: 'text-[27px]',
+          count: 'text-[21px]',
+          stat: 'text-[21px] gap-y-2',
+          statGrid: 'grid-cols-2',
+          ability: 'text-[21px]',
+          statIcon: 'h-9 w-9',
+          abilityIcon: 'h-6 w-6',
         }
       : {
           pad: 'px-3 py-2 gap-1.5',
-          sprite: 'h-11 w-10',
-          name: 'text-sm',
-          count: 'text-xs',
-          stat: 'text-xs gap-y-0.5',
-          ability: 'text-[11px]',
+          sprite: 'h-16 w-14',
+          name: 'text-[21px]',
+          count: 'text-lg',
+          stat: 'text-lg gap-y-1.5',
+          statGrid: 'grid-cols-2',
+          ability: 'text-[16.5px]',
+          statIcon: 'h-6 w-6',
+          abilityIcon: 'h-6 w-6',
         }
   );
 
@@ -70,9 +77,15 @@
     return [
       { key: 'count', value: `${unit.count}` },
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
-      { key: 'attack', value: `${d.attack + heroAttack + (unit.attackBuff ?? 0)}`, buff: unit.attackBuff ?? 0 },
-      { key: 'defense', value: `${d.defense + (unit.defenseBuff ?? 0)}`, buff: unit.defenseBuff ?? 0 },
-      { key: 'damage', value: `${d.minDamage}–${d.maxDamage}` },
+      // Straight from the damage formula's own helpers, so an infected stack
+      // shown at 0 attack is exactly what it fights at.
+      { key: 'attack', value: `${effectiveAttack(unit, heroAttack)}`, buff: unit.attackBuff ?? 0 },
+      { key: 'defense', value: `${effectiveDefense(unit)}`, buff: unit.defenseBuff ?? 0 },
+      {
+        key: 'damage',
+        value: `${d.minDamage + (unit.damageBonus ?? 0)}–${d.maxDamage + (unit.damageBonus ?? 0)}`,
+        buff: unit.damageBonus ?? 0,
+      },
       { key: 'speed', value: `${d.speed}` },
       { key: 'initiative', value: `${d.initiative + (unit.initiativeBonus ?? 0)}`, buff: unit.initiativeBonus ?? 0 },
       { key: 'morale', value: `${unit.morale}` },
@@ -90,7 +103,7 @@
      panel can toggle the page scrollbar and reflow the width-driven board. A
      unit with many abilities scrolls rather than growing. -->
 <div
-  class="flex h-full flex-col overflow-y-auto rounded-lg bg-slate-800 {sz.pad}
+  class="flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-lg bg-slate-800 {sz.pad}
     {embedded ? '' : `border ${pinned ? 'border-amber-500/60' : 'border-slate-700'}`}"
 >
   {#if unit}
@@ -123,18 +136,26 @@
           ×
         </button>
       {:else if !embedded}
-        <span class="shrink-0 text-[10px] uppercase tracking-wide text-slate-600">right-click to pin</span>
+        <span class="min-w-0 truncate text-[10px] uppercase tracking-wide text-slate-600">right-click to pin</span>
       {/if}
     </div>
 
-    <div class="grid shrink-0 grid-cols-2 gap-x-4 border-t border-slate-700 pt-1.5 {sz.stat}">
+    <div class="grid shrink-0 gap-x-4 border-t border-slate-700 pt-1.5 {sz.statGrid} {sz.stat}">
       {#each stats as stat (stat.key)}
-        <span class="flex cursor-help items-baseline gap-1.5" title={STAT_META[stat.key].title}>
-          <span aria-hidden="true">{STAT_META[stat.key].icon}</span>
+        <span class="flex cursor-help items-center gap-1.5" title={STAT_META[stat.key].title}>
+          <img
+            src={STAT_META[stat.key].icon}
+            alt=""
+            class="shrink-0 object-contain [image-rendering:pixelated] {sz.statIcon}"
+          />
           <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
           <span class="font-mono text-slate-100">
             {#if stat.buff}
-              <span class="text-emerald-400">(+{stat.buff})</span>{stat.value}
+              <!-- Buffs can be negative (Zombie infecting strike), so the sign
+                   and the color both follow the value. -->
+              <span class={stat.buff > 0 ? 'text-emerald-400' : 'text-rose-400'}
+                >({stat.buff > 0 ? '+' : '−'}{Math.abs(stat.buff)})</span
+              >{stat.value}
             {:else}
               {stat.value}
             {/if}
@@ -154,7 +175,11 @@
                    glyph until then) — visually distinct from base abilities. -->
               <p class="flex items-center gap-1 font-semibold leading-tight text-violet-300 {sz.ability}">
                 {#if skillIconFor(ability)}
-                  <img src={skillIconFor(ability)} alt="" class="h-4 w-4" />
+                  <img
+                    src={skillIconFor(ability)}
+                    alt=""
+                    class="shrink-0 object-contain [image-rendering:pixelated] {sz.abilityIcon}"
+                  />
                 {:else}
                   <span aria-hidden="true">{skillGlyph(ability)}</span>
                 {/if}
@@ -172,6 +197,6 @@
       </div>
     {/if}
   {:else}
-    <p class="text-xs text-slate-500">Hover a unit to inspect it. Right-click to pin.</p>
+    <p class="text-lg text-slate-500">Hover a unit to inspect it. Right-click to pin.</p>
   {/if}
 </div>

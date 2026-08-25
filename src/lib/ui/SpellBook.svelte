@@ -2,6 +2,7 @@
   import type { Hero, SpellId } from '$lib/engine/types';
   import { SPELLS, lightningDamage } from '$lib/engine/battle';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { spellIconFor } from './spellIcons';
 
   interface Props {
     hero: Hero;
@@ -15,7 +16,7 @@
 
   interface SpellEntry {
     id: SpellId;
-    glyph: string;
+    icon: string;
     label: string;
     target: string;
     effect: string;
@@ -26,7 +27,7 @@
   const entries: SpellEntry[] = $derived([
     {
       id: 'lightning' as SpellId,
-      glyph: '⚡',
+      icon: spellIconFor('lightning')!,
       label: 'Lightning',
       target: 'Enemy stack',
       effect: `${lightningDamage(hero.level)} true damage`,
@@ -37,7 +38,7 @@
     },
     {
       id: 'bloodlust' as SpellId,
-      glyph: '💪',
+      icon: spellIconFor('bloodlust')!,
       label: 'Bloodlust',
       target: 'Friendly stack',
       effect: '+4 attack',
@@ -48,7 +49,7 @@
     },
     {
       id: 'stoneskin' as SpellId,
-      glyph: '🗿',
+      icon: spellIconFor('stoneskin')!,
       label: 'Stoneskin',
       target: 'Friendly stack',
       effect: '+4 defense',
@@ -87,7 +88,11 @@
             disabled={!affordable}
             onclick={() => onpick(s.id)}
           >
-            {s.glyph}
+            <img
+              src={s.icon}
+              alt=""
+              class="h-12 w-12 object-contain [image-rendering:pixelated]"
+            />
           </button>
           <p class="mt-2 text-sm font-bold text-stone-800">{s.label}</p>
           <p class="font-mono text-[11px] leading-tight text-stone-600">Mana: {SPELLS[s.id].cost}</p>

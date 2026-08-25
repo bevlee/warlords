@@ -7,6 +7,7 @@ import { budgetForLevel, xpToReach } from '../src/lib/engine/progression.ts';
 import { armyCost, MAX_STACKS, mergeArmySlots } from '../src/lib/engine/recruit.ts';
 import { canShootTarget, getAttackOrigins, getReachableCells, isShootingBlocked } from '../src/lib/engine/selectors.ts';
 import type { BattleAction, BattleState } from '../src/lib/engine/types.ts';
+import { canActivate } from '../src/lib/engine/unitAbilities.ts';
 import type {
   AuthenticatedClientMessage,
   CoopLoadout,
@@ -402,6 +403,7 @@ function isLegalAction(state: BattleState, action: BattleAction): boolean {
   const actor = state.units.find(unit => unit.id === state.currentUnitId);
   if (!actor || actor.count <= 0) return false;
   if (action.type === 'wait' || action.type === 'defend' || action.type === 'cast') return true;
+  if (action.type === 'ability') return canActivate(state, actor, action.abilityId);
   if (action.type === 'move') {
     return isPos(action.to) && getReachableCells(state.grid, actor).some(pos => samePos(pos, action.to));
   }

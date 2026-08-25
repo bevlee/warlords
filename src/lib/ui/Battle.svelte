@@ -24,6 +24,8 @@
     SpellId,
     UnitStack,
   } from '$lib/engine/types';
+  import { UNIT_ABILITIES, activatedAbilitiesOf } from '$lib/engine/unitAbilities';
+  import { abilityInfo } from './abilities';
   import { describeEvent, SPELL_META } from './logLines';
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
@@ -38,6 +40,8 @@
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
+  import { statusIconFor } from './statusIcons';
+  import { attributeIconFor } from './attributeIcons';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -509,6 +513,24 @@
     takeAction({ type: 'defend' }, 'host');
   }
 
+  // Activated unit abilities (Bone Dragon absorb): one button per ability the
+  // acting stack owns, greyed by the engine's own canUse so the button and the
+  // rule can never disagree.
+  const unitAbilities = $derived.by(() => {
+    if (!activeUnit || activeUnit.isHero) return [];
+    return activatedAbilitiesOf(activeUnit).map(id => ({
+      id,
+      info: abilityInfo(id),
+      enabled: isPlayerTurn && !animating && UNIT_ABILITIES[id].canUse(battle, activeUnit),
+    }));
+  });
+
+  function handleAbility(abilityId: string) {
+    if (!isPlayerTurn || animating) return;
+    pendingSpell = null;
+    takeAction({ type: 'ability', abilityId }, 'host');
+  }
+
   function handleForfeit() {
     if (online || replay) return;
     if (battle.result !== 'ongoing') return;
@@ -736,36 +758,40 @@
         />
       </div>
 
-      <!-- Right rail: big action buttons, top-aligned where the board's
+      <!-- Right rail: compact action buttons, top-aligned where the board's
            projected far edge is narrow — clear of every tile. -->
-      <div class="ml-2 flex w-32 shrink-0 flex-col items-center gap-3 self-start pt-1">
+      <div class="ml-2 flex w-20 shrink-0 flex-col items-center gap-2 self-start pt-1">
         <button
           type="button"
-          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
+          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500
             bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Wait"
           title="Wait — act again in half a cycle"
           disabled={!isPlayerTurn}
           onclick={handleWait}
         >
-          <span class="text-5xl leading-none">⏳</span>
-          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Wait</span>
+          <span class="text-2xl leading-none">⏳</span>
+          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Wait</span>
         </button>
         <button
           type="button"
-          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 border-slate-500
+          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-slate-500
             bg-slate-800/90 shadow-lg hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Defend"
           title="Defend — +30% defense until your next turn"
           disabled={!isPlayerTurn}
           onclick={handleDefend}
         >
-          <span class="text-5xl leading-none">🛡️</span>
-          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-300">Defend</span>
+          <img
+            src={statusIconFor('defending')}
+            alt=""
+            class="h-7 w-7 object-contain [image-rendering:pixelated]"
+          />
+          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300">Defend</span>
         </button>
         <button
           type="button"
-          class="flex h-28 w-28 flex-col items-center justify-center rounded-full border-2 shadow-lg
+          class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 shadow-lg
             disabled:cursor-not-allowed disabled:opacity-40
             {spellbookOpen ? 'border-violet-300 bg-violet-700' : 'border-violet-500/70 bg-violet-950/90 hover:bg-violet-800'}"
           aria-label="Spellbook"
@@ -773,9 +799,31 @@
           disabled={!isHeroTurn}
           onclick={() => (spellbookOpen = !spellbookOpen)}
         >
-          <span class="text-5xl leading-none">📖</span>
-          <span class="mt-1 text-xs font-semibold uppercase tracking-wide text-violet-200">Spells</span>
+          <img
+            src={attributeIconFor('mana')}
+            alt=""
+            class="h-7 w-7 object-contain [image-rendering:pixelated]"
+          />
+          <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">Spells</span>
         </button>
+        {#each unitAbilities as ability (ability.id)}
+          <button
+            type="button"
+            class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-emerald-500/70
+              bg-emerald-950/90 shadow-lg hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={ability.info.label}
+            title="{ability.info.label} — {ability.info.description}"
+            disabled={!ability.enabled}
+            onclick={() => handleAbility(ability.id)}
+          >
+            <img
+              src={statusIconFor('life_drain')}
+              alt=""
+              class="h-7 w-7 object-contain [image-rendering:pixelated]"
+            />
+            <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Absorb</span>
+          </button>
+        {/each}
       </div>
 
       <!-- Settings: cog at the top-left, under the page title. -->
@@ -869,15 +917,16 @@
     {/if}
     </div>
 
-    <!-- Bottom: turns bar on the left (70%), unit info on the right (30%) —
-         tall enough for the info panel to fit stats plus ability badges. -->
-    <div class="relative z-10 mt-1.5 flex items-stretch gap-3">
-      <div class="min-w-0 flex-[7]">
+    <!-- Bottom: turns bar keeps its original 70% share. On desktop the unit
+         panel starts in its original 30% slot, then extends across the gap and
+         over the lower battle log. This leaves the upper log readable while
+         giving the two-column stat layout enough horizontal room. -->
+    <div class="battle-footer relative z-20 mt-1.5 flex h-60 items-stretch gap-3">
+      <div class="battle-turnbar min-w-0 flex-[4]">
         <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
       </div>
-      <!-- h-60 fits the tallest unit (stats + a couple of ability blurbs);
-           anything longer scrolls inside the panel rather than reflowing. -->
-      <div class="h-60 min-w-0 flex-[3]">
+      <!-- Anything taller than the fixed footer scrolls inside UnitInfo. -->
+      <div class="battle-unit-info h-60 min-w-0 flex-[6]">
         <UnitInfo
           unit={infoUnit}
           hero={infoUnit ? heroFor(battle, infoUnit) : battle.hero}
@@ -924,6 +973,23 @@
 {/if}
 
 <style>
+  /* The desktop log is 14rem wide with a 0.75rem outer flex gap. Extending
+     across exactly both values lets UnitInfo cover the log's lower section
+     without changing the board or turn-bar width. */
+  @media (min-width: 64rem) {
+    .battle-turnbar {
+      flex: 0 0 calc((100% - 0.75rem) * 0.7);
+    }
+
+    .battle-unit-info {
+      position: absolute;
+      inset-block: 0;
+      right: -14.75rem;
+      width: calc((100% - 0.75rem) * 0.3 + 14.75rem);
+      z-index: 20;
+    }
+  }
+
   .hero-shadow {
     position: absolute;
     bottom: 4px;

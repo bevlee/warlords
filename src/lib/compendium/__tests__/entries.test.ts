@@ -4,10 +4,13 @@ import {
   TAB_OF,
   entriesOfKind,
   entryHref,
+  entryHrefFrom,
   factionSkillId,
   findEntry,
   kindOfTab,
+  matchesFilters,
   spellEntries,
+  tabHrefFrom,
   type EntryKind,
 } from '../entries';
 import { CATALOG } from '../../engine/catalog';
@@ -138,6 +141,101 @@ describe('entries read from their sources rather than restating them', () => {
   it('prices units from the recruit table, tolerating units with no price', () => {
     const champion = entriesOfKind('unit').find(e => e.id === 'champion');
     expect(champion?.kind === 'unit' && champion.cost).toBe(150);
+  });
+});
+
+describe('filters', () => {
+  const unit = (slug: string) => entriesOfKind('unit').find(e => e.id === slug)!;
+
+  it('applies a tier filter only to units, so other tabs are not emptied', () => {
+    expect(matchesFilters(unit('champion'), { tier: 7 })).toBe(true);
+    expect(matchesFilters(unit('champion'), { tier: 3 })).toBe(false);
+    // An item has no tier; a stale tier filter must not hide it.
+    expect(matchesFilters(entriesOfKind('item')[0], { tier: 3 })).toBe(true);
+    expect(entriesOfKind('item').filter(e => matchesFilters(e, { tier: 3 }))).toHaveLength(
+      entriesOfKind('item').length,
+    );
+  });
+
+  it('applies a faction filter only to entries that have a faction', () => {
+    expect(matchesFilters(unit('champion'), { faction: 'knight' })).toBe(true);
+    expect(matchesFilters(unit('champion'), { faction: 'demon' })).toBe(false);
+    expect(matchesFilters(entriesOfKind('spell')[0], { faction: 'demon' })).toBe(true);
+  });
+
+  it('matches names case-insensitively and ignores blank search', () => {
+    expect(matchesFilters(unit('champion'), { search: 'CHAMP' })).toBe(true);
+    expect(matchesFilters(unit('champion'), { search: '  ' })).toBe(true);
+    expect(matchesFilters(unit('champion'), { search: 'goblin' })).toBe(false);
+  });
+});
+
+describe('links keep the browsing context', () => {
+  const params = (q: string) => new URLSearchParams(q);
+
+  it('carries the active filters onto the entry you pick', () => {
+    const href = entryHrefFrom(params('tab=units&faction=knight'), 'unit', 'champion');
+    const url = new URL(href, 'https://example.test');
+    expect(url.searchParams.get('faction')).toBe('knight');
+    expect(url.searchParams.get('entry')).toBe('champion');
+  });
+
+  it('carries several filters at once', () => {
+    const url = new URL(
+      entryHrefFrom(params('faction=knight&tier=7'), 'unit', 'champion'),
+      'https://example.test',
+    );
+    expect(url.searchParams.get('faction')).toBe('knight');
+    expect(url.searchParams.get('tier')).toBe('7');
+  });
+
+  it('drops a filter that would hide where the link goes', () => {
+    // Following a shared ability out of the Knight roster should land on the
+    // Ranger unit, not on a grid that excludes it.
+    const url = new URL(
+      entryHrefFrom(params('faction=knight'), 'unit', 'pegasus'),
+      'https://example.test',
+    );
+    expect(url.searchParams.get('faction')).toBeNull();
+    expect(url.searchParams.get('entry')).toBe('pegasus');
+  });
+
+  it('keeps a filter that does not apply to the destination kind', () => {
+    const url = new URL(entryHrefFrom(params('tier=7'), 'item', 'aegis_charm'), 'https://example.test');
+    expect(url.searchParams.get('tier')).toBe('7');
+  });
+
+  it('never emits a link whose own filters would hide its entry', () => {
+    for (const kind of ENTRY_KINDS) {
+      for (const entry of entriesOfKind(kind)) {
+        const url = new URL(
+          entryHrefFrom(params('faction=knight&tier=7'), kind, entry.id),
+          'https://example.test',
+        );
+        const applied = {
+          faction: url.searchParams.get('faction'),
+          tier: Number(url.searchParams.get('tier')) || null,
+        };
+        expect(matchesFilters(entry, applied), `${kind}/${entry.id} would be hidden`).toBe(true);
+      }
+    }
+  });
+
+  it('carries filters across tabs but drops the selected entry', () => {
+    const url = new URL(
+      tabHrefFrom(params('tab=units&faction=knight&tier=7&entry=champion'), 'item'),
+      'https://example.test',
+    );
+    expect(url.searchParams.get('faction')).toBe('knight');
+    expect(url.searchParams.get('tier')).toBe('7');
+    expect(url.searchParams.get('entry')).toBeNull();
+    expect(kindOfTab(url.searchParams.get('tab'))).toBe('item');
+  });
+
+  it('leaves in-game links unfiltered — they have no browsing context', () => {
+    const url = new URL(entryHref('unit', 'champion'), 'https://example.test');
+    expect(url.searchParams.get('faction')).toBeNull();
+    expect(url.searchParams.get('tier')).toBeNull();
   });
 });
 

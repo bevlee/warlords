@@ -109,6 +109,20 @@ export function describeEvent(
             : line(u, t(' drain '), num(d.heal), t(' HP of life.'));
         }
         case 'slow': return line(u, t(' are slowed.'));
+        case 'infect':
+          return line(u, t(' fester — '), num(`−${d.penalty}`), t(' attack and defense.'));
+        case 'blood_frenzy':
+          return line(u, t(' feed on their own wounds — damage up to +'), num(d.bonus), t('.'));
+        case 'absorbed': {
+          const eaten = (d.consumed as number) ?? 0;
+          return line(u, t(eaten === 1 ? ' crumble as one of them is devoured.' : ` crumble as ${eaten} of them are devoured.`));
+        }
+        case 'absorb': {
+          const revived = (d.revived as number) ?? 0;
+          return revived > 0
+            ? line(u, t(' absorb the bones for '), num(d.heal), t(' HP, reviving '), num(revived), t(revived === 1 ? ' creature.' : ' creatures.'))
+            : line(u, t(' absorb the bones for '), num(d.heal), t(' HP.'));
+        }
         case 'drain_morale': return line(u, t(' morale is drained.'));
         case 'blind': return line(u, t(' are blinded and skip their turn.'));
         case 'burn_apply': return line(u, t(' catch fire.'));

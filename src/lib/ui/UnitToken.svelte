@@ -2,6 +2,7 @@
   import type { UnitStack } from '$lib/engine/types';
   import Sprite from './Sprite.svelte';
   import { controllerOf, CONTROLLER_STYLE } from './controllers';
+  import { statusIconFor } from './statusIcons';
 
   interface Props {
     unit: UnitStack;
@@ -35,14 +36,24 @@
 
   {#if unit.attackBuff || unit.defenseBuff}
     <span
-      class="absolute bottom-0 left-0 leading-none {small ? 'text-[8px]' : 'text-[10px]'}"
+      class="absolute bottom-0 left-0 flex items-center {small ? 'gap-px' : 'gap-0.5'}"
       title="{unit.attackBuff ? `+${unit.attackBuff} attack ` : ''}{unit.defenseBuff ? `+${unit.defenseBuff} defense` : ''}"
     >
-      {unit.attackBuff ? '💪' : ''}{unit.defenseBuff ? '🗿' : ''}
+      {#if unit.attackBuff}
+        <img src={statusIconFor('bloodlust')} alt="" class="{small ? 'h-[18px] w-[18px]' : 'h-6 w-6'} object-contain [image-rendering:pixelated]" />
+      {/if}
+      {#if unit.defenseBuff}
+        <img src={statusIconFor('stoneskin')} alt="" class="{small ? 'h-[18px] w-[18px]' : 'h-6 w-6'} object-contain [image-rendering:pixelated]" />
+      {/if}
     </span>
   {/if}
 
   {#if unit.isDefending}
-    <span class="absolute left-0 top-0 leading-none {small ? 'text-[9px]' : 'text-xs'}" title="defending">🛡️</span>
+    <img
+      src={statusIconFor('defending')}
+      alt=""
+      class="absolute left-0 top-0 object-contain [image-rendering:pixelated] {small ? 'h-[18px] w-[18px]' : 'h-6 w-6'}"
+      title="defending"
+    />
   {/if}
 </div>

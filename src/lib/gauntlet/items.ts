@@ -97,9 +97,9 @@ export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
 const RARITY_WEIGHT: Record<ItemRarity, number> = { common: 60, rare: 35, epic: 5 };
 
 const STAT_LABEL: Record<ItemStat, string> = {
-  attack: 'Atk', defense: 'Def', initiative: 'Init', luck: 'Luck', morale: 'Morale',
+  attack: 'Atk', defense: 'Def', initiative: 'Init', speed: 'Speed', luck: 'Luck', morale: 'Morale',
 };
-const STAT_ORDER: ItemStat[] = ['attack', 'defense', 'initiative', 'luck', 'morale'];
+const STAT_ORDER: ItemStat[] = ['attack', 'defense', 'initiative', 'speed', 'luck', 'morale'];
 
 /** Human-readable effect line, e.g. "+10 Atk · −4 Def". */
 export function itemEffectText(item: ItemDef): string {
@@ -117,7 +117,7 @@ const PROC_STAT_CAP = 3;
 const CAPPED_STATS: ItemStat[] = ['luck', 'morale'];
 
 export function itemBonuses(itemIds: ItemId[]): ArmyBonuses {
-  const total: ArmyBonuses = { attack: 0, defense: 0, initiative: 0, luck: 0, morale: 0 };
+  const total: ArmyBonuses = { attack: 0, defense: 0, initiative: 0, speed: 0, luck: 0, morale: 0 };
   for (const id of itemIds) {
     for (const [stat, value] of Object.entries(ITEMS[id].effects)) {
       total[stat as ItemStat] += value;

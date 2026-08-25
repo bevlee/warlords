@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { UnitEntry } from '$lib/compendium/entries';
-  import { entryHref } from '$lib/compendium/entries';
+  import type { EntryKind, UnitEntry } from '$lib/compendium/entries';
   import { FACTION_INFO } from '$lib/engine/factions';
   import { TIER_STYLE } from '../tierStyle';
   import { STAT_META, type StatKey } from '../statMeta';
@@ -8,7 +7,13 @@
   import { skillIconFor, skillGlyph } from '../skillIcons';
   import Sprite from '../Sprite.svelte';
 
-  let { entry }: { entry: UnitEntry } = $props();
+  interface Props {
+    entry: UnitEntry;
+    /** Filter-preserving link builder, supplied by the route. */
+    hrefFor: (kind: EntryKind, id: string) => string;
+  }
+
+  let { entry, hrefFor }: Props = $props();
 
   const tier = $derived(TIER_STYLE[entry.tier]);
   const base = $derived(entry.unit.base);
@@ -39,7 +44,7 @@
     <p class="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider">
       <span class="rounded border {tier.border} px-1.5 py-0.5 {tier.text}">Tier {entry.tier} · {tier.label}</span>
       <a
-        href={entryHref('faction', entry.faction)}
+        href={hrefFor('faction', entry.faction)}
         class="rounded border border-slate-600 px-1.5 py-0.5 text-slate-300 hover:border-amber-500 hover:text-amber-300"
       >
         {FACTION_INFO[entry.faction].name}
@@ -53,8 +58,12 @@
 
 <div class="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-slate-700 pt-3 text-sm">
   {#each stats as stat (stat.key)}
-    <span class="flex cursor-help items-baseline gap-2" title={STAT_META[stat.key].title}>
-      <span aria-hidden="true">{STAT_META[stat.key].icon}</span>
+    <span class="flex cursor-help items-center gap-2" title={STAT_META[stat.key].title}>
+      <img
+        src={STAT_META[stat.key].icon}
+        alt=""
+        class="h-5 w-5 shrink-0 object-contain [image-rendering:pixelated]"
+      />
       <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
       <span class="font-mono text-slate-100">{stat.value}</span>
     </span>
@@ -69,7 +78,7 @@
         {@const info = abilityInfo(ability.id, ability.level)}
         <div>
           <a
-            href={entryHref('ability', ability.id)}
+            href={hrefFor('ability', ability.id)}
             class="flex items-center gap-1.5 text-sm font-semibold text-amber-300 hover:underline"
           >
             {#if skillIconFor(ability.id)}

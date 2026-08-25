@@ -39,8 +39,9 @@ export interface UnitStack {
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
   isAlly?: boolean;    // summoned ally stack: fights on the player side, AI-controlled
   controllerId?: string; // authoritative owner in co-op; absent uses legacy side/isAlly derivation
-  attackBuff?: number;  // battle-long spell bonus to attack
-  defenseBuff?: number; // battle-long spell bonus to defense
+  attackBuff?: number;  // battle-long attack modifier (spells add, Zombie infecting_strike subtracts)
+  defenseBuff?: number; // battle-long defense modifier (spells add, Zombie infecting_strike subtracts)
+  damageBonus?: number; // battle-long flat bonus to min and max damage (Blood Acolyte blood_frenzy)
   initiativeBonus?: number; // battle-long flat bonus to ATB fill rate (gauntlet items)
   lastMovedFrom?: Pos;  // set when a unit moves this turn; cleared at round start (Knight jousting)
   speedBonus?: number;        // battle-long movement bonus (Ranger Logistics), set once at battle start
@@ -94,11 +95,12 @@ export interface ArmySlot {
   count: number;
 }
 
-/** Army-wide flat stat bonuses (gauntlet items) applied to player stacks at battle start. */
+/** Army-wide flat stat bonuses applied to player stacks at battle start. */
 export interface ArmyBonuses {
   attack: number;
   defense: number;
   initiative: number;
+  speed: number;
   luck: number;
   morale: number;
 }
@@ -140,4 +142,8 @@ export type BattleAction =
   | { type: 'shoot'; targetId: string }
   | { type: 'defend' }
   | { type: 'cast'; spell: SpellId; targetId: string }
+  // Activated unit ability (engine/unitAbilities.ts). Deliberately not a
+  // `cast`: spells are hero-only, cost mana, and target by side, none of which
+  // fits a unit spending its own turn on its own resources.
+  | { type: 'ability'; abilityId: string }
   | { type: 'wait' };

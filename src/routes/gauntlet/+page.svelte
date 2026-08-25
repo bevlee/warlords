@@ -33,7 +33,7 @@
   import { TIER_STYLE } from '$lib/ui/tierStyle';
   import UnitInfo from '$lib/ui/UnitInfo.svelte';
   import ItemIcon from '$lib/ui/ItemIcon.svelte';
-  import type { FactionClass, UnitDef, UnitStack } from '$lib/engine/types';
+  import type { ArmyBonuses, FactionClass, UnitDef, UnitStack } from '$lib/engine/types';
 
   const ACT_NAMES: Record<1 | 2 | 3, string> = {
     1: 'Act I — The Borderlands',
@@ -47,11 +47,30 @@
   let battleKey = $state(0);
   let loaded = $state(false);
 
-  // Debug: +99 hero attack, which the combat formula adds to every player
-  // stack's attack — a quick "win button" for testing. Session-only state,
-  // never saved to the run.
-  const DEBUG_ATTACK = 99;
+  // A session-only "win button" for testing. These bonuses are applied to
+  // every player stack when a battle starts and are never saved to the run.
+  const DEBUG_BONUSES: ArmyBonuses = {
+    attack: 99,
+    defense: 0,
+    initiative: 0,
+    speed: 99,
+    luck: 3,
+    morale: 3,
+  };
   let debugBoost = $state(false);
+
+  function battleBonuses(itemIds: ItemId[]): ArmyBonuses {
+    const bonuses = itemBonuses(itemIds);
+    if (!debugBoost) return bonuses;
+    return {
+      attack: bonuses.attack + DEBUG_BONUSES.attack,
+      defense: bonuses.defense + DEBUG_BONUSES.defense,
+      initiative: bonuses.initiative + DEBUG_BONUSES.initiative,
+      speed: bonuses.speed + DEBUG_BONUSES.speed,
+      luck: bonuses.luck + DEBUG_BONUSES.luck,
+      morale: bonuses.morale + DEBUG_BONUSES.morale,
+    };
+  }
 
   let loadError = $state(false);
 
@@ -226,8 +245,8 @@
       <Battle
         playerArmy={applyUnitSkills(run.army, run.unitSkills, run.faction)}
         enemyArmy={encounter?.army ?? []}
-        hero={debugBoost ? { ...run.hero, attack: run.hero.attack + DEBUG_ATTACK } : run.hero}
-        armyBonuses={itemBonuses(run.items)}
+        hero={run.hero}
+        armyBonuses={battleBonuses(run.items)}
         items={run.items}
         allowRestart={false}
         exitLabel="Continue"
@@ -515,7 +534,8 @@
               : 'border-slate-600 text-slate-500 hover:border-slate-500 hover:text-slate-300'}"
           onclick={() => (debugBoost = !debugBoost)}
         >
-          🐛 Debug +{DEBUG_ATTACK} ATK · {debugBoost ? 'ON' : 'OFF'}
+          🐛 Debug +{DEBUG_BONUSES.attack} ATK · +{DEBUG_BONUSES.speed} Speed ·
+          +{DEBUG_BONUSES.luck} Luck · +{DEBUG_BONUSES.morale} Morale · {debugBoost ? 'ON' : 'OFF'}
         </button>
         <button
           type="button"

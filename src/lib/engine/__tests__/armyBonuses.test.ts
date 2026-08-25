@@ -32,7 +32,7 @@ function makeStack(
 }
 
 const bonuses = (partial: Partial<ArmyBonuses>): ArmyBonuses => ({
-  attack: 0, defense: 0, initiative: 0, luck: 0, morale: 0, ...partial,
+  attack: 0, defense: 0, initiative: 0, speed: 0, luck: 0, morale: 0, ...partial,
 });
 
 describe('initiativeBonus in turn order', () => {
@@ -55,14 +55,15 @@ describe('initBattle armyBonuses', () => {
   const enemyArmy = [{ unit: PEASANT, count: 10 }];
   const allyArmy = [{ unit: OGRE, count: 2 }];
 
-  it('applies attack/defense/initiative/luck/morale to player stacks only', () => {
+  it('applies attack/defense/initiative/speed/luck/morale to player stacks only', () => {
     const state = initBattle(playerArmy, enemyArmy, mockHero, 7, allyArmy,
-      bonuses({ attack: 4, defense: 8, initiative: 1, luck: 1, morale: 2 }));
+      bonuses({ attack: 4, defense: 8, initiative: 1, speed: 6, luck: 1, morale: 2 }));
 
     const player = state.units.find(u => u.side === 'player' && !u.isHero && !u.isAlly)!;
     expect(player.attackBuff).toBe(4);
     expect(player.defenseBuff).toBe(8);
     expect(player.initiativeBonus).toBe(1);
+    expect(player.speedBonus).toBe(6);
     expect(player.luck).toBe(1);
     expect(player.morale).toBe(2);
 
@@ -72,6 +73,7 @@ describe('initBattle armyBonuses', () => {
     for (const bystander of [enemy, ally, hero]) {
       expect(bystander.attackBuff ?? 0).toBe(0);
       expect(bystander.initiativeBonus ?? 0).toBe(0);
+      expect(bystander.speedBonus ?? 0).toBe(0);
       expect(bystander.luck).toBe(0);
       expect(bystander.morale).toBe(0);
     }
