@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
+  import { effectiveAttack, effectiveDefense } from '$lib/engine/combat';
   import { abilityInfo } from './abilities';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { skillIconFor, skillGlyph } from './skillIcons';
@@ -76,9 +77,15 @@
     return [
       { key: 'count', value: `${unit.count}` },
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
-      { key: 'attack', value: `${d.attack + heroAttack + (unit.attackBuff ?? 0)}`, buff: unit.attackBuff ?? 0 },
-      { key: 'defense', value: `${d.defense + (unit.defenseBuff ?? 0)}`, buff: unit.defenseBuff ?? 0 },
-      { key: 'damage', value: `${d.minDamage}–${d.maxDamage}` },
+      // Straight from the damage formula's own helpers, so an infected stack
+      // shown at 0 attack is exactly what it fights at.
+      { key: 'attack', value: `${effectiveAttack(unit, heroAttack)}`, buff: unit.attackBuff ?? 0 },
+      { key: 'defense', value: `${effectiveDefense(unit)}`, buff: unit.defenseBuff ?? 0 },
+      {
+        key: 'damage',
+        value: `${d.minDamage + (unit.damageBonus ?? 0)}–${d.maxDamage + (unit.damageBonus ?? 0)}`,
+        buff: unit.damageBonus ?? 0,
+      },
       { key: 'speed', value: `${d.speed}` },
       { key: 'initiative', value: `${d.initiative + (unit.initiativeBonus ?? 0)}`, buff: unit.initiativeBonus ?? 0 },
       { key: 'morale', value: `${unit.morale}` },
@@ -144,7 +151,11 @@
           <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
           <span class="font-mono text-slate-100">
             {#if stat.buff}
-              <span class="text-emerald-400">(+{stat.buff})</span>{stat.value}
+              <!-- Buffs can be negative (Zombie infecting strike), so the sign
+                   and the color both follow the value. -->
+              <span class={stat.buff > 0 ? 'text-emerald-400' : 'text-rose-400'}
+                >({stat.buff > 0 ? '+' : '−'}{Math.abs(stat.buff)})</span
+              >{stat.value}
             {:else}
               {stat.value}
             {/if}

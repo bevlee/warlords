@@ -46,6 +46,25 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
     label: 'Slow on hit',
     description: 'Chance to reduce the target’s movement range until its next turn.',
   },
+  infecting_strike: {
+    label: 'Infecting strike',
+    description: 'Every hit rots the target for −5 attack and −5 defense for the rest of the battle, stacking.',
+  },
+  soul_reaper: {
+    label: 'Soul reaper',
+    description: 'Every melee blow claims one creature beyond what its damage would kill.',
+  },
+  blood_frenzy: {
+    label: 'Blood frenzy',
+    description: 'Each wound it survives raises its minimum and maximum damage by 2 for the rest of the battle.',
+  },
+  absorb_skeleton: {
+    label: 'Absorb skeleton',
+    description:
+      'Active: devours your largest Skeleton stack, each Skeleton healing a full Bone Dragon’s ' +
+      'worth of health. Takes only as many as it can use, up to one per Bone Dragon in the ' +
+      'stack. Uses the turn.',
+  },
   drain_morale: {
     label: 'Drain morale',
     description: "Lowers the target's morale, making it more likely to freeze and skip a turn.",

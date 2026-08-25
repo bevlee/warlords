@@ -1,6 +1,6 @@
 import type { BattleState, Grid, Pos, UnitStack } from './types.ts';
 import { getNeighbours, chebyshevDistance, manhattanDistance } from './grid.ts';
-import { modifiedDamage, applyDamage } from './combat.ts';
+import { modifiedDamage, applyDamage, applyStrike } from './combat.ts';
 
 /** Movement range for this turn: base speed, plus Logistics, minus any active slow (Zombie slow_on_hit). */
 export function effectiveSpeed(unit: UnitStack): number {
@@ -103,12 +103,11 @@ export function damagePreview(
   };
   const min = roll(attacker.definition.minDamage);
   const max = roll(attacker.definition.maxDamage);
-  return {
-    min,
-    max,
-    killsMin: applyDamage(defender, min).killed,
-    killsMax: applyDamage(defender, max).killed,
-  };
+  // Melee forecasts route through applyStrike so Black Knight soul_reaper's
+  // extra kill shows in the tooltip instead of surprising the player.
+  const kills = (damage: number) =>
+    ranged ? applyDamage(defender, damage).killed : applyStrike(attacker, defender, damage).killed;
+  return { min, max, killsMin: kills(min), killsMax: kills(max) };
 }
 
 /** LordsWM rule: a living enemy directly adjacent disables shooting. */

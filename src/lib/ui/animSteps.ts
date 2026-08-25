@@ -1,5 +1,6 @@
 import type { BattleEvent, BattleState, Pos } from '$lib/engine/types';
-import { applyDamage } from '$lib/engine/combat';
+import { applyDamage, applyStrike } from '$lib/engine/combat';
+import { BLOOD_FRENZY_DAMAGE } from '$lib/engine/abilityCatalog';
 import { setOccupant } from '$lib/engine/grid';
 import { statusIconFor } from './statusIcons';
 
@@ -13,6 +14,13 @@ const STATUS_ICON: Partial<Record<string, string>> = {
   drain_morale: statusIconFor('morale_drain'),
   life_drain: statusIconFor('life_drain'),
   gating: statusIconFor('gating'),
+  // No dedicated art yet — these borrow the nearest existing icon rather than
+  // animating silently: infection weakens like a slow, frenzy is an attack
+  // buff, and absorbing bones reads as the drain it is.
+  infect: statusIconFor('slow'),
+  blood_frenzy: statusIconFor('bloodlust'),
+  absorb: statusIconFor('life_drain'),
+  absorbed: statusIconFor('life_drain'),
 };
 
 export type AnimStep =
@@ -101,10 +109,13 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       const { unitId, effect } = entry.data as { unitId: string; effect: string };
       const icon = STATUS_ICON[effect];
       const base: AnimStep[] = icon ? [{ unitId, kind: 'status', icon }] : [];
-      // Lifesteal also floats the numbers: green revived count + red partial HP.
-      if (effect === 'life_drain') {
+      // Healing effects also float the numbers: green revived count + red partial HP.
+      if (effect === 'life_drain' || effect === 'absorb') {
         const { revived = 0, topHp = 0 } = entry.data as { revived?: number; topHp?: number };
         if (revived > 0 || topHp > 0) base.push({ unitId, kind: 'heal', revived, topHp });
+      }
+      if (effect === 'blood_frenzy') {
+        base.push({ unitId, kind: 'buff', value: BLOOD_FRENZY_DAMAGE, label: 'DMG' });
       }
       return base;
     }
@@ -156,7 +167,15 @@ export function applyLogEntry(state: BattleState, entry: BattleEvent): BattleSta
 
   switch (entry.type) {
     case 'attack':
-    case 'retaliate':
+    case 'retaliate': {
+      // Melee goes through applyStrike so a soul_reaper's extra kill is gone
+      // from the board on the same beat the floater reports it.
+      const { attackerId, targetId, damage } = entry.data as { attackerId: string; targetId: string; damage: number };
+      const attacker = state.units.find(u => u.id === attackerId);
+      return patchUnit(targetId, u =>
+        attacker ? applyStrike(attacker, u, damage).remaining : applyDamage(u, damage).remaining
+      );
+    }
     case 'shoot': {
       const { targetId, damage } = entry.data as { targetId: string; damage: number };
       return patchUnit(targetId, u => applyDamage(u, damage).remaining);

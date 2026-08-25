@@ -1,7 +1,27 @@
-import type { UnitStack, Hero } from './types.ts';
-import { abilityLevel, defenseReductionMult } from './abilityCatalog.ts';
+import type { BattleEvent, UnitStack, Hero } from './types.ts';
+import { abilityLevel, defenseReductionMult, BLOOD_FRENZY_DAMAGE } from './abilityCatalog.ts';
 import type { Rng } from './rng.ts';
 import { chebyshevDistance } from './grid.ts';
+
+/**
+ * A stack's attack and defense as the damage formula sees them: base, plus the
+ * battle-long buffs, plus the hero's attack for player stacks.
+ *
+ * Buffs can be negative (Zombie infecting_strike), so both floor at 0 — a stack
+ * stripped past zero defense must not start feeding its attacker unbounded
+ * bonus damage. Exported because the unit info panel shows these numbers, and a
+ * panel that disagreed with the formula would be worse than no panel.
+ */
+export function effectiveAttack(stack: UnitStack, heroAttack = 0): number {
+  return Math.max(
+    0,
+    stack.definition.attack + (stack.attackBuff ?? 0) + (stack.side === 'player' ? heroAttack : 0)
+  );
+}
+
+export function effectiveDefense(stack: UnitStack): number {
+  return Math.max(0, stack.definition.defense + (stack.defenseBuff ?? 0));
+}
 
 /**
  * HoMM3-style damage formula.
@@ -15,11 +35,8 @@ export function modifiedDamage(
   heroAttack: number,
   dmgPerCreature: number
 ): number {
-  const atk =
-    attacker.definition.attack +
-    (attacker.attackBuff ?? 0) +
-    (attacker.side === 'player' ? heroAttack : 0);
-  let def = defender.definition.defense + (defender.defenseBuff ?? 0);
+  const atk = effectiveAttack(attacker, heroAttack);
+  let def = effectiveDefense(defender);
 
   // Defensive stance: +30% defense until the stack's own next turn
   if (defender.isDefending) {
@@ -32,7 +49,9 @@ export function modifiedDamage(
     def = Math.floor(def * defenseReductionMult(drLevel));
   }
 
-  let totalDamage = dmgPerCreature * attacker.count;
+  // blood_frenzy's accrued bonus raises the roll itself, so it lands in
+  // damagePreview's tooltip as well as in the hit — both read this function.
+  let totalDamage = (dmgPerCreature + (attacker.damageBonus ?? 0)) * attacker.count;
 
   // Attack/defense modifier: +5% damage per point of attack over defense,
   // −5%-equivalent per point under. Uncapped in both directions.
@@ -129,6 +148,61 @@ export function applyDamage(defender: UnitStack, damage: number): DamageResult {
     killed,
     remaining: { ...defender, count: newCount, hp: newHp },
   };
+}
+
+/** A DamageResult plus the log entries the defender's own reactive abilities
+ *  produced. Callers already build a log array per hit, so they just spread it. */
+export interface StrikeResult extends DamageResult {
+  events: BattleEvent[];
+}
+
+/**
+ * Blood Acolyte blood_frenzy: every wound it survives permanently raises its
+ * min and max damage for the rest of the battle. Fires once per damage
+ * instance, whatever the source — melee, retaliation, shot, splash, burn or
+ * spell — which is why it lives on the shared damage wrappers below rather
+ * than in applyOnHitEffects (that only sees attacks).
+ */
+function frenzy(stack: UnitStack, damage: number): { stack: UnitStack; events: BattleEvent[] } {
+  if (damage <= 0 || stack.count <= 0) return { stack, events: [] };
+  if (!stack.definition.abilities.includes('blood_frenzy')) return { stack, events: [] };
+  const grown = { ...stack, damageBonus: (stack.damageBonus ?? 0) + BLOOD_FRENZY_DAMAGE };
+  return {
+    stack: grown,
+    events: [{ type: 'status', data: { effect: 'blood_frenzy', unitId: grown.id, bonus: grown.damageBonus } }],
+  };
+}
+
+/**
+ * The single entry point for "this stack took damage": applyDamage plus the
+ * defender's on-damaged abilities. applyDamage itself stays a pure HP-pool
+ * function because damagePreview and the animation replay call it too, and
+ * neither may accrue battle state.
+ */
+export function damageStack(defender: UnitStack, damage: number): StrikeResult {
+  const hit = applyDamage(defender, damage);
+  const { stack, events } = frenzy(hit.remaining, damage);
+  return { killed: hit.killed, remaining: stack, events };
+}
+
+/**
+ * A melee hit: damageStack plus the attacker's kill-count abilities.
+ *
+ * Black Knight soul_reaper claims one creature beyond whatever the damage
+ * alone would kill — 140 damage that fells 2 fells 3, and a hit too weak to
+ * kill anything still takes one. The extra creature dies whole, so the next
+ * one steps up at full HP rather than inheriting the leftover damage.
+ */
+export function applyStrike(attacker: UnitStack, defender: UnitStack, damage: number): StrikeResult {
+  const hit = applyDamage(defender, damage);
+  let { killed, remaining } = hit;
+  if (attacker.definition.abilities.includes('soul_reaper') && remaining.count > 0) {
+    const reaped = applyDamage(remaining, remaining.hp);
+    killed += reaped.killed;
+    remaining = reaped.remaining;
+  }
+  const { stack, events } = frenzy(remaining, damage);
+  return { killed, remaining: stack, events };
 }
 
 export interface HealResult {

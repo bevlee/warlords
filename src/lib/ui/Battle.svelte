@@ -24,6 +24,8 @@
     SpellId,
     UnitStack,
   } from '$lib/engine/types';
+  import { UNIT_ABILITIES, activatedAbilitiesOf } from '$lib/engine/unitAbilities';
+  import { abilityInfo } from './abilities';
   import { describeEvent, SPELL_META } from './logLines';
   import BattleGrid from './BattleGrid.svelte';
   import TurnBar from './TurnBar.svelte';
@@ -511,6 +513,24 @@
     takeAction({ type: 'defend' }, 'host');
   }
 
+  // Activated unit abilities (Bone Dragon absorb): one button per ability the
+  // acting stack owns, greyed by the engine's own canUse so the button and the
+  // rule can never disagree.
+  const unitAbilities = $derived.by(() => {
+    if (!activeUnit || activeUnit.isHero) return [];
+    return activatedAbilitiesOf(activeUnit).map(id => ({
+      id,
+      info: abilityInfo(id),
+      enabled: isPlayerTurn && !animating && UNIT_ABILITIES[id].canUse(battle, activeUnit),
+    }));
+  });
+
+  function handleAbility(abilityId: string) {
+    if (!isPlayerTurn || animating) return;
+    pendingSpell = null;
+    takeAction({ type: 'ability', abilityId }, 'host');
+  }
+
   function handleForfeit() {
     if (online || replay) return;
     if (battle.result !== 'ongoing') return;
@@ -786,6 +806,24 @@
           />
           <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-200">Spells</span>
         </button>
+        {#each unitAbilities as ability (ability.id)}
+          <button
+            type="button"
+            class="flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-emerald-500/70
+              bg-emerald-950/90 shadow-lg hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={ability.info.label}
+            title="{ability.info.label} — {ability.info.description}"
+            disabled={!ability.enabled}
+            onclick={() => handleAbility(ability.id)}
+          >
+            <img
+              src={statusIconFor('life_drain')}
+              alt=""
+              class="h-7 w-7 object-contain [image-rendering:pixelated]"
+            />
+            <span class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Absorb</span>
+          </button>
+        {/each}
       </div>
 
       <!-- Settings: cog at the top-left, under the page title. -->

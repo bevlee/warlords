@@ -1,10 +1,18 @@
 import type { BattleAction, BattleState } from './types.ts';
 import { chebyshevDistance } from './grid.ts';
 import { canShootTarget, getMeleeApproaches, getReachableCells, isShootingBlocked } from './selectors.ts';
+import { UNIT_ABILITIES, activatedAbilitiesOf } from './unitAbilities.ts';
 
 export function aiTakeTurn(state: BattleState, unitId: string): BattleAction {
   const unit = state.units.find(u => u.id === unitId);
   if (!unit || unit.count === 0) return { type: 'wait' };
+
+  // Self-repair before fighting, but only once whole creatures have been lost —
+  // otherwise a Bone Dragon grazed for a few HP would spend its turn without doing anything.
+  if (unit.count < unit.startCount) {
+    const healing = activatedAbilitiesOf(unit).find(id => UNIT_ABILITIES[id].canUse(state, unit));
+    if (healing) return { type: 'ability', abilityId: healing };
+  }
 
   const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0 && !u.isHero);
   if (enemies.length === 0) return { type: 'wait' };
