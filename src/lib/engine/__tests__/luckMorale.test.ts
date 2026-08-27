@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { initBattle, applyAction } from '../battle';
 import { stepsFromLogEntry } from '../../ui/animSteps';
 import { statusIconFor } from '../../ui/statusIcons';
-import { WOLF_RIDER, GOBLIN } from '../barbarian';
+import { WOLF_RIDER, GOBLIN, OGRE } from '../barbarian';
 import type { Hero, BattleState } from '../types';
 
 const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 5, defense: 3, statPoints: 0, factionSkills: [] };
@@ -60,5 +60,41 @@ describe('luck + morale reach the fx layer across many battles', () => {
     );
     console.log('ZERO-stat luck/morale icons (expect none):', luckOrMorale.length);
     expect(luckOrMorale).toEqual([]);
+  });
+
+  it('does not grant morale when retaliation kills the acting stack', () => {
+    // Seed 7 makes the first morale roll succeed at morale +3.
+    let state = initBattle(
+      [{ unit: GOBLIN, count: 1 }, { unit: GOBLIN, count: 5 }],
+      [{ unit: OGRE, count: 10 }],
+      hero,
+      7,
+    );
+    const attacker = state.units.find(u => u.side === 'player' && !u.isHero)!;
+    const defender = state.units.find(u => u.side === 'enemy')!;
+    state = {
+      ...state,
+      currentUnitId: attacker.id,
+      log: [],
+      units: state.units.map(u => (u.id === attacker.id ? { ...u, hp: 1, morale: 3 } : u)),
+    };
+
+    const next = applyAction(state, {
+      type: 'attack',
+      targetId: defender.id,
+      moveTo: { col: defender.pos.col - 1, row: defender.pos.row },
+    });
+
+    expect(next.units.find(u => u.id === attacker.id)?.count).toBe(0);
+    expect(next.log).toContainEqual(expect.objectContaining({
+      type: 'retaliate',
+      data: expect.objectContaining({ targetId: attacker.id }),
+    }));
+    expect(next.log).not.toContainEqual(expect.objectContaining({
+      type: 'morale_boost',
+      data: expect.objectContaining({ unitId: attacker.id }),
+    }));
+    expect(next.result).toBe('ongoing');
+    expect(next.currentUnitId).not.toBe(attacker.id);
   });
 });

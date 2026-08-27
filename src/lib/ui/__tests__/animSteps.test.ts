@@ -181,6 +181,17 @@ describe('stepsFromLogEntry: death and status', () => {
     ]);
   });
 
+  it('maps a curse to a visible status effect', () => {
+    const entry: BattleEvent = {
+      type: 'status',
+      data: { effect: 'curse', unitId: 't1', penalty: 5 },
+    };
+
+    expect(stepsFromLogEntry(entry)).toEqual([
+      { unitId: 't1', kind: 'status', icon: statusIconFor('slow') },
+    ]);
+  });
+
   it('maps an unrecognized status effect to no steps rather than throwing', () => {
     const entry: BattleEvent = {
       type: 'status',
@@ -264,6 +275,25 @@ describe('applyLogEntry', () => {
     const next = applyLogEntry(state, entry);
 
     expect(next.units.find(u => u.id === target.id)!.attackBuff).toBe(4);
+    expect(next.units.find(u => u.id === target.id)!.modifierSources).toContainEqual({
+      id: 'bloodlust', label: 'Bloodlust', stats: { attack: 4 }, stacks: 1,
+    });
+  });
+
+  it('applies a curse attack penalty while replaying the status event', () => {
+    const target = makeStack(GOBLIN, { col: 5, row: 5 }, 'enemy', { attackBuff: -5 });
+    const state = makeState([target]);
+    const entry: BattleEvent = {
+      type: 'status',
+      data: { effect: 'curse', unitId: target.id, penalty: 5 },
+    };
+
+    const next = applyLogEntry(state, entry);
+
+    expect(next.units.find(u => u.id === target.id)!.attackBuff).toBe(-10);
+    expect(next.units.find(u => u.id === target.id)!.modifierSources).toContainEqual({
+      id: 'curse_shot', label: 'Lich — Curse Shot', stats: { attack: -5 }, stacks: 1,
+    });
   });
 
   it('relocates the unit and its grid occupancy on a move entry', () => {

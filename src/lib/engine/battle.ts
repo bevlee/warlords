@@ -1,10 +1,10 @@
-import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types.ts';
-import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid.ts';
+import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitModifierSource, UnitModifierStat, UnitStack } from './types.ts';
+import { createGrid, placeUnits, setBlocked, setOccupant } from './grid.ts';
 import { advanceTurn } from './turnOrder.ts';
 import { calculateDamage, applyDamage, applyHeal, applyStrike, damageStack, canRetaliate, checkMorale, type LuckSink } from './combat.ts';
 import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors.ts';
 import { mulberry32, type Rng } from './rng.ts';
-import { abilityLevel, lifestealFraction, INFECT_PENALTY } from './abilityCatalog.ts';
+import { abilityLevel, lifestealFraction, CURSE_SHOT_PENALTY, INFECT_PENALTY } from './abilityCatalog.ts';
 import { canActivate, UNIT_ABILITIES } from './unitAbilities.ts';
 import {
   applyOffenseBonus,
@@ -22,6 +22,7 @@ import {
   maxMana,
 } from './factionSkills.ts';
 import { DEMON_UNITS } from './demon.ts';
+import { addModifierSource } from './unitModifiers.ts';
 
 /** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
  *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon
@@ -39,7 +40,7 @@ function withHeroBonus(
   if (attacker.side === 'player') {
     d = applyOffenseBonus(d, attackerHero);
     if (ranged) d = applyArcheryBonus(d, attackerHero);
-    if (attacker.definition.abilities.includes('area_shot')) d = applyDeathMagicBonus(d, attackerHero);
+    if (attacker.definition.abilities.includes('curse_shot')) d = applyDeathMagicBonus(d, attackerHero);
     if (attacker.definition.abilities.includes('burn')) d = applyFireMagicBonus(d, attackerHero);
   }
   if (defender.side === 'player') d = applyArmorerBonus(d, defenderHero);
@@ -109,11 +110,20 @@ function applyOnHitEffects(
 
   if (v.count > 0 && !v.isHero) {
     if (abilities.includes('slow_on_hit') && rng() < 0.3) {
-      v = { ...v, speedPenalty: (v.speedPenalty ?? 0) + 1 };
+      v = addModifierSource(
+        { ...v, speedPenalty: (v.speedPenalty ?? 0) + 1 },
+        { id: 'slow_on_hit', label: 'Zombie — Slow on Hit', stats: { speed: -1 } },
+      );
       events.push({ type: 'status', data: { effect: 'slow', unitId: v.id } });
     }
     if (abilities.includes('drain_morale')) {
-      v = { ...v, morale: Math.max(-3, v.morale - 1) };
+      const morale = Math.max(-3, v.morale - 1);
+      if (morale < v.morale) {
+        v = addModifierSource(
+          { ...v, morale },
+          { id: 'drain_morale', label: 'Ghost — Drain Morale', stats: { morale: morale - v.morale } },
+        );
+      }
       events.push({ type: 'status', data: { effect: 'drain_morale', unitId: v.id } });
     }
     if (abilities.includes('blind_on_hit') && rng() < 0.2) {
@@ -133,11 +143,18 @@ function applyOnHitEffects(
     // 5 attack and 5 defense off the victim for the rest of the battle.
     // modifiedDamage floors both at 0.
     if (abilities.includes('infecting_strike')) {
-      v = {
-        ...v,
-        attackBuff: (v.attackBuff ?? 0) - INFECT_PENALTY,
-        defenseBuff: (v.defenseBuff ?? 0) - INFECT_PENALTY,
-      };
+      v = addModifierSource(
+        {
+          ...v,
+          attackBuff: (v.attackBuff ?? 0) - INFECT_PENALTY,
+          defenseBuff: (v.defenseBuff ?? 0) - INFECT_PENALTY,
+        },
+        {
+          id: 'infecting_strike',
+          label: 'Zombie — Infecting Strike',
+          stats: { attack: -INFECT_PENALTY, defense: -INFECT_PENALTY },
+        },
+      );
       events.push({ type: 'status', data: { effect: 'infect', unitId: v.id, penalty: INFECT_PENALTY } });
     }
   }
@@ -174,6 +191,7 @@ const GRID_H = 10;
 export interface BattleInitOptions {
   controllers?: { player: string; ally: string; enemy: string };
   allyHero?: Hero;
+  modifierSources?: UnitModifierSource[];
 }
 
 export function heroFor(state: BattleState, unit: UnitStack): Hero {
@@ -214,13 +232,20 @@ function slotToStack(
   slot: ArmySlot,
   side: 'player' | 'enemy',
   index: number,
+  armySize: number,
   id: string,
   colShift = 0,
   controllerId?: string
 ): UnitStack {
   const col = side === 'player' ? 1 + colShift : GRID_W - 2;
-  const row = 1 + index * Math.floor((GRID_H - 2) / 6);
-  return {
+  // Keep the traditional inner-row lineup for up to eight stacks. Larger
+  // armies use every board row, evenly and uniquely, so ten stacks never
+  // overlap or spawn beyond the 10-row grid.
+  const row = armySize <= GRID_H - 2
+    ? 1 + index
+    : Math.round(index * (GRID_H - 1) / Math.max(1, armySize - 1));
+  const bravery = abilityLevel(slot.unit, 'bravery');
+  let stack: UnitStack = {
     id,
     definition: slot.unit,
     count: slot.count,
@@ -231,12 +256,16 @@ function slotToStack(
     hasRetaliated: false,
     shotsLeft: slot.unit.shots,
     // Bravery: the unit carries its own morale into battle, either side; +level.
-    morale: clampProc(abilityLevel(slot.unit, 'bravery')),
+    morale: clampProc(bravery),
     luck: 0,
     atb: 0,
     isDefending: false,
     ...(controllerId ? { controllerId } : {}),
   };
+  if (bravery > 0) {
+    stack = addModifierSource(stack, { id: 'bravery', label: 'Bravery', stats: { morale: bravery } });
+  }
+  return stack;
 }
 
 const clampProc = (v: number) => Math.max(-3, Math.min(3, v));
@@ -259,10 +288,25 @@ export function initBattle(
   const logisticsBonus = getLogisticsBonus(hero);
   const luckBonus = getNatureLuckBonus(hero);
   const playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
-    let stack = slotToStack(slot, 'player', i, allocateId(), tacticsShift, options.controllers?.player);
-    if (moraleBonus > 0) stack = { ...stack, morale: stack.morale + moraleBonus };
-    if (logisticsBonus > 0) stack = { ...stack, speedBonus: logisticsBonus };
-    if (luckBonus > 0) stack = { ...stack, luck: stack.luck + luckBonus };
+    let stack = slotToStack(slot, 'player', i, playerArmy.length, allocateId(), tacticsShift, options.controllers?.player);
+    if (moraleBonus > 0) {
+      stack = addModifierSource(
+        { ...stack, morale: stack.morale + moraleBonus },
+        { id: 'leadership', label: 'Leadership', stats: { morale: moraleBonus } },
+      );
+    }
+    if (logisticsBonus > 0) {
+      stack = addModifierSource(
+        { ...stack, speedBonus: logisticsBonus },
+        { id: 'logistics', label: 'Logistics', stats: { speed: logisticsBonus } },
+      );
+    }
+    if (luckBonus > 0) {
+      stack = addModifierSource(
+        { ...stack, luck: stack.luck + luckBonus },
+        { id: 'natures_luck', label: 'Nature’s Luck', stats: { luck: luckBonus } },
+      );
+    }
     if (armyBonuses) {
       stack = {
         ...stack,
@@ -273,27 +317,65 @@ export function initBattle(
         morale: clampProc(stack.morale + armyBonuses.morale),
         luck: clampProc(stack.luck + armyBonuses.luck),
       };
+      const configuredSources = options.modifierSources ?? [];
+      if (configuredSources.length > 0) {
+        stack = { ...stack, modifierSources: [...(stack.modifierSources ?? []), ...configuredSources] };
+        const sourceTotals = configuredSources.reduce<Partial<Record<UnitModifierStat, number>>>((totals, source) => {
+          for (const [stat, value] of Object.entries(source.stats)) {
+            totals[stat as UnitModifierStat] = (totals[stat as UnitModifierStat] ?? 0) + value;
+          }
+          return totals;
+        }, {});
+        const residual = Object.fromEntries(
+          Object.entries(armyBonuses)
+            .map(([stat, value]) => [stat, value - (sourceTotals[stat as UnitModifierStat] ?? 0)])
+            .filter(([, value]) => value !== 0)
+        );
+        if (Object.keys(residual).length > 0) {
+          stack = addModifierSource(stack, { id: 'other_army_bonuses', label: 'Other army bonuses', stats: residual });
+        }
+      } else {
+        const stats = Object.fromEntries(Object.entries(armyBonuses).filter(([, value]) => value !== 0));
+        if (Object.keys(stats).length > 0) {
+          stack = addModifierSource(stack, { id: 'army_bonuses', label: 'Army bonuses', stats });
+        }
+      }
     }
     return stack;
   });
   const enemyUnits: UnitStack[] = enemyArmy.map((slot, i) =>
-    slotToStack(slot, 'enemy', i, allocateId(), 0, options.controllers?.enemy)
+    slotToStack(slot, 'enemy', i, enemyArmy.length, allocateId(), 0, options.controllers?.enemy)
   );
   // Summoned ally: player-side but AI-driven, fielded one column behind the
   // player line. Hero skill bonuses (morale/logistics/luck/gating) deliberately
   // don't apply — the ally fights under its own banner.
   const allyUnits: UnitStack[] = allyArmy.map((slot, i) => {
     let stack: UnitStack = {
-      ...slotToStack(slot, 'player', i, allocateId(), -1, options.controllers?.ally),
+      ...slotToStack(slot, 'player', i, allyArmy.length, allocateId(), -1, options.controllers?.ally),
       isAlly: true,
     };
     if (options.allyHero) {
       const allyMorale = getMoraleBonus(options.allyHero);
       const allyLogistics = getLogisticsBonus(options.allyHero);
       const allyLuck = getNatureLuckBonus(options.allyHero);
-      if (allyMorale > 0) stack = { ...stack, morale: stack.morale + allyMorale };
-      if (allyLogistics > 0) stack = { ...stack, speedBonus: allyLogistics };
-      if (allyLuck > 0) stack = { ...stack, luck: stack.luck + allyLuck };
+      if (allyMorale > 0) {
+        stack = addModifierSource(
+          { ...stack, morale: stack.morale + allyMorale },
+          { id: 'leadership', label: 'Leadership', stats: { morale: allyMorale } },
+        );
+      }
+      if (allyLogistics > 0) {
+        stack = addModifierSource(
+          { ...stack, speedBonus: allyLogistics },
+          { id: 'logistics', label: 'Logistics', stats: { speed: allyLogistics } },
+        );
+      }
+      if (allyLuck > 0) {
+        stack = addModifierSource(
+          { ...stack, luck: stack.luck + allyLuck },
+          { id: 'natures_luck', label: 'Nature’s Luck', stats: { luck: allyLuck } },
+        );
+      }
     }
     return stack;
   });
@@ -390,7 +472,7 @@ export function initBattle(
 export const DEPLOY_COLS = 3;
 
 /** Max on-field player stacks; splitting is refused past this (HoMM-style). */
-export const MAX_FIELD_STACKS = 7;
+export const MAX_FIELD_STACKS = 10;
 
 /** A cell is deployable if it's in the left zone (widened forward by Tactics)
  *  and on the board. Occupancy/obstacles are checked separately by the ops. */
@@ -473,9 +555,12 @@ export function splitStack(state: BattleState, unitId: string, amount: number, t
     isDefending: false,
     ...(unit.isAlly ? { isAlly: true } : {}),
     ...(unit.controllerId ? { controllerId: unit.controllerId } : {}),
+    ...(unit.modifierSources ? { modifierSources: unit.modifierSources.map(source => ({ ...source, stats: { ...source.stats } })) } : {}),
     ...(unit.attackBuff !== undefined ? { attackBuff: unit.attackBuff } : {}),
     ...(unit.defenseBuff !== undefined ? { defenseBuff: unit.defenseBuff } : {}),
+    ...(unit.damageBonus !== undefined ? { damageBonus: unit.damageBonus } : {}),
     ...(unit.initiativeBonus !== undefined ? { initiativeBonus: unit.initiativeBonus } : {}),
+    ...(unit.speedBonus !== undefined ? { speedBonus: unit.speedBonus } : {}),
   };
   const units = state.units
     .map(u => (u.id === unitId ? { ...u, count: u.count - amount, startCount: u.startCount - amount } : u))
@@ -623,8 +708,14 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     } else {
       const buffed =
         action.spell === 'bloodlust'
-          ? { ...target, attackBuff: (target.attackBuff ?? 0) + 4 }
-          : { ...target, defenseBuff: (target.defenseBuff ?? 0) + 4 };
+          ? addModifierSource(
+              { ...target, attackBuff: (target.attackBuff ?? 0) + 4 },
+              { id: 'bloodlust', label: 'Bloodlust', stats: { attack: 4 } },
+            )
+          : addModifierSource(
+              { ...target, defenseBuff: (target.defenseBuff ?? 0) + 4 },
+              { id: 'stoneskin', label: 'Stoneskin', stats: { defense: 4 } },
+            );
       nextState = { ...nextState, units: nextState.units.map((u, i) => (i === targetIdx ? buffed : u)) };
       nextState.log = [...nextState.log, { type: 'cast', data: { spell: action.spell, casterId: actorId, targetId: target.id } }];
     }
@@ -758,11 +849,9 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     // LordsWM far-shot rule: beyond the shooter's range the shot deals half damage.
     const farShot = isBeyondRange(actor, target);
     let currentTarget = target;
-    let firstShotDamage = 0;
     for (let shot = 0; shot < shotCount && currentTarget.count > 0; shot++) {
       const { damage: fullDamage, luckEvents } = rollHit(nextState, actor, currentTarget, rng, actorHero.attack, true);
       const shotDamage = farShot ? Math.max(1, Math.round(fullDamage / 2)) : fullDamage;
-      if (shot === 0) firstShotDamage = shotDamage;
       const { killed, remaining, events: shotEvents } = damageStack(currentTarget, shotDamage);
       currentTarget = remaining;
       nextState.log = [...nextState.log, ...luckEvents, { type: 'shoot', data: { attackerId: actorId, targetId, damage: shotDamage, killed, ...(farShot ? { farShot: true } : {}) } }, ...shotEvents];
@@ -781,28 +870,32 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       nextState = handleDeath(nextState, currentTarget, rng);
     }
 
-    // Lich area_shot: 50% splash damage to enemy stacks adjacent to the target.
-    if (actor.definition.abilities.includes('area_shot')) {
-      const splashDamage = Math.max(1, Math.round(firstShotDamage * 0.5));
-      const splashTargets = nextState.units.filter(
-        u => u.id !== targetId && u.count > 0 && !u.isHero && u.side !== actor.side
-          && chebyshevDistance(u.pos, target.pos) === 1
+    // Lich curse shot: every surviving target permanently loses another 5
+    // attack. The penalty compounds with repeated shots and other modifiers.
+    if (actor.definition.abilities.includes('curse_shot') && currentTarget.count > 0) {
+      currentTarget = addModifierSource(
+        {
+          ...currentTarget,
+          attackBuff: (currentTarget.attackBuff ?? 0) - CURSE_SHOT_PENALTY,
+        },
+        { id: 'curse_shot', label: 'Lich — Curse Shot', stats: { attack: -CURSE_SHOT_PENALTY } },
       );
-      for (const victim of splashTargets) {
-        const idx = nextState.units.findIndex(u => u.id === victim.id);
-        const { killed: splashKilled, remaining: splashRemaining, events: splashEvents } =
-          damageStack(nextState.units[idx], splashDamage);
-        nextState = { ...nextState, units: nextState.units.map((u, i) => (i === idx ? splashRemaining : u)) };
-        nextState.log = [...nextState.log, { type: 'shoot', data: { attackerId: actorId, targetId: victim.id, damage: splashDamage, killed: splashKilled, splash: true } }, ...splashEvents];
-        if (splashRemaining.count === 0) {
-          nextState = handleDeath(nextState, splashRemaining, rng);
-        }
-      }
+      nextState = {
+        ...nextState,
+        units: nextState.units.map(u => (u.id === targetId ? currentTarget : u)),
+        log: [
+          ...nextState.log,
+          { type: 'status', data: { effect: 'curse', unitId: targetId, penalty: CURSE_SHOT_PENALTY } },
+        ],
+      };
     }
   }
 
-  // Morale boost = extra turn (don't advance)
-  if (moraleResult === 'boost') {
+  // Morale boost = extra turn (don't advance). The roll happens before the
+  // action, but retaliation and other action effects may kill the acting
+  // stack; a dead stack cannot receive or log an extra turn.
+  const actorSurvived = nextState.units.some(u => u.id === actorId && u.count > 0);
+  if (moraleResult === 'boost' && actorSurvived) {
     nextState.log = [...nextState.log, { type: 'morale_boost', data: { unitId: actorId } }];
     return nextState;
   }

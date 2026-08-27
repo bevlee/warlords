@@ -1,6 +1,6 @@
 import type { ArmySlot, FactionClass, Hero } from '../engine/types';
 import { FACTION_UNITS, FACTION_INFO } from '../engine/factions';
-import { UNIT_COSTS } from '../engine/recruit';
+import { MAX_STACKS, UNIT_COSTS } from '../engine/recruit';
 import { updateFactionSkills } from '../engine/factionSkills';
 import { mixSeed, mulberry32, type Rng } from '../engine/rng';
 import { itemDraftOptions, type ItemId } from './items';
@@ -11,7 +11,6 @@ export { mixSeed };
 
 export const RUN_LENGTH = 10;
 export const BOSS_NODES = new Set([3, 7, 10]);
-const MAX_STACKS = 6;
 
 export interface UnitCard {
   unitName: string;
@@ -139,16 +138,32 @@ export function draftOptions(run: RunState): UnitCard[] {
   const power = node <= 3 ? 60 : node <= 7 ? 110 : 170;
   const atCap = run.army.length >= MAX_STACKS;
   const ownNames = new Set(run.army.map(s => s.unit.name));
+  // Round 9 is the tier-7 graduation draft: always reserve one card for the
+  // faction's capstone unit (Bone Dragon for Necromancer). This exception also
+  // bypasses the normal full-army filter so filling every slot earlier cannot
+  // permanently lock the capstone out of the run.
+  const guaranteed = node === 9
+    ? FACTION_UNITS[run.faction].find(u => u.tier === 7)
+    : undefined;
 
   let pool = FACTION_UNITS[run.faction].filter(u => u.tier >= 1 && u.tier <= maxTier);
   if (atCap) {
     const owned = pool.filter(u => ownNames.has(u.name));
-    if (owned.length >= 1) pool = owned;
+    if (owned.length >= 1) {
+      pool = guaranteed && !ownNames.has(guaranteed.name) ? [...owned, guaranteed] : owned;
+    }
   }
 
   const rng = mulberry32(mixSeed(run.seed, run.encounterIndex * 449 + run.battlesWon));
   const cards: UnitCard[] = [];
   const used = new Set<string>();
+  if (guaranteed) {
+    cards.push({
+      unitName: guaranteed.name,
+      count: Math.max(1, Math.round(power / UNIT_COSTS[guaranteed.name])),
+    });
+    used.add(guaranteed.name);
+  }
   for (let guard = 0; cards.length < Math.min(3, pool.length) && guard < 50; guard++) {
     const unit = pool[Math.floor(rng() * pool.length)];
     if (used.has(unit.name)) continue;

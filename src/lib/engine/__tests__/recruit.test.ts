@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { UNIT_COSTS, armyCost, generateEnemyArmy, mergeArmySlots, recruitLimit, DEFAULT_BUDGET } from '../recruit';
+import { UNIT_COSTS, armyCost, generateEnemyArmy, mergeArmySlots, recruitLimit, DEFAULT_BUDGET, MAX_STACKS } from '../recruit';
 import { BARBARIAN_UNITS, GOBLIN, OGRE } from '../barbarian';
 import { mulberry32 } from '../rng';
 
@@ -29,7 +29,7 @@ describe('recruiting', () => {
     expect(cost).toBe(10 * UNIT_COSTS.Goblin + 2 * UNIT_COSTS.Ogre);
   });
 
-  it('generateEnemyArmy stays within budget, spends most of it, fields 1–6 stacks', () => {
+  it('generateEnemyArmy stays within budget, spends most of it, and respects the stack cap', () => {
     for (const seed of [1, 7, 42, 999]) {
       const army = generateEnemyArmy(DEFAULT_BUDGET, mulberry32(seed));
       const cost = armyCost(army);
@@ -37,7 +37,7 @@ describe('recruiting', () => {
       expect(cost).toBeLessThanOrEqual(DEFAULT_BUDGET);
       expect(cost).toBeGreaterThanOrEqual(DEFAULT_BUDGET * 0.7);
       expect(army.length).toBeGreaterThanOrEqual(1);
-      expect(army.length).toBeLessThanOrEqual(6);
+      expect(army.length).toBeLessThanOrEqual(MAX_STACKS);
       for (const slot of army) expect(slot.count).toBeGreaterThan(0);
     }
   });

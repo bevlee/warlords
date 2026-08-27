@@ -56,6 +56,12 @@ describe('Zombie infecting strike', () => {
     const hit = next.units.find(u => u.id === defender.id)!;
     expect(hit.attackBuff).toBe(-INFECT_PENALTY);
     expect(hit.defenseBuff).toBe(-INFECT_PENALTY);
+    expect(hit.modifierSources).toContainEqual({
+      id: 'infecting_strike',
+      label: 'Zombie — Infecting Strike',
+      stats: { attack: -INFECT_PENALTY, defense: -INFECT_PENALTY },
+      stacks: 1,
+    });
     expect(attacker.definition.abilities).toContain('infecting_strike');
   });
 

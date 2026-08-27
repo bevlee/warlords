@@ -44,4 +44,5 @@ export const defenseReductionMult = (level: number) => 1 - 0.05 * level; // −5
 /** Unique-ability magnitudes. Same rationale as the formulas above: one place
  *  to tune, so combat/battle code reads the name rather than a bare number. */
 export const INFECT_PENALTY = 5;      // Zombie infecting_strike: −5 attack and defense per hit
+export const CURSE_SHOT_PENALTY = 5;  // Lich curse_shot: −5 attack per shot
 export const BLOOD_FRENZY_DAMAGE = 2; // Blood Acolyte blood_frenzy: +2 min/max damage per wound

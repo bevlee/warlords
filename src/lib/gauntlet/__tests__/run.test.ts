@@ -91,6 +91,31 @@ describe('gauntlet run', () => {
     }
   });
 
+  it('guarantees the faction tier-7 unit in the round-9 draft even at the stack cap', () => {
+    const roster = FACTION_UNITS.necromancer;
+    const nonCapstones = roster.filter(unit => unit.tier < 7);
+    const fullArmy = Array.from({ length: 10 }, (_, index) => ({
+      unit: nonCapstones[index % nonCapstones.length],
+      count: 1,
+    }));
+
+    for (let seed = 1; seed <= 20; seed++) {
+      const base = newRun('necromancer', seed);
+      const run = {
+        ...base,
+        encounterIndex: 9,
+        battlesWon: 8,
+        hero: { ...base.hero, level: 9 },
+        army: fullArmy,
+      };
+      const cards = draftOptions(run);
+
+      expect(cards).toHaveLength(3);
+      expect(cards[0]).toEqual({ unitName: 'Bone Dragon', count: 1 });
+      expect(new Set(cards.map(card => card.unitName)).size).toBe(3);
+    }
+  });
+
   it('applyPick stacks duplicate unit types', () => {
     let run = newRun('barbarian', 3);
     const existing = run.army[0];

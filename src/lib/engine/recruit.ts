@@ -60,7 +60,7 @@ export const UNIT_COSTS: Record<string, number> = {
 };
 
 export const DEFAULT_BUDGET = 300;
-export const MAX_STACKS = 6;
+export const MAX_STACKS = 10;
 
 export function armyCost(slots: ArmySlot[]): number {
   return slots.reduce((sum, s) => sum + s.count * (UNIT_COSTS[s.unit.name] ?? 0), 0);

@@ -2,6 +2,7 @@ import type { BattleEvent, UnitStack, Hero } from './types.ts';
 import { abilityLevel, defenseReductionMult, BLOOD_FRENZY_DAMAGE } from './abilityCatalog.ts';
 import type { Rng } from './rng.ts';
 import { chebyshevDistance } from './grid.ts';
+import { addModifierSource } from './unitModifiers.ts';
 
 /**
  * A stack's attack and defense as the damage formula sees them: base, plus the
@@ -166,7 +167,10 @@ export interface StrikeResult extends DamageResult {
 function frenzy(stack: UnitStack, damage: number): { stack: UnitStack; events: BattleEvent[] } {
   if (damage <= 0 || stack.count <= 0) return { stack, events: [] };
   if (!stack.definition.abilities.includes('blood_frenzy')) return { stack, events: [] };
-  const grown = { ...stack, damageBonus: (stack.damageBonus ?? 0) + BLOOD_FRENZY_DAMAGE };
+  const grown = addModifierSource(
+    { ...stack, damageBonus: (stack.damageBonus ?? 0) + BLOOD_FRENZY_DAMAGE },
+    { id: 'blood_frenzy', label: 'Blood Frenzy', stats: { damage: BLOOD_FRENZY_DAMAGE } },
+  );
   return {
     stack: grown,
     events: [{ type: 'status', data: { effect: 'blood_frenzy', unitId: grown.id, bonus: grown.damageBonus } }],

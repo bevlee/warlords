@@ -34,9 +34,9 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
     label: 'Double shot',
     description: 'Fires twice per shooting attack, consuming two shots.',
   },
-  area_shot: {
-    label: 'Area shot',
-    description: 'Splash damage: nearby enemy stacks take partial damage too.',
+  curse_shot: {
+    label: 'Curse shot',
+    description: 'Every shot curses its target for −5 attack for the rest of the battle, stacking.',
   },
   life_drain: {
     label: 'Life drain',
