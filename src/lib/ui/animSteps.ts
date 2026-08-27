@@ -3,6 +3,7 @@ import { applyDamage, applyStrike } from '$lib/engine/combat';
 import { BLOOD_FRENZY_DAMAGE } from '$lib/engine/abilityCatalog';
 import { setOccupant } from '$lib/engine/grid';
 import { statusIconFor } from './statusIcons';
+import { addModifierSource, setModifierSource } from '$lib/engine/unitModifiers';
 
 const STATUS_ICON: Partial<Record<string, string>> = {
   burn_apply: statusIconFor('burn'),
@@ -18,6 +19,7 @@ const STATUS_ICON: Partial<Record<string, string>> = {
   // animating silently: infection weakens like a slow, frenzy is an attack
   // buff, and absorbing bones reads as the drain it is.
   infect: statusIconFor('slow'),
+  curse: statusIconFor('slow'),
   blood_frenzy: statusIconFor('bloodlust'),
   absorb: statusIconFor('life_drain'),
   absorbed: statusIconFor('life_drain'),
@@ -198,8 +200,55 @@ export function applyLogEntry(state: BattleState, entry: BattleEvent): BattleSta
         spell: 'lightning' | 'bloodlust' | 'stoneskin';
       };
       if (damage !== undefined) return patchUnit(targetId, u => applyDamage(u, damage).remaining);
-      if (spell === 'bloodlust') return patchUnit(targetId, u => ({ ...u, attackBuff: (u.attackBuff ?? 0) + 4 }));
-      if (spell === 'stoneskin') return patchUnit(targetId, u => ({ ...u, defenseBuff: (u.defenseBuff ?? 0) + 4 }));
+      if (spell === 'bloodlust') {
+        return patchUnit(targetId, u => addModifierSource(
+          { ...u, attackBuff: (u.attackBuff ?? 0) + 4 },
+          { id: 'bloodlust', label: 'Bloodlust', stats: { attack: 4 } },
+        ));
+      }
+      if (spell === 'stoneskin') {
+        return patchUnit(targetId, u => addModifierSource(
+          { ...u, defenseBuff: (u.defenseBuff ?? 0) + 4 },
+          { id: 'stoneskin', label: 'Stoneskin', stats: { defense: 4 } },
+        ));
+      }
+      return state;
+    }
+    case 'status': {
+      const { unitId, effect } = entry.data as { unitId: string; effect: string };
+      if (effect === 'curse') {
+        const penalty = Number(entry.data.penalty) || 0;
+        return patchUnit(unitId, u => addModifierSource(
+          { ...u, attackBuff: (u.attackBuff ?? 0) - penalty },
+          { id: 'curse_shot', label: 'Lich — Curse Shot', stats: { attack: -penalty } },
+        ));
+      }
+      if (effect === 'infect') {
+        const penalty = Number(entry.data.penalty) || 0;
+        return patchUnit(unitId, u => addModifierSource(
+          {
+            ...u,
+            attackBuff: (u.attackBuff ?? 0) - penalty,
+            defenseBuff: (u.defenseBuff ?? 0) - penalty,
+          },
+          { id: 'infecting_strike', label: 'Zombie — Infecting Strike', stats: { attack: -penalty, defense: -penalty } },
+        ));
+      }
+      if (effect === 'blood_frenzy') {
+        const bonus = Number(entry.data.bonus) || 0;
+        return patchUnit(unitId, u => {
+          if ((u.damageBonus ?? 0) >= bonus) return u;
+          return setModifierSource(
+            { ...u, damageBonus: bonus },
+            {
+              id: 'blood_frenzy',
+              label: 'Blood Frenzy',
+              stats: { damage: bonus },
+              stacks: Math.max(1, Math.round(bonus / BLOOD_FRENZY_DAMAGE)),
+            },
+          );
+        });
+      }
       return state;
     }
     default:

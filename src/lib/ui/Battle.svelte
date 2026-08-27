@@ -34,7 +34,7 @@
   import TurnBar from './TurnBar.svelte';
   import UnitInfo from './UnitInfo.svelte';
   import ArtifactStrip from './ArtifactStrip.svelte';
-  import type { ItemId } from '$lib/gauntlet/items';
+  import { ITEMS, type ItemId } from '$lib/gauntlet/items';
   import Sprite from './Sprite.svelte';
   import { heroSpriteName, unitSlug } from './sprites';
   import { recordSeen } from '$lib/compendium/discovery';
@@ -108,7 +108,16 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  let battle: BattleState = $state(initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses));
+  const modifierSources = items.map(id => ({
+    id: `item:${id}`,
+    label: ITEMS[id].name,
+    stats: { ...ITEMS[id].effects },
+    stacks: 1,
+  }));
+  // svelte-ignore state_referenced_locally
+  let battle: BattleState = $state(
+    initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, { modifierSources })
+  );
   // The pristine deploy layout, for the Reset button. Deploy ops are pure
   // (they return new states), so this reference stays untouched. Restart
   // refreshes it.
@@ -829,7 +838,7 @@
     pendingSpell = null;
     resultAnnounced = false;
     recorder = null;
-    battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
+    battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, { modifierSources });
     deployBaseline = battle; // restart re-enters deploy with a fresh layout
     originalDeployBaseline = structuredClone($state.snapshot(battle) as BattleState);
     deploymentDebugNotes = [];

@@ -31,7 +31,7 @@ export const NECROMANCER_UNITS: UnitDef[] = [
   {
     name: 'Lich', tier: 5, speed: 6, initiative: 9, hp: 65,
     attack: 13, defense: 10, minDamage: 11, maxDamage: 15,
-    shots: 6, range: 10, isLarge: false, abilities: ['undead', 'area_shot'],
+    shots: 6, range: 10, isLarge: false, abilities: ['undead', 'curse_shot'],
   },
   {
     name: 'Black Knight', tier: 6, speed: 6, initiative: 9, hp: 120,

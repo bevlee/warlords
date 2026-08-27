@@ -1,4 +1,5 @@
 import type { BattleState, UnitStack } from './types.ts';
+import { removeModifierSource } from './unitModifiers.ts';
 
 /** ATB fill rate in scale-units per round; initiative 10 = one turn per round.
  *  Floored at 1 so a stacked penalty can never freeze a unit entirely. */
@@ -56,11 +57,11 @@ export function advanceTurn(state: BattleState): BattleState {
     log = [...log, { type: 'round_start', data: { round } }];
     // Knight jousting only counts movement made within the same charge.
     // Zombie slow_on_hit's speed penalty lasts until the round ends.
-    finalUnits = units.map(u =>
-      u.lastMovedFrom || u.speedPenalty !== undefined
-        ? { ...u, lastMovedFrom: undefined, speedPenalty: undefined }
-        : u
-    );
+    finalUnits = units.map(u => {
+      if (!u.lastMovedFrom && u.speedPenalty === undefined) return u;
+      const cleared = { ...u, lastMovedFrom: undefined, speedPenalty: undefined };
+      return u.speedPenalty !== undefined ? removeModifierSource(cleared, 'slow_on_hit') : cleared;
+    });
   }
 
   return { ...state, units: finalUnits, battleTime, round, log, currentUnitId: actor.id };

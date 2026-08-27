@@ -111,6 +111,8 @@ export function describeEvent(
         case 'slow': return line(u, t(' are slowed.'));
         case 'infect':
           return line(u, t(' fester — '), num(`−${d.penalty}`), t(' attack and defense.'));
+        case 'curse':
+          return line(u, t(' are cursed — '), num(`−${d.penalty}`), t(' attack.'));
         case 'blood_frenzy':
           return line(u, t(' feed on their own wounds — damage up to +'), num(d.bonus), t('.'));
         case 'absorbed': {

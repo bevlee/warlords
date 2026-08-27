@@ -22,6 +22,25 @@ export interface UnitDef {
   abilityLevels?: Record<string, number>;
 }
 
+export type UnitModifierStat =
+  | 'attack'
+  | 'defense'
+  | 'damage'
+  | 'initiative'
+  | 'speed'
+  | 'morale'
+  | 'luck';
+
+/** One named cause behind a stack's active numeric modifiers. The combat
+ * fields below remain the calculation fast-path; this ledger makes their
+ * sources independently visible instead of collapsing everything to a total. */
+export interface UnitModifierSource {
+  id: string;
+  label: string;
+  stats: Partial<Record<UnitModifierStat, number>>;
+  stacks: number;
+}
+
 export interface UnitStack {
   id: string;
   definition: UnitDef;
@@ -43,6 +62,7 @@ export interface UnitStack {
   isHero?: boolean;    // hero combatant: off-grid, untargetable, no retaliation vs it
   isAlly?: boolean;    // summoned ally stack: fights on the player side, AI-controlled
   controllerId?: string; // authoritative owner in co-op; absent uses legacy side/isAlly derivation
+  modifierSources?: UnitModifierSource[]; // named causes for the active numeric modifiers below
   attackBuff?: number;  // battle-long attack modifier (spells add, Zombie infecting_strike subtracts)
   defenseBuff?: number; // battle-long defense modifier (spells add, Zombie infecting_strike subtracts)
   damageBonus?: number; // battle-long flat bonus to min and max damage (Blood Acolyte blood_frenzy)

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { initBattle, applyAction } from '../battle';
 import { calculateDamage } from '../combat';
 import { effectiveSpeed } from '../selectors';
-import { setOccupant } from '../grid';
 import { updateFactionSkills } from '../factionSkills';
+import { CURSE_SHOT_PENALTY } from '../abilityCatalog';
 import { GOBLIN } from '../barbarian';
 import { ZOMBIE, GHOST, VAMPIRE, BLACK_KNIGHT, LICH } from '../necromancer';
 import { DENDROID, UNICORN, GRAND_ELF } from '../ranger';
@@ -219,8 +219,8 @@ describe('Grand Elf double_shot', () => {
   });
 });
 
-describe('Lich area_shot', () => {
-  it('splashes 50% damage to enemy stacks adjacent to the target', () => {
+describe('Lich curse_shot', () => {
+  it('reduces only the target attack by 5 with every shot', () => {
     const hero = baseHero();
     let state = initBattle(
       [{ unit: LICH, count: 3 }],
@@ -229,20 +229,21 @@ describe('Lich area_shot', () => {
       6
     );
     const lich = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const enemies = state.units.filter(u => u.side === 'enemy');
-    const [primary, splashTarget] = enemies;
-    const adjacentPos = { col: primary.pos.col, row: primary.pos.row + 1 };
-    state = {
-      ...state,
-      units: state.units.map(u => (u.id === splashTarget.id ? { ...u, pos: adjacentPos } : u)),
-      grid: setOccupant(setOccupant(state.grid, splashTarget.pos, null), adjacentPos, splashTarget.id),
-    };
+    const [target, otherEnemy] = state.units.filter(u => u.side === 'enemy');
 
-    const next = applyAction({ ...state, currentUnitId: lich.id }, { type: 'shoot', targetId: primary.id });
-    const splashEvent = next.log.find(e => e.type === 'shoot' && e.data.splash === true);
-    expect(splashEvent).toBeDefined();
-    const splashed = next.units.find(u => u.id === splashTarget.id)!;
-    expect(splashed.count < splashTarget.count || splashed.hp < splashTarget.hp).toBe(true);
+    state = applyAction({ ...state, currentUnitId: lich.id }, { type: 'shoot', targetId: target.id });
+    expect(state.units.find(u => u.id === target.id)!.attackBuff).toBe(-CURSE_SHOT_PENALTY);
+    expect(state.units.find(u => u.id === otherEnemy.id)!.attackBuff).toBeUndefined();
+
+    state = applyAction({ ...state, currentUnitId: lich.id }, { type: 'shoot', targetId: target.id });
+    expect(state.units.find(u => u.id === target.id)!.attackBuff).toBe(-2 * CURSE_SHOT_PENALTY);
+    expect(state.units.find(u => u.id === target.id)!.modifierSources).toContainEqual({
+      id: 'curse_shot',
+      label: 'Lich — Curse Shot',
+      stats: { attack: -2 * CURSE_SHOT_PENALTY },
+      stacks: 2,
+    });
+    expect(state.log.filter(e => e.type === 'status' && e.data.effect === 'curse')).toHaveLength(2);
   });
 });
 

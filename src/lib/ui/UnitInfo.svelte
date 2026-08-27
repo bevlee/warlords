@@ -2,6 +2,7 @@
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import { effectiveAttack, effectiveDefense } from '$lib/engine/combat';
+  import { effectiveSpeed } from '$lib/engine/selectors';
   import { abilityInfo } from './abilities';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { skillIconFor, skillGlyph } from './skillIcons';
@@ -9,6 +10,7 @@
   import { unitSlug } from './sprites';
   import { entryHref } from '$lib/compendium/entries';
   import Sprite from './Sprite.svelte';
+  import { activeEffects } from './unitEffects';
 
   interface Props {
     unit: UnitStack | null;
@@ -68,7 +70,6 @@
   interface Stat {
     key: StatKey;
     value: string;
-    buff?: number;
   }
 
   const stats = $derived.by((): Stat[] => {
@@ -86,30 +87,34 @@
         { key: 'xp', value: `${hero.xp}` },
       ];
     }
-    // The hero's attack is added to every player stack in the damage formula,
-    // so fold it into the unit's shown attack — it's their real base. Spell
-    // buffs stay separate as the green (+N).
+    // Every row is the final effective value used by combat. The named source
+    // breakdown lives exclusively in Active effects below, avoiding a second
+    // partial modifier display beside these totals.
     const heroAttack = !unit.isHero && unit.side === 'player' && hero ? hero.attack : 0;
     return [
       { key: 'count', value: `${unit.count} / ${unit.startCount}` },
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
       // Straight from the damage formula's own helpers, so an infected stack
       // shown at 0 attack is exactly what it fights at.
-      { key: 'attack', value: `${effectiveAttack(unit, heroAttack)}`, buff: unit.attackBuff ?? 0 },
-      { key: 'defense', value: `${effectiveDefense(unit)}`, buff: unit.defenseBuff ?? 0 },
+      { key: 'attack', value: `${effectiveAttack(unit, heroAttack)}` },
+      { key: 'defense', value: `${effectiveDefense(unit)}` },
       {
         key: 'damage',
         value: `${d.minDamage + (unit.damageBonus ?? 0)}–${d.maxDamage + (unit.damageBonus ?? 0)}`,
-        buff: unit.damageBonus ?? 0,
       },
-      { key: 'speed', value: `${d.speed}` },
-      { key: 'initiative', value: `${d.initiative + (unit.initiativeBonus ?? 0)}`, buff: unit.initiativeBonus ?? 0 },
+      {
+        key: 'speed',
+        value: `${effectiveSpeed(unit)}`,
+      },
+      { key: 'initiative', value: `${d.initiative + (unit.initiativeBonus ?? 0)}` },
       { key: 'morale', value: `${unit.morale}` },
       { key: 'luck', value: `${unit.luck}` },
       { key: 'range', value: d.range > 0 ? `${d.range}` : '—' },
       { key: 'shots', value: d.shots > 0 ? `${unit.shotsLeft}/${d.shots}` : '—' },
     ];
   });
+
+  const effects = $derived(unit ? activeEffects(unit, hero) : []);
 </script>
 
 <!-- One layout for both states: right-clicking pins the panel to whatever it is
@@ -185,16 +190,27 @@
               class="shrink-0 object-contain [image-rendering:pixelated] {sz.statIcon}"
             />
             <span class="flex-1 truncate text-slate-400">{STAT_META[stat.key].label}</span>
-            <span class="font-mono text-slate-100">
-              {#if stat.buff}
-                <span class="text-emerald-400">(+{stat.buff})</span>{stat.value}
-              {:else}
-                {stat.value}
-              {/if}
-            </span>
+            <span class="font-mono text-slate-100">{stat.value}</span>
           </span>
         {/each}
       </div>
+
+      {#if effects.length > 0}
+        <section class="effects-section border-t border-slate-700 pt-1.5" aria-label="Active effects">
+          <h3 class="effects-title">Active effects</h3>
+          <div class="effects-list">
+            {#each effects as effect (effect.id)}
+              <div class="effect-row {effect.tone}">
+                <div class="effect-heading">
+                  <span class="effect-label">{effect.label}</span>
+                  {#if effect.value}<span class="effect-value">{effect.value}</span>{/if}
+                </div>
+                {#if effect.detail}<p class="effect-detail">{effect.detail}</p>{/if}
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
 
       {#if unit.definition.abilities.length > 0}
         <div class="ability-list flex flex-col gap-1 border-t border-slate-700 pt-1.5">
@@ -325,6 +341,87 @@
   .rail .ability-list {
     padding-top: calc(6 * var(--fx));
     gap: calc(5 * var(--fx));
+  }
+
+  .effects-section {
+    flex: none;
+  }
+
+  .effects-title {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .effects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .effect-row {
+    border-left: 2px solid #64748b;
+    border-radius: 0.25rem;
+    padding: 0.3rem 0.4rem;
+    background: rgb(15 23 42 / 0.65);
+  }
+
+  .effect-row.buff { border-color: #34d399; }
+  .effect-row.debuff { border-color: #f87171; }
+
+  .effect-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 650;
+    line-height: 1.15;
+  }
+
+  .effect-label { color: #e2e8f0; }
+  .effect-value {
+    flex: none;
+    font-family: ui-monospace, monospace;
+  }
+  .effect-row.buff .effect-value { color: #34d399; }
+  .effect-row.debuff .effect-value { color: #f87171; }
+
+  .effect-detail {
+    margin: 0.18rem 0 0;
+    font-size: 0.68rem;
+    line-height: 1.25;
+    color: #94a3b8;
+  }
+
+  .rail .effects-section {
+    padding-top: calc(6 * var(--fx));
+  }
+
+  .rail .effects-title {
+    margin-bottom: calc(4 * var(--fx));
+    font-size: calc(9 * var(--fx));
+  }
+
+  .rail .effects-list {
+    gap: calc(4 * var(--fx));
+  }
+
+  .rail .effect-row {
+    border-radius: calc(4 * var(--fx));
+    padding: calc(4 * var(--fx)) calc(5 * var(--fx));
+  }
+
+  .rail .effect-heading {
+    font-size: calc(11 * var(--fx));
+  }
+
+  .rail .effect-detail {
+    margin-top: calc(2 * var(--fx));
+    font-size: calc(9.5 * var(--fx));
   }
 
   .rail .ability-label {

@@ -44,6 +44,27 @@ describe('isInDeployZone', () => {
   });
 });
 
+describe('large-army placement', () => {
+  it('places ten stacks per side on distinct in-bounds cells', () => {
+    const army = Array.from({ length: MAX_FIELD_STACKS }, (_, index) => ({
+      unit: index % 2 === 0 ? GOBLIN : WOLF_RIDER,
+      count: 1,
+    }));
+    const state = initBattle(army, army, HERO, 42);
+
+    for (const side of ['player', 'enemy'] as const) {
+      const stacks = state.units.filter(unit => unit.side === side && !unit.isHero);
+      expect(stacks).toHaveLength(10);
+      expect(new Set(stacks.map(unit => `${unit.pos.col},${unit.pos.row}`)).size).toBe(10);
+      for (const stack of stacks) {
+        expect(stack.pos.row).toBeGreaterThanOrEqual(0);
+        expect(stack.pos.row).toBeLessThan(state.grid.height);
+        expect(state.grid.cells[stack.pos.row][stack.pos.col].occupantId).toBe(stack.id);
+      }
+    }
+  });
+});
+
 describe('initBattle deploy phase', () => {
   it('starts in the deploy phase', () => {
     expect(deployState().phase).toBe('deploy');
