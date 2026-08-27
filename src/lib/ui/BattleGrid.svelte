@@ -19,6 +19,10 @@
     deployMode?: boolean;
     deployableKeys?: Set<string>;
     selectedDeployId?: string | null;
+    /** Development debugger placement: normal/deploy input stays locked while
+     * highlighted empty cells route exclusively to ondebugcell. */
+    debugPlacementMode?: boolean;
+    debugPlaceableKeys?: Set<string>;
     actionIcons: Map<string, 'melee' | 'shoot' | 'spell'>;
     penalizedShotIds: Set<string>;
     originsByTarget: Map<string, Pos[]>;
@@ -37,6 +41,7 @@
     ontargetingchange?: (mode: 'choose' | 'drag' | null) => void;
     ondeploycell?: (pos: Pos) => void;
     ondeployunit?: (unit: UnitStack) => void;
+    ondebugcell?: (pos: Pos) => void;
     onunithover: (unit: UnitStack | null) => void;
     onunitinspect: (unit: UnitStack | null) => void;
   }
@@ -52,6 +57,8 @@
     deployMode = false,
     deployableKeys = new Set<string>(),
     selectedDeployId = null,
+    debugPlacementMode = false,
+    debugPlaceableKeys = new Set<string>(),
     actionIcons,
     penalizedShotIds,
     originsByTarget,
@@ -69,6 +76,7 @@
     ontargetingchange,
     ondeploycell,
     ondeployunit,
+    ondebugcell,
     onunithover,
     onunitinspect,
   }: Props = $props();
@@ -399,6 +407,10 @@
       return;
     }
     if (cell.blocked) return;
+    if (debugPlacementMode) {
+      if (!occupant && debugPlaceableKeys.has(cellKey(col, row))) ondebugcell?.({ col, row });
+      return;
+    }
     if (deployMode) {
       if (occupant) ondeployunit?.(occupant);
       else ondeploycell?.({ col, row });
@@ -436,7 +448,8 @@
       {#each row as cell (cellKey(cell.col, cell.row))}
         {@const occupant = cell.occupantId ? unitsById.get(cell.occupantId) : undefined}
         {@const deployTarget = deployMode && deployableKeys.has(cellKey(cell.col, cell.row))}
-        {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row)) || deployTarget}
+        {@const debugTarget = debugPlacementMode && debugPlaceableKeys.has(cellKey(cell.col, cell.row))}
+        {@const reachable = reachableKeys.has(cellKey(cell.col, cell.row)) || deployTarget || debugTarget}
         {@const inMovementRange = movementRangeKeys.has(cellKey(cell.col, cell.row))}
         {@const inShootingRange = shootingRangeKeys.has(cellKey(cell.col, cell.row))}
         {@const attackable = !deployMode && !!occupant && targetIds.has(occupant.id)}
@@ -456,8 +469,8 @@
             {isExplicitOrigin ? 'explicit-origin' : ''}
             {isExplicitTarget ? 'explicit-target' : ''}
             {deploySelected ? 'deploy-selected' : ''}
-            {!interactive && !deployMode ? 'cursor-default' : ''}"
-          style:cursor={deployMode ? (occupant?.side === 'player' && !occupant.isHero ? 'pointer' : deployTarget ? 'pointer' : 'default') : cursorFor(cell.occupantId, attackable)}
+            {!interactive && !deployMode && !debugPlacementMode ? 'cursor-default' : ''}"
+          style:cursor={debugPlacementMode ? (debugTarget ? 'crosshair' : 'default') : deployMode ? (occupant?.side === 'player' && !occupant.isHero ? 'pointer' : deployTarget ? 'pointer' : 'default') : cursorFor(cell.occupantId, attackable)}
           aria-label={cell.blocked
             ? `obstacle at ${cell.col},${cell.row}`
             : occupant

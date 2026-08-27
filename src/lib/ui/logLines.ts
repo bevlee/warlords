@@ -134,6 +134,8 @@ export function describeEvent(
     }
     case 'battle_end':
       return line(t('The battle is over.'));
+    case 'debug':
+      return line(t(`Debug: ${String(d.label ?? 'battle state modified')}.`));
     default:
       return line(t(ev.type));
   }

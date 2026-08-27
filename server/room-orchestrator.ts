@@ -402,6 +402,9 @@ function requireLoadout(value: unknown): CoopLoadout {
 function isLegalAction(state: BattleState, action: BattleAction): boolean {
   const actor = state.units.find(unit => unit.id === state.currentUnitId);
   if (!actor || actor.count <= 0) return false;
+  // Debug actions are accepted only by the solo history uploader; the co-op
+  // protocol never parses them and the authoritative room rejects them here.
+  if (action.type === 'debug') return false;
   if (action.type === 'wait' || action.type === 'defend' || action.type === 'cast') return true;
   if (action.type === 'ability') return canActivate(state, actor, action.abilityId);
   if (action.type === 'move') {

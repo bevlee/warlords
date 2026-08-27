@@ -1,4 +1,16 @@
-import type { ArmyBonuses, ArmySlot, BattleAction, BattleEvent, BattleState, Hero, Pos, SpellId, UnitStack } from './types.ts';
+import type {
+  ArmyBonuses,
+  ArmySlot,
+  BattleAction,
+  BattleEvent,
+  BattleState,
+  DebugBattleOperation,
+  DebugStackTemplate,
+  Hero,
+  Pos,
+  SpellId,
+  UnitStack,
+} from './types.ts';
 import { chebyshevDistance, createGrid, placeUnits, setBlocked, setOccupant } from './grid.ts';
 import { advanceTurn } from './turnOrder.ts';
 import { calculateDamage, applyDamage, applyHeal, applyStrike, damageStack, canRetaliate, checkMorale, type LuckSink } from './combat.ts';
@@ -516,7 +528,135 @@ export function checkBattleEnd(state: BattleState): 'player_wins' | 'enemy_wins'
   return null;
 }
 
+function validDebugTemplate(stack: DebugStackTemplate): boolean {
+  const d = stack.definition;
+  const finiteNonNegative = (...values: number[]) => values.every(value => Number.isFinite(value) && value >= 0);
+  return (
+    !stack.isHero &&
+    (stack.side === 'player' || stack.side === 'enemy') &&
+    Number.isInteger(stack.count) && stack.count >= 1 &&
+    Number.isInteger(stack.startCount) && stack.startCount >= stack.count &&
+    finiteNonNegative(d.hp, d.attack, d.defense, d.minDamage, d.maxDamage, d.speed, d.initiative, d.shots, d.range) &&
+    d.hp >= 1 && d.minDamage <= d.maxDamage &&
+    Number.isFinite(stack.hp) && stack.hp >= 1 && stack.hp <= d.hp &&
+    Number.isFinite(stack.shotsLeft) && stack.shotsLeft >= 0 && stack.shotsLeft <= d.shots &&
+    Number.isFinite(stack.morale) && stack.morale >= -3 && stack.morale <= 3 &&
+    Number.isFinite(stack.luck) && stack.luck >= -3 && stack.luck <= 3 &&
+    Number.isFinite(stack.atb) && stack.atb >= 0 && stack.atb <= 1
+  );
+}
+
+function reconcileDebugState(state: BattleState): BattleState {
+  const result = checkBattleEnd(state);
+  if (result) {
+    return {
+      ...state,
+      result,
+      log: [...state.log, { type: 'battle_end', data: { result, debug: true } }],
+    };
+  }
+  const current = state.units.find(unit => unit.id === state.currentUnitId && unit.count > 0);
+  return current ? state : advance({ ...state, currentUnitId: null });
+}
+
+/** Apply a development debug mutation without consuming the current stack's
+ * turn. This lives in the deterministic engine rather than the UI because the
+ * same action must reproduce exactly in battle-history replays. */
+function applyDebugOperation(state: BattleState, operation: DebugBattleOperation): BattleState {
+  if (state.result !== 'ongoing') return state;
+  const event = (unitId?: string): BattleEvent => ({
+    type: 'debug',
+    data: { label: operation.label, ...(unitId ? { unitId } : {}) },
+  });
+
+  if (operation.kind === 'note') {
+    return { ...state, log: [...state.log, event()] };
+  }
+
+  if (operation.kind === 'restore') {
+    return {
+      ...operation.snapshot,
+      log: [...state.log, event()],
+    };
+  }
+
+  if (operation.kind === 'add') {
+    if (!validDebugTemplate(operation.stack)) return state;
+    const cell = state.grid.cells[operation.to.row]?.[operation.to.col];
+    if (!cell || cell.blocked || cell.occupantId) return state;
+    const id = `u${state.nextId}`;
+    const stack: UnitStack = {
+      ...operation.stack,
+      definition: {
+        ...operation.stack.definition,
+        abilities: [...operation.stack.definition.abilities],
+        ...(operation.stack.definition.abilityLevels
+          ? { abilityLevels: { ...operation.stack.definition.abilityLevels } }
+          : {}),
+      },
+      id,
+      pos: operation.to,
+      tiePriority: mulberry32(state.seed + state.nextId)(),
+    };
+    return reconcileDebugState({
+      ...state,
+      units: [...state.units, stack],
+      grid: setOccupant(state.grid, operation.to, id),
+      nextId: state.nextId + 1,
+      log: [...state.log, event(id)],
+    });
+  }
+
+  const index = state.units.findIndex(unit => unit.id === operation.unitId && unit.count > 0 && !unit.isHero);
+  if (index < 0) return state;
+  const target = state.units[index];
+  let replacement: UnitStack;
+
+  if (operation.kind === 'update') {
+    if (!validDebugTemplate(operation.stack) || operation.stack.side !== target.side) return state;
+    replacement = {
+      ...operation.stack,
+      definition: {
+        ...operation.stack.definition,
+        abilities: [...operation.stack.definition.abilities],
+        ...(operation.stack.definition.abilityLevels
+          ? { abilityLevels: { ...operation.stack.definition.abilityLevels } }
+          : {}),
+      },
+      id: target.id,
+      pos: target.pos,
+      tiePriority: target.tiePriority,
+    };
+  } else if (operation.kind === 'heal') {
+    replacement = { ...target, count: target.startCount, hp: target.definition.hp };
+  } else if (operation.kind === 'switch_side') {
+    replacement = {
+      ...target,
+      side: target.side === 'player' ? 'enemy' : 'player',
+      isAlly: undefined,
+      controllerId: undefined,
+    };
+  } else {
+    replacement = { ...target, count: 0, hp: 0 };
+  }
+
+  let next: BattleState = {
+    ...state,
+    units: state.units.map((unit, i) => (i === index ? replacement : unit)),
+    grid:
+      operation.kind === 'delete' || operation.kind === 'kill'
+        ? setOccupant(state.grid, target.pos, null)
+        : state.grid,
+    log: [...state.log, event(target.id)],
+  };
+  if (operation.kind === 'kill') {
+    next = { ...next, log: [...next.log, { type: 'death', data: { unitId: target.id, debug: true } }] };
+  }
+  return reconcileDebugState(next);
+}
+
 export function applyAction(state: BattleState, action: BattleAction): BattleState {
+  if (action.type === 'debug') return applyDebugOperation(state, action.operation);
   const rng = mulberry32(state.seed + state.log.length);
   let nextState = { ...state, units: [...state.units], log: [...state.log] };
 

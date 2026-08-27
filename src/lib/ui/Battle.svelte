@@ -19,9 +19,12 @@
     ArmySlot,
     BattleAction,
     BattleState,
+    DebugBattleOperation,
+    DebugStackTemplate,
     Hero,
     Pos,
     SpellId,
+    UnitDef,
     UnitStack,
   } from '$lib/engine/types';
   import { UNIT_ABILITIES, activatedAbilitiesOf } from '$lib/engine/unitAbilities';
@@ -42,6 +45,8 @@
   import { stepsFromLogEntry, applyLogEntry, deathIdsIn, type AnimStep } from './animSteps';
   import { createSoloBattleRecorder } from '$lib/replay/recording';
   import { postSoloBattle, type SoloController } from '$lib/net/api';
+  import { createDebugStackTemplate, debugSnapshot, templateFromStack } from '$lib/engine/debugBattle';
+  import BattleDebugDrawer from './BattleDebugDrawer.svelte';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -109,7 +114,21 @@
   // refreshes it.
   // svelte-ignore state_referenced_locally
   let deployBaseline: BattleState = battle;
+  // Debug Reset is intentionally stronger than deployment Reset: it rewinds
+  // the entire battle to this untouched initial deployment snapshot.
+  // svelte-ignore state_referenced_locally
+  let originalDeployBaseline: BattleState = structuredClone($state.snapshot(battle) as BattleState);
   let recorder: ReturnType<typeof createSoloBattleRecorder> | null = null;
+
+  // The compiler removes the drawer from production builds. Online battles
+  // and replays remain read-only even when viewed through a development build.
+  // svelte-ignore state_referenced_locally
+  const debugAvailable = import.meta.env.DEV && !online && !replay;
+  let debugOpen = $state(false);
+  let debugSelectedId = $state<string | null>(null);
+  let debugPlacement = $state<{ stack: DebugStackTemplate; label: string } | null>(null);
+  let debugUndo = $state<{ state: BattleState; label: string } | null>(null);
+  let deploymentDebugNotes: string[] = [];
 
   // --- Deployment phase ---
   const inDeploy = $derived(battle.phase === 'deploy');
@@ -132,6 +151,17 @@
         if (!cell.blocked && !cell.occupantId && isInDeployZone({ col: cell.col, row: cell.row }, tacticsShift)) {
           keys.add(`${cell.col},${cell.row}`);
         }
+      }
+    }
+    return keys;
+  });
+
+  const debugPlaceableKeys = $derived.by(() => {
+    const keys = new Set<string>();
+    if (!debugOpen || !debugPlacement || battle.result !== 'ongoing') return keys;
+    for (const row of battle.grid.cells) {
+      for (const cell of row) {
+        if (!cell.blocked && !cell.occupantId) keys.add(`${cell.col},${cell.row}`);
       }
     }
     return keys;
@@ -174,11 +204,116 @@
     }
     battle = beginCombat(battle);
     recorder = createSoloBattleRecorder($state.snapshot(battle) as BattleState);
+    // Deployment mutations are already baked into the recorder's initial
+    // state. Replay them as descriptive no-op actions so history still tells
+    // the viewer how that unusual starting army was assembled.
+    for (const label of deploymentDebugNotes) {
+      const action: BattleAction = { type: 'debug', operation: { kind: 'note', label } };
+      battle = applyAction(battle, action);
+      recorder.record('host', action);
+    }
+    deploymentDebugNotes = [];
+    debugUndo = null;
     selectDeploy(null);
   }
 
   function resetDeploy() {
     battle = deployBaseline;
+    selectDeploy(null);
+  }
+
+  function closeDebug() {
+    debugOpen = false;
+    debugPlacement = null;
+  }
+
+  function commitDebug(operation: DebugBattleOperation) {
+    if (!debugAvailable || battle.result !== 'ongoing' || animating) return;
+    const before = structuredClone($state.snapshot(battle) as BattleState);
+    const action: BattleAction = { type: 'debug', operation };
+    const result = applyAction(battle, action);
+    if (result === battle) return;
+    if (battle.phase === 'deploy') deploymentDebugNotes = [...deploymentDebugNotes, operation.label];
+    else recorder?.record('host', action);
+    battle = result;
+    debugUndo = { state: before, label: operation.label };
+    hovered = null;
+    if (selectedDeployId && !battle.units.some(unit => unit.id === selectedDeployId && unit.count > 0)) {
+      selectDeploy(null);
+    }
+    if (debugSelectedId && !battle.units.some(unit => unit.id === debugSelectedId && unit.count > 0)) {
+      debugSelectedId = null;
+    }
+  }
+
+  function requestDebugAdd(definition: UnitDef, side: UnitStack['side'], count: number) {
+    const stack = createDebugStackTemplate(definition, side, count, battle.hero, armyBonuses);
+    debugPlacement = {
+      stack,
+      label: `added ${count} ${definition.name}${count === 1 ? '' : 's'} for ${side === 'player' ? 'your side' : 'the opponent'}`,
+    };
+  }
+
+  function requestDebugDuplicate(unit: UnitStack) {
+    debugPlacement = {
+      stack: templateFromStack(unit),
+      label: `duplicated ${unit.definition.name}s for ${unit.side === 'player' ? 'your side' : 'the opponent'}`,
+    };
+  }
+
+  function handleDebugPlacement(to: Pos) {
+    if (!debugPlacement) return;
+    const pending = debugPlacement;
+    commitDebug({ kind: 'add', stack: pending.stack, to, label: pending.label });
+    const createdId = `u${battle.nextId - 1}`;
+    if (battle.units.some(unit => unit.id === createdId && unit.count > 0)) debugSelectedId = createdId;
+    debugPlacement = null;
+    void recordSeen({ units: [unitSlug(pending.stack.definition.name)], factions: [] });
+  }
+
+  function updateDebugStack(unitId: string, stack: DebugStackTemplate) {
+    const unit = battle.units.find(row => row.id === unitId);
+    if (!unit) return;
+    commitDebug({ kind: 'update', unitId, stack, label: `changed ${unit.definition.name} stats and abilities` });
+  }
+
+  function undoDebug() {
+    if (!debugUndo || battle.result !== 'ongoing') return;
+    const checkpoint = debugUndo;
+    const action: BattleAction = {
+      type: 'debug',
+      operation: {
+        kind: 'restore',
+        snapshot: debugSnapshot(checkpoint.state),
+        label: `undid ${checkpoint.label}`,
+      },
+    };
+    if (battle.phase === 'deploy') deploymentDebugNotes = [...deploymentDebugNotes, action.operation.label];
+    else recorder?.record('host', action);
+    battle = applyAction(battle, action);
+    debugUndo = null;
+    debugPlacement = null;
+    debugSelectedId = null;
+    hovered = null;
+  }
+
+  function resetDebugBattle() {
+    revealToken++;
+    animating = false;
+    activeSteps = [];
+    dyingIds = new Set();
+    doomedIds = new Set();
+    pendingSpell = null;
+    resultAnnounced = false;
+    recorder = null;
+    battle = structuredClone(originalDeployBaseline);
+    deployBaseline = battle;
+    deploymentDebugNotes = [];
+    debugUndo = null;
+    debugPlacement = null;
+    debugSelectedId = null;
+    selectedId = null;
+    hovered = null;
     selectDeploy(null);
   }
 
@@ -250,6 +385,9 @@
     // Invalid casts are rejected by returning the original state. Do not put a
     // rejected cause into the replay journal.
     if (result === battle) return;
+    // One-step debug undo is intentionally local to the clean analysis point
+    // where the edit happened. A real turn commits it.
+    debugUndo = null;
     recorder?.record(controller, action);
     // A hovered stack can move away while the pointer remains over its old
     // cell. Clear it as soon as an action begins so its old/new range does not
@@ -263,7 +401,7 @@
     battle.units.find(u => u.isHero && (!online || u.controllerId === localControllerId)) ?? null
   );
   const isPlayerTurn = $derived(
-    !replay && !autoBattle && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
+    !replay && !debugOpen && !autoBattle && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
       (!online || activeUnit.controllerId === localControllerId)
   );
 
@@ -503,6 +641,8 @@
   $effect(() => {
     if (battle.result !== 'ongoing' && !resultAnnounced) {
       resultAnnounced = true;
+      debugOpen = false;
+      debugPlacement = null;
       const finalState = $state.snapshot(battle) as BattleState;
       onresult?.(battle.result, finalState.units);
       if (recorder && !online) {
@@ -518,7 +658,7 @@
   // Automated turns play one action at a time, using the same pacing and AI
   // for enemies, summoned allies, and (when enabled) the player's own stacks.
   $effect(() => {
-    if (replay || battle.result !== 'ongoing' || animating || inDeploy) return;
+    if (replay || debugOpen || battle.result !== 'ongoing' || animating || inDeploy) return;
     const unit = battle.units.find(u => u.id === battle.currentUnitId);
     if (!unit || !shouldAutomateTurn(unit, autoBattle, !!online, localControllerId)) return;
     // The server has not confirmed this unit's previously submitted choice yet.
@@ -528,6 +668,7 @@
       const current = battle.units.find(u => u.id === battle.currentUnitId);
       if (
         battle.result !== 'ongoing' ||
+        debugOpen ||
         animating ||
         !current ||
         current.id !== unit.id ||
@@ -690,6 +831,12 @@
     recorder = null;
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses);
     deployBaseline = battle; // restart re-enters deploy with a fresh layout
+    originalDeployBaseline = structuredClone($state.snapshot(battle) as BattleState);
+    deploymentDebugNotes = [];
+    debugUndo = null;
+    debugPlacement = null;
+    debugOpen = false;
+    debugSelectedId = null;
     selectDeploy(null);
   }
 
@@ -701,6 +848,8 @@
     if (battle.result === 'enemy_wins') return 'Defeat…';
     if (!activeUnit) return '';
     if (replay) return `Replay — ${activeUnit.definition.name}s are acting…`;
+    if (debugOpen && debugPlacement) return `Debug placement — click a highlighted empty cell for ${debugPlacement.stack.definition.name}.`;
+    if (debugOpen) return 'Battle paused while the debugger is open.';
     if (autoBattle && shouldAutomateTurn(activeUnit, true, !!online, localControllerId)) {
       return `Auto battle — ${activeUnit.definition.name}s are acting…`;
     }
@@ -728,11 +877,25 @@
     }
     return `Enemy ${activeUnit.definition.name}s are acting…`;
   });
-  // Escape backs out of the most recent thing first: the expanded log, then a
-  // spell being aimed, then a pinned unit.
+  // D toggles the development drawer unless a form control owns the keystroke.
+  // Escape backs out of the most recent modal/targeting state first.
   function handleKeydown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    const typing = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
+    if (debugAvailable && e.key.toLowerCase() === 'd' && !typing && battle.result === 'ongoing' && !animating) {
+      e.preventDefault();
+      if (debugOpen) closeDebug();
+      else {
+        settingsOpen = false;
+        debugOpen = true;
+        debugSelectedId = activeUnit && !activeUnit.isHero ? activeUnit.id : debugSelectedId;
+      }
+      return;
+    }
     if (e.key !== 'Escape') return;
     if (logOpen) logOpen = false;
+    else if (debugPlacement) debugPlacement = null;
+    else if (debugOpen) closeDebug();
     else if (pendingSpell) pendingSpell = null;
     else if (selectedId) selectedId = null;
   }
@@ -786,9 +949,9 @@
           </p>
         {/if}
         {#if !online}
-          <button type="button" class="status-button ml-auto" onclick={resetDeploy}>Reset</button>
+          <button type="button" class="status-button ml-auto" disabled={debugOpen} onclick={resetDeploy}>Reset</button>
         {/if}
-        <button type="button" class="status-button primary" onclick={beginBattle}>
+        <button type="button" class="status-button primary" disabled={debugOpen} onclick={beginBattle}>
           {online ? 'Confirm deployment ✓' : 'Begin battle ⚔️'}
         </button>
       </div>
@@ -812,15 +975,33 @@
               class="flank-button {settingsOpen ? 'active' : ''}"
               aria-label="Settings"
               title="Battle settings"
+              disabled={debugOpen}
               onclick={() => (settingsOpen = !settingsOpen)}
             >⚙️</button>
-            <button
-              type="button"
-              class="flank-button"
-              aria-label="Auto battle"
-              title="Auto battle — not wired up yet"
-              disabled
-            >⏩</button>
+            {#if debugAvailable}
+              <button
+                type="button"
+                class="flank-button debug {debugOpen ? 'active' : ''}"
+                aria-label="Battle debugger"
+                title="Battle debugger (D)"
+                disabled={battle.result !== 'ongoing' || animating}
+                onclick={() => {
+                  settingsOpen = false;
+                  debugOpen = !debugOpen;
+                  if (!debugOpen) debugPlacement = null;
+                  else debugSelectedId = activeUnit && !activeUnit.isHero ? activeUnit.id : debugSelectedId;
+                }}
+              >🛠️</button>
+            {/if}
+            {#if !debugAvailable}
+              <button
+                type="button"
+                class="flank-button"
+                aria-label="Auto battle"
+                title="Auto battle — not wired up yet"
+                disabled
+              >⏩</button>
+            {/if}
           </div>
 
           {#if settingsOpen}
@@ -900,9 +1081,11 @@
           targetIds={gridTargetIds}
           activeId={battle.currentUnitId}
           interactive={isPlayerTurn && !animating}
-          deployMode={inDeploy}
+          deployMode={inDeploy && !debugOpen}
           deployableKeys={deployableKeys}
           selectedDeployId={selectedDeployId}
+          debugPlacementMode={debugOpen && !!debugPlacement}
+          {debugPlaceableKeys}
           actionIcons={gridActionIcons}
           penalizedShotIds={pendingSpell || animating ? new Set() : penalizedShotIds}
           originsByTarget={pendingSpell ? new Map() : originsByTarget}
@@ -920,6 +1103,7 @@
           ontargetingchange={mode => (meleeTargeting = mode)}
           ondeploycell={handleDeployCell}
           ondeployunit={handleDeployUnit}
+          ondebugcell={handleDebugPlacement}
           onunithover={u => (hovered = u)}
           onunitinspect={inspect}
         />
@@ -1025,6 +1209,42 @@
     </div>
   {/if}
 </div>
+
+{#if debugAvailable && debugOpen && battle.result === 'ongoing'}
+  <BattleDebugDrawer
+    state={battle}
+    selectedId={debugSelectedId}
+    placementLabel={debugPlacement?.label ?? null}
+    canUndo={!!debugUndo}
+    onclose={closeDebug}
+    onselect={unitId => (debugSelectedId = unitId)}
+    onrequestadd={requestDebugAdd}
+    onrequestduplicate={requestDebugDuplicate}
+    onupdate={updateDebugStack}
+    ondelete={unit => commitDebug({
+      kind: 'delete',
+      unitId: unit.id,
+      label: `deleted ${unit.definition.name}s from ${unit.side === 'player' ? 'your side' : 'the opponent'}`,
+    })}
+    onkill={unit => commitDebug({
+      kind: 'kill',
+      unitId: unit.id,
+      label: `killed ${unit.definition.name}s on ${unit.side === 'player' ? 'your side' : 'the opponent'}`,
+    })}
+    onheal={unit => commitDebug({
+      kind: 'heal',
+      unitId: unit.id,
+      label: `fully healed ${unit.definition.name}s`,
+    })}
+    onswitchside={unit => commitDebug({
+      kind: 'switch_side',
+      unitId: unit.id,
+      label: `switched ${unit.definition.name}s to ${unit.side === 'player' ? 'the opponent' : 'your side'}`,
+    })}
+    onundo={undoDebug}
+    onreset={resetDebugBattle}
+  />
+{/if}
 
 {#if online}
   <div class="mx-auto mt-3 flex max-w-4xl gap-3 rounded border border-slate-700 bg-slate-800 p-3">

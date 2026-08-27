@@ -112,7 +112,7 @@ export interface ArmyBonuses {
 export type BattleEventType =
   | 'attack' | 'retaliate' | 'shoot' | 'move' | 'defend' | 'cast'
   | 'death' | 'morale_boost' | 'morale_freeze' | 'luck' | 'status'
-  | 'round_start' | 'battle_end';
+  | 'round_start' | 'battle_end' | 'debug';
 
 export interface BattleEvent {
   type: BattleEventType;
@@ -140,6 +140,25 @@ export interface BattleState {
   phase?: 'deploy' | 'combat';
 }
 
+/** A complete stack payload without battle-owned identity or placement. Debug
+ * actions carry the resolved values so replays do not depend on whichever
+ * catalog or army bonuses happen to exist in a later build. */
+export type DebugStackTemplate = Omit<UnitStack, 'id' | 'pos' | 'tiePriority'>;
+
+/** State restored by one-step debug undo. The existing journal stays intact so
+ * history shows both the original edit and the explicit undo operation. */
+export type DebugBattleSnapshot = Omit<BattleState, 'log'>;
+
+export type DebugBattleOperation =
+  | { kind: 'add'; stack: DebugStackTemplate; to: Pos; label: string }
+  | { kind: 'update'; unitId: string; stack: DebugStackTemplate; label: string }
+  | { kind: 'delete'; unitId: string; label: string }
+  | { kind: 'kill'; unitId: string; label: string }
+  | { kind: 'heal'; unitId: string; label: string }
+  | { kind: 'switch_side'; unitId: string; label: string }
+  | { kind: 'restore'; snapshot: DebugBattleSnapshot; label: string }
+  | { kind: 'note'; label: string };
+
 export type BattleAction =
   | { type: 'move'; to: Pos }
   | { type: 'attack'; targetId: string; moveTo?: Pos }
@@ -150,4 +169,7 @@ export type BattleAction =
   // `cast`: spells are hero-only, cost mana, and target by side, none of which
   // fits a unit spending its own turn on its own resources.
   | { type: 'ability'; abilityId: string }
+  // Development-only controls create these in solo battles. They remain an
+  // engine action so persisted cause-only journals replay truthfully.
+  | { type: 'debug'; operation: DebugBattleOperation }
   | { type: 'wait' };

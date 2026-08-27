@@ -6,7 +6,7 @@ import { pruneBattleHistory } from './retention.ts';
 
 const SLOTS = new Set(['hero', 'army', 'campaign', 'gauntletRun', 'compendium']);
 const MAX_BODY = 256 * 1024;
-const ACTION_TYPES = new Set(['move', 'attack', 'shoot', 'defend', 'cast', 'wait']);
+const ACTION_TYPES = new Set(['move', 'attack', 'shoot', 'defend', 'cast', 'ability', 'debug', 'wait']);
 
 type Next = () => void;
 
