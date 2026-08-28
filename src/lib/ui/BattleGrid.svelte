@@ -568,6 +568,18 @@
     transform: rotateX(var(--tilt)) scale(0.97);
     transform-style: preserve-3d;
     transform-origin: 50% 50%;
+    /* The board and its cells are coplanar inside one 3D rendering context
+       (every .cell keeps preserve-3d so standees can stand up out of the
+       board plane). Coplanar surfaces have no depth to sort by, so Chromium's
+       hit test picks between this div and the cell under the cursor
+       arbitrarily — over a quarter of the board answered with the board
+       itself, in bands a couple of pixels tall. Dragging the cursor across
+       the board therefore fired a stream of mouseenter/mouseleave pairs and
+       the hover highlight (and a hovered stack's range overlay) strobed; the
+       same holes swallowed clicks. The board is pure decoration — background,
+       border, padding — so take it out of hit testing entirely and let the
+       cells, which never overlap each other, answer alone. */
+    pointer-events: none;
     /* Reclaim the vertical space the tilt foreshortens away: the layout box
        is the untilted height, ~20% taller than the projected board. The
        controls and turn bar below sit in their own z-raised stacking
@@ -581,6 +593,9 @@
 
   .cell {
     transform-style: preserve-3d;
+    /* Restores what .board gives up above; the cells are the board's only
+       input surface, so anything added inside .board needs this too. */
+    pointer-events: auto;
   }
 
   .cell.attackable {
