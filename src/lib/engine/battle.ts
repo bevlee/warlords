@@ -14,7 +14,7 @@ import type {
   UnitStack,
 } from './types.ts';
 import { createGrid, placeUnits, setBlocked, setOccupant } from './grid.ts';
-import { advanceTurn } from './turnOrder.ts';
+import { advanceTurn, reentryAtb } from './turnOrder.ts';
 import { calculateDamage, applyDamage, applyHeal, applyStrike, damageStack, canRetaliate, checkMorale, type LuckSink } from './combat.ts';
 import { isBeyondRange, isShootingBlocked, type DamagePreview } from './selectors.ts';
 import { mulberry32, type Rng } from './rng.ts';
@@ -754,7 +754,8 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
   let actor = nextState.units[actorIdx];
   let actorHero = heroFor(nextState, actor);
 
-  // A finished turn re-enters the scale at 0; wait re-enters at 0.5 (half cycle).
+  // Re-entry heights live in turnOrder's reentryAtb, which the turns bar's
+  // hover preview reads too, so the preview can't promise a different scale.
   const reenter = (st: BattleState, atb: number): BattleState => ({
     ...st,
     units: st.units.map(u => (u.id === actorId ? { ...u, atb } : u)),
@@ -1048,5 +1049,5 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     return { ...nextState, result: endResult };
   }
 
-  return advance(reenter(nextState, action.type === 'wait' ? 0.5 : 0));
+  return advance(reenter(nextState, reentryAtb(action.type)));
 }

@@ -1,32 +1,24 @@
 <script lang="ts">
-  import type { BattleState, UnitStack } from '$lib/engine/types';
-  import { predictTurnSchedule } from '$lib/engine/turnOrder';
+  import type { BattleAction, BattleState, UnitStack } from '$lib/engine/types';
+  import { turnBarEntries } from './turnBar';
   import Sprite from './Sprite.svelte';
 
   interface Props {
     state: BattleState;
     hoveredId: string | null;
+    /** The action the player is hovering in the dock, or null. Set, the strip
+     *  shows the scale that action would produce instead of the live one. */
+    previewAction?: BattleAction['type'] | null;
     onhover: (unit: UnitStack | null) => void;
   }
 
   // Aliased: a local `state` would shadow the `$state` rune.
-  let { state: battleState, hoveredId, onhover }: Props = $props();
-
-  const ENTRIES = 16;
+  let { state: battleState, hoveredId, previewAction = null, onhover }: Props = $props();
 
   // Each entry carries the round it falls in, so the strip can break itself
   // into rounds inline — `startsRound` is set on the first turn of each new
-  // one, which is where the marker goes.
-  const entries = $derived.by(() => {
-    const slots = predictTurnSchedule(battleState.units, ENTRIES, battleState.battleTime);
-    return slots
-      .map((slot, i) => ({
-        unit: battleState.units.find(u => u.id === slot.unitId),
-        round: slot.round,
-        startsRound: i > 0 && slot.round !== slots[i - 1].round,
-      }))
-      .filter((e): e is { unit: UnitStack; round: number; startsRound: boolean } => !!e.unit);
-  });
+  // one, which is where the marker goes. See ./turnBar.ts for the projection.
+  const entries = $derived(turnBarEntries(battleState, previewAction));
 
   // Paged, not scrolled. Scrolling cost a permanent scrollbar across the
   // ribbon's full width — space the portraits can use instead — and a hovered
@@ -73,10 +65,12 @@
     return () => ro.disconnect();
   });
 
-  // Every turn re-predicts the whole order, so a page further along stops
-  // meaning anything. Snap back to the acting stack, which is always first.
+  // Every turn — and every projection — re-predicts the whole order, so a page
+  // further along stops meaning anything. Snap back to the head of the strip,
+  // which is where both the acting stack and the projected landing spot are.
   $effect(() => {
     void battleState.currentUnitId;
+    void previewAction;
     page = 0;
   });
 </script>
@@ -85,7 +79,7 @@
      round medallion and paging arrows built into its frame. Full width on
      purpose — a content-sized ribbon visibly narrows as stacks die. Every
      dimension is a multiple of --fx; see "Fitting the screen" in Battle.svelte. -->
-<div class="atb-ribbon">
+<div class="atb-ribbon" class:projecting={!!previewAction}>
   <button
     type="button"
     class="atb-arrow"
@@ -111,9 +105,12 @@
           type="button"
           class="portrait relative shrink-0 overflow-hidden rounded-sm border-2 transition-transform
             {entry.unit.side === 'player' ? 'border-sky-400 bg-sky-950' : 'border-red-500 bg-red-950'}
-            {i === 0 ? 'current ring-2 ring-amber-300' : ''}
+            {entry.isCurrent ? 'current ring-2 ring-amber-300' : ''}
+            {entry.isProjected ? 'projected ring-2 ring-emerald-300' : ''}
             {entry.unit.id === hoveredId ? 'scale-110 brightness-125' : ''}"
-          aria-label="turn {i + 1}: {entry.unit.definition.name} ×{entry.unit.count}"
+          aria-label="turn {i + 1}: {entry.unit.definition.name} ×{entry.unit.count}{entry.isProjected
+            ? ' — where this stack lands'
+            : ''}"
           onmouseenter={() => onhover(entry.unit)}
           onmouseleave={() => onhover(null)}
         >
@@ -238,6 +235,27 @@
 
   .portrait.current {
     transform: translateY(calc(-4 * var(--fx)));
+  }
+
+  /* Where the acting stack lands if it takes the hovered action. Lifted like
+     .current so the eye finds it in the same place, but green rather than
+     amber: this slot is a projection, not a turn anyone is taking yet. */
+  .portrait.projected {
+    transform: translateY(calc(-4 * var(--fx)));
+  }
+
+  /* The whole strip dims while projecting, so a hypothetical order is never
+     mistaken for the real one at a glance. The projected slots stay lit. */
+  .projecting .portrait {
+    opacity: 0.55;
+  }
+
+  .projecting .portrait.projected {
+    opacity: 1;
+  }
+
+  .projecting {
+    border-color: rgb(110 231 183 / 0.55);
   }
 
   .count-plate {

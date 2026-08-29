@@ -515,6 +515,17 @@
 
   let hovered: UnitStack | null = $state(null);
 
+  // The dock action the player is hovering, projected onto the turns bar. Held
+  // here rather than in the dock because the bar is the thing that renders it.
+  // Cleared whenever the turn moves on: the mouse can still be sitting on the
+  // button after the click that ended the turn, and the projection it asked
+  // for is about a stack that is no longer acting.
+  let previewAction: 'wait' | 'defend' | null = $state(null);
+  $effect(() => {
+    void battle.currentUnitId;
+    previewAction = null;
+  });
+
   // Hover always shows movement reach. Ranged units additionally paint their
   // full-damage shooting radius in a second color, so neither stat hides the
   // other. Suppress both while an action is animating so a moving unit cannot
@@ -921,7 +932,12 @@
 <div bind:this={screenEl} class="battle-screen" style="--fx: {fx}px; height: {availableH}px">
   <!-- ══ Band 1: ATB turn ribbon ══ -->
   <div class="atb-band">
-    <TurnBar state={battle} hoveredId={hovered?.id ?? null} onhover={u => (hovered = u)} />
+    <TurnBar
+      state={battle}
+      hoveredId={hovered?.id ?? null}
+      {previewAction}
+      onhover={u => (hovered = u)}
+    />
   </div>
 
   <!-- ══ Band 2: status strip ══ -->
@@ -1187,6 +1203,7 @@
         abilities={unitAbilities}
         onwait={handleWait}
         ondefend={handleDefend}
+        onpreview={action => (previewAction = action)}
         onspellbook={() => (spellbookOpen = !spellbookOpen)}
         onability={handleAbility}
       />

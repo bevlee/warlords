@@ -42,7 +42,9 @@ range, with a hover overlay: enemies show movement reach, own shooters
 their full-damage range) · player-chosen attack-from tile with ⚔️/🏹
 indicators · owner colours · combat log · 2.5D perspective board ·
 **ATB initiative bar** (continuous scale, repeat turns, wait = half-cycle,
-paged top ribbon with inline round breaks and two-way hover sync) ·
+paged top ribbon with inline round breaks and two-way hover sync, and a
+read-only projection: hovering Wait or Defend re-draws the strip as that
+action would leave it and rings where the stack lands) ·
 **shooter melee-block** (adjacent enemy disables shooting; Shift-click forces
 melee) · **Defend** (+30% defense until own next turn, 🛡️ badge) ·
 **obstacles** (seeded rocks in the middle columns) · **hero as an actor**

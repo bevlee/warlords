@@ -1,4 +1,4 @@
-import type { BattleState, UnitStack } from './types.ts';
+import type { BattleAction, BattleState, UnitStack } from './types.ts';
 import { removeModifierSource } from './unitModifiers.ts';
 
 /** ATB fill rate in scale-units per round; initiative 10 = one turn per round.
@@ -84,7 +84,9 @@ export interface TurnSlot {
  * makes), is anything decided later by a player or a die:
  *
  *  - **Wait** re-enters at 0.5 rather than 0, so a waiter acts sooner than
- *    shown. Everyone here is assumed to re-enter at 0.
+ *    shown. Everyone here is assumed to re-enter at 0. Once the player is
+ *    actually hovering an action it stops being a guess: `previewTurnSchedule`
+ *    below answers it for that one stack.
  *  - **Deaths** remove a stack and every later turn it had.
  *  - **Morale** is rolled at the moment a stack acts, not scheduled: a boost
  *    grants an immediate extra turn, a freeze forfeits one. Neither changes
@@ -114,4 +116,36 @@ export function predictTurnSchedule(units: UnitStack[], n: number, startTime = 0
 /** Just the actors, for callers that don't care when the rounds fall. */
 export function predictTurnOrder(units: UnitStack[], n: number): string[] {
   return predictTurnSchedule(units, n).map(slot => slot.unitId);
+}
+
+/**
+ * Where a stack re-enters the scale once its turn ends: a finished turn drops
+ * to 0, a wait to 0.5, so a waiter comes round again in half a cycle.
+ * `applyAction` and the bar's preview both read this, so what the player is
+ * shown and what the engine then does cannot drift apart.
+ */
+export function reentryAtb(action: BattleAction['type']): number {
+  return action === 'wait' ? 0.5 : 0;
+}
+
+/**
+ * The schedule the bar would show if the acting stack took `action` right now
+ * — the one thing `predictTurnSchedule` deliberately refuses to guess at, made
+ * available for the case where it is no longer a guess because the player is
+ * hovering the action.
+ *
+ * Read-only: the state is untouched, so this is safe to call on every hover.
+ * Everything `predictTurnSchedule` cannot foresee (deaths, morale rolls) is
+ * still unforeseen here.
+ */
+export function previewTurnSchedule(
+  state: BattleState,
+  action: BattleAction['type'],
+  n: number,
+): TurnSlot[] {
+  const actorId = state.currentUnitId;
+  if (!actorId) return predictTurnSchedule(state.units, n, state.battleTime);
+  const atb = reentryAtb(action);
+  const units = state.units.map(u => (u.id === actorId ? { ...u, atb } : u));
+  return predictTurnSchedule(units, n, state.battleTime);
 }

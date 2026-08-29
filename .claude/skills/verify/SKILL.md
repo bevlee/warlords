@@ -93,7 +93,12 @@ Useful hooks in the battle UI:
   ("turn N: <Unit> ×<count>"), current unit first. Fast units repeat. Hovering
   an entry glows the matching field token (`div.token-standing.hover-glow`).
   Waiting re-enters at half a cycle — the waiter drops down the bar, it
-  doesn't just go to the back.
+  doesn't just go to the back. Hovering `Wait`/`Defend` in the dock projects
+  that action onto the ribbon: `.atb-ribbon.projecting` dims the strip, the
+  amber `.current` ring disappears (nothing is acting in a hypothetical
+  order) and the single `.projected` entry — aria-label suffix
+  "— where this stack lands" — marks where the acting stack would land.
+  Read-only; it clears on mouseleave and whenever the turn moves on.
 - Shooters with an adjacent living enemy can't shoot (status says
   "Shooting blocked — enemy adjacent!"; their targets show ⚔️ not 🏹).
 - `Defend` button next to Wait: logs "brace for defense", shows a 🛡️ badge

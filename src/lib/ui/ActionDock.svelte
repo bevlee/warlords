@@ -23,6 +23,9 @@
     abilities?: { id: string; info: { label: string; description: string }; enabled: boolean }[];
     onwait: () => void;
     ondefend: () => void;
+    /** Hovering an action projects its effect onto the turns bar. Null on
+     *  leave. Read-only — the projection never commits anything. */
+    onpreview?: (action: 'wait' | 'defend' | null) => void;
     onspellbook: () => void;
     onability?: (abilityId: string) => void;
   }
@@ -35,6 +38,7 @@
     abilities = [],
     onwait,
     ondefend,
+    onpreview,
     onspellbook,
     onability,
   }: Props = $props();
@@ -96,6 +100,10 @@
         title="Wait — act again in half a cycle"
         {disabled}
         onclick={onwait}
+        onmouseenter={() => !disabled && onpreview?.('wait')}
+        onmouseleave={() => onpreview?.(null)}
+        onfocus={() => !disabled && onpreview?.('wait')}
+        onblur={() => onpreview?.(null)}
       >
         <span class="action-glyph">⏳</span>
         <span class="action-label">Wait</span>
@@ -107,6 +115,10 @@
         title="Defend — +30% defense until your next turn"
         {disabled}
         onclick={ondefend}
+        onmouseenter={() => !disabled && onpreview?.('defend')}
+        onmouseleave={() => onpreview?.(null)}
+        onfocus={() => !disabled && onpreview?.('defend')}
+        onblur={() => onpreview?.(null)}
       >
         <img src={statusIconFor('defending')} alt="" class="action-icon" />
         <span class="action-label">Defend</span>

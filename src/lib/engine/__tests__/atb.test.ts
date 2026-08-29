@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGrid, placeUnits } from '../grid';
-import { advanceTurn, predictTurnOrder, predictTurnSchedule } from '../turnOrder';
+import { advanceTurn, predictTurnOrder, predictTurnSchedule, previewTurnSchedule } from '../turnOrder';
 import { calculateDamage } from '../combat';
 import { initBattle, applyAction } from '../battle';
 import { GOBLIN, WOLF_RIDER, THUNDERBIRD, OGRE } from '../barbarian';
@@ -267,5 +267,60 @@ describe('predictTurnSchedule', () => {
     // slots instead of 2, and now leads.
     const hasted = { ...b, initiativeBonus: 10 };
     expect(predictTurnSchedule([a, hasted], 4).map(s => s.unitId)).toEqual(['b', 'a', 'b', 'b']);
+  });
+});
+
+describe('previewTurnSchedule', () => {
+  const evenDef: UnitDef = { ...GOBLIN, name: 'Even', initiative: 10 };
+
+  /** Two identical stacks with the player already at the act point. */
+  function standoff(): BattleState {
+    const a = makeStack(evenDef, { col: 1, row: 1 }, 'player', { id: 'a', atb: 1, tiePriority: 0.1 });
+    const b = makeStack(evenDef, { col: 1, row: 3 }, 'enemy', { id: 'b', atb: 0.4, tiePriority: 0.9 });
+    return { ...makeState([a, b]), currentUnitId: 'a' };
+  }
+
+  it('shows a waiting stack acting sooner than a finished turn would', () => {
+    const state = standoff();
+
+    // Re-entering at 0, 'a' needs a full cycle and 'b' beats it to the punch.
+    expect(previewTurnSchedule(state, 'defend', 3).map(s => s.unitId)).toEqual(['b', 'a', 'b']);
+    // Re-entering at 0.5, 'a' only needs half a cycle and goes first instead.
+    expect(previewTurnSchedule(state, 'wait', 3).map(s => s.unitId)).toEqual(['a', 'b', 'a']);
+  });
+
+  it('predicts the order the engine actually produces after the action', () => {
+    let state = standoff();
+    const predicted = previewTurnSchedule(state, 'wait', 5);
+
+    state = applyAction(state, { type: 'wait' });
+
+    for (const [i, slot] of predicted.entries()) {
+      if (i > 0) state = advanceTurn(state);
+      expect(state.currentUnitId).toBe(slot.unitId);
+      expect(state.round).toBe(slot.round);
+      // Every stack after the previewed one re-enters at 0, as the prediction assumes.
+      state = {
+        ...state,
+        units: state.units.map(u => (u.id === state.currentUnitId ? { ...u, atb: 0 } : u)),
+      };
+    }
+  });
+
+  it('leaves the battle state untouched', () => {
+    const state = standoff();
+    const before = JSON.stringify(state);
+
+    previewTurnSchedule(state, 'wait', 8);
+
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
+  it('falls back to the plain schedule when no stack is acting', () => {
+    const state = { ...standoff(), currentUnitId: null };
+
+    expect(previewTurnSchedule(state, 'wait', 3)).toEqual(
+      predictTurnSchedule(state.units, 3, state.battleTime)
+    );
   });
 });
