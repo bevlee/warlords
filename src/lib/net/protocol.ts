@@ -19,7 +19,6 @@ export type ClientMessage =
   | { type: 'room.create'; loadout: unknown }
   | { type: 'room.join'; code: string; loadout: unknown }
   | { type: 'deploy.move'; unitId: string; to: Pos }
-  | { type: 'deploy.split'; unitId: string; amount: number; to: Pos }
   | { type: 'deploy.confirm' }
   | { type: 'battle.action'; lastSeq: number; action: BattleAction }
   | { type: 'chat.send'; text: string }

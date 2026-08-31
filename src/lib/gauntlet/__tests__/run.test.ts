@@ -31,13 +31,11 @@ describe('gauntlet run', () => {
   });
 
   it('encounter budgets follow the design curve with a boss premium on 3/7/10', () => {
-    // The design table's exact numbers drift from its own formula by rounding;
-    // hold the curve to within 2% of the published values.
     expect(encounterBudget(1)).toBe(90);
-    expect(encounterBudget(2)).toBe(119);
-    for (const [n, v] of [[3, 172], [7, 518], [10, 1195]] as const) {
-      expect(Math.abs(encounterBudget(n) - v) / v).toBeLessThanOrEqual(0.02);
-    }
+    expect(encounterBudget(2)).toBe(113);
+    expect(encounterBudget(3)).toBe(155);
+    expect(encounterBudget(7)).toBe(378);
+    expect(encounterBudget(10)).toBe(738);
   });
 
   it('acts split 1–3 / 4–7 / 8–10', () => {
@@ -186,7 +184,7 @@ describe('gauntlet run', () => {
     expect(afterUnit.status).toBe('draft');
 
     const afterBoth = applyItemPick(afterUnit, afterUnit.pendingItems![0]);
-    expect(afterBoth.items).toEqual([run.pendingItems![0]]);
+    expect(afterBoth.items).toEqual([...run.items, run.pendingItems![0]]);
     expect(afterBoth.pendingItems).toBeNull();
     expect(afterBoth.status).toBe('map');
   });
@@ -196,7 +194,7 @@ describe('gauntlet run', () => {
     run = { ...run, status: 'draft' as const, pendingDraft: draftOptions(run), pendingItems: itemDraftOptions(run) };
 
     const afterItem = applyItemPick(run, run.pendingItems![0]);
-    expect(afterItem.items).toEqual([run.pendingItems![0]]);
+    expect(afterItem.items).toEqual([...run.items, run.pendingItems![0]]);
     expect(afterItem.pendingDraft).toEqual(run.pendingDraft); // unit still owed
     expect(afterItem.status).toBe('draft');
     expect(afterItem.army).toEqual(run.army); // no unit taken yet

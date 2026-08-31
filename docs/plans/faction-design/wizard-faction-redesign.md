@@ -20,11 +20,13 @@ Verified against the engine before designing. Three of these change what is wort
 abilities today.** `undead` and `fire_immunity` are in the same category on
 other factions.
 
-### 2. `magic_resistance` is unfixable as written
+### 2. The legacy `magic_resistance` description is too narrow
 
-Only player-side heroes exist as combatants (`battle.ts:419`). Enemies never
-cast. Spell resistance would guard against a threat that does not exist.
-**Dropped from the roster** rather than wired.
+The old ability was framed as spell resistance even though hostile magic can
+also come from unit abilities, Fire, Acid, and damage-over-time packets. Stone
+Golem still drops the legacy ability in favour of Weakness Aura. The shared
+engine implements the broader all-hostile-magic version for Ranger's Unicorn
+rather than retaining a Wizard-specific spell-only rule.
 
 ### 3. `no_melee_penalty` is misnamed for this engine
 
@@ -64,19 +66,19 @@ A granted spell would resolve in the engine and be invisible in the UI.
 
 ### 7. Mysticism's mana regen has no cap
 
-`battle.ts:598` adds regen with no `maxMana` check. Harmless today; unbounded
-once Mana Font, Runed Ballast and Golemancer's Sigil feed the same pool.
+`battle.ts:598` adds regeneration with no `maxMana` check. Clamp every mana-gain
+path to the hero's maximum so a long battle cannot create an unbounded pool.
 
 ---
 
 ## Faction identity
 
-**The Wizard army is a mana-and-spell engine for the hero.**
+**The Wizard army is a positioning-and-spell engine for the hero.**
 
-Stone Golems generate mana. Mages amplify spell damage. The Titan is the
-artillery finish. Artifacts extend the same axis, and some grant new spells
-outright. This is more distinctive than "wizard units ignore armour", and it
-gives artifacts a coherent thing to key off.
+Stone Golems create dangerous magic-damage zones. Mages amplify spell damage.
+The Titan is the artillery finish. Artifacts extend the same axis, and some
+grant new spells outright. This is more distinctive than "wizard units ignore
+armour", and it gives artifacts a coherent thing to key off.
 
 Armour-Piercing survives as a **Titan-only signature** rather than a
 faction-wide trait, and spreads only via the Conduit Array artifact.
@@ -94,7 +96,7 @@ On each hero turn, the Wizard chooses between:
 - preserving mana for a later turn; or
 - building the army and artifact combinations that unlock stronger spells.
 
-The base spellbook remains Lightning, Bloodlust, and Stoneskin. Spell-tome artifacts add Slow, Chain Lightning, Resurrect, and Blizzard. Stone Golems generate mana, Mages increase spell damage, and construct deaths or artifacts can alter the rate at which the spellbook is fuelled.
+The base spellbook remains Lightning, Bloodlust, and Stoneskin. Spell-tome artifacts add Slow, Chain Lightning, Resurrect, and Blizzard. Stone Golems expose nearby units to amplified magic damage, Mages increase spell damage, and construct deaths or artifacts can alter the rate at which the spellbook is fuelled.
 
 Mana follows these rules:
 
@@ -103,6 +105,14 @@ Mana follows these rules:
 - spell access belongs to the individual Wizard hero rather than a global list;
 - non-Wizard heroes cannot cast spells from old saves or spell-granting artifacts; and
 - the UI shows mana and the spellbook only for Wizard.
+
+Damaging Wizard spells use **magic** as their base damage type and may carry a
+more specific attribute for thematic interactions. Lightning and Chain
+Lightning carry **Lightning**; Blizzard carries **Cold**. Caustic Breath is not
+a spell, but its damage is magic carrying **Acid**. An attribute never stops the
+damage from receiving general magic bonuses, vulnerabilities, or resistance.
+Spells such as Bloodlust, Stoneskin, Slow, and Resurrect do not deal damage and
+therefore do not need a damage attribute.
 
 This keeps Wizard's decision system resource-driven, while the other factions make decisions through Orders, Battle Cries, Hunt Plans, sacrifices, or battlefield creatures.
 
@@ -113,9 +123,9 @@ This keeps Wizard's decision system resource-driven, while the other factions ma
 | Unit | Ability 1 | Ability 2 |
 |---|---|---|
 | Gremlin | Repair (active) | Scrap Frenzy |
-| Stone Golem | Mana Font | Unlimited retaliation |
+| Stone Golem | Weakness Aura | Unlimited retaliation |
 | Mage | Arcane Conduit | Combat Casting |
-| Gorgon | Death Stare | Bind, level 1 |
+| Bilehorn | Caustic Breath | Corrosive Carapace |
 | Naga | No retaliation | Double strike |
 | Siege Golem | Crushing Blows | Shockwave |
 | Giant | Boulder Throw | Death Blow |
@@ -131,16 +141,56 @@ creatures up to the count it started with.
 returns at 50% ATB. The effect is self-limiting because of the
 8-shot pool.
 
-**Mana Font** *(Stone Golem)* — while this stack lives, the hero regenerates +1
-mana per round. Presence-based, non-stacking.
+**Weakness Aura** *(Stone Golem)* — every other unit in the eight cells directly
+or diagonally adjacent to this stack takes **double magic damage**.
+
+- It affects enemies and friendly units.
+- It does not affect the Stone Golem carrying the aura unless that Golem is
+  adjacent to another allied Stone Golem.
+- Check adjacency separately for every victim when each magic-damage packet
+  resolves. An area spell may therefore amplify some victims but not others.
+- Moving, teleporting, displacing, or killing the Stone Golem updates the aura
+  immediately.
+- Several Weakness Auras do not multiply one another; a victim is either
+  exposed or not exposed.
+- Attributed magic—such as Fire, Lightning, Cold, or Acid—is still magic and is amplified by the aura before any matching resistance or immunity is checked.
+- Physical, true, sacrifice, and ordinary collision damage are unaffected.
 
 **Arcane Conduit** *(Mage)* — the hero deals 10% more spell damage while this stack lives.
 Presence-based, non-stacking.
 
 **Combat Casting** *(Mage)* — can shoot with an enemy adjacent, at half damage.
 
-**Bind, level 1** *(Gorgon)* — 33% chance on hit to root the target for its
-next turn.
+**Caustic Breath** *(Bilehorn, active ability; cooldown 2)* — choose one of the
+eight directions and spray the first three cells in a straight line.
+
+- Every unit occupying those cells takes 75% of the Bilehorn stack's normal
+  rolled damage as magic damage with the Acid attribute, including friendly
+  units.
+- The line continues through occupied cells and affects every occupant in it.
+- Every survivor becomes Corroded for its next three completed turns.
+- Using the Breath spends the Bilehorn's turn. An invalid direction or a
+  cancelled selection does not start the cooldown.
+- It follows the shared start-of-turn cooldown rules and is ready again on the
+  third Bilehorn turn after use.
+
+**Corrosive Carapace** *(Bilehorn)* — when the Bilehorn takes primary melee
+damage, a surviving attacker becomes Corroded for its next three completed
+turns.
+
+- Retaliation, ranged, secondary, damage-over-time, and artifact damage do not
+  trigger the Carapace.
+- It applies after the incoming melee damage resolves.
+
+**Corroded** is a removable negative combat effect. While Corroded, the unit's
+Defence cannot reduce incoming physical damage; attack-over-defence bonuses
+still apply normally.
+
+- Its duration decreases after the Corroded unit finishes a turn, including
+  Wait, Defend, and a skipped turn.
+- Reapplication refreshes the duration to three turns and never stacks.
+- Cleanse removes it.
+- It does not alter magic, true, sacrifice, or collision damage by itself.
 
 **Shockwave** *(Siege Golem)* — melee hits also deal 50% to enemies adjacent to
 the target.
@@ -161,29 +211,28 @@ positioning a decision rather than free value.
 
 ### Non-stacking auras
 
-`splitStack` exists, so three Mage stacks would otherwise triple the aura. Mana
-Font and Arcane Conduit are **presence-based and non-stacking**: one stack alive
-gives the full bonus, five give the same. Runed Ballast is the artifact that
-deliberately turns this rule off.
+Deployment cannot split stacks. Weakness Aura and Arcane Conduit remain
+**non-stacking** so temporary stack creation, co-op armies, or future summon
+effects cannot multiply them accidentally. Hexfield Core improves the Weakness
+Aura multiplier rather than changing this rule.
 
 ### Reused as-is (zero implementation)
 
-`unlimited_retaliation`, `double_strike`, `death_blow`, `no_retaliation`,
-`death_stare`, `defense_reduction` (Crushing Blows, level 6) are already
+`unlimited_retaliation`, `double_strike`, `death_blow`, `no_retaliation`, and
+`defense_reduction` (Crushing Blows, level 6) are already
 implemented. Tireless Guard was an earlier name for `unlimited_retaliation`;
 use the existing id and label.
 
-### Bind as a leveled ability
+### Legacy Gorgon replacement
 
-The Dendroid's bind is 100% on hit. A T4 Gorgon rooting on every blow is too
-much, but a second `petrify` id is the wrong fix — the tooltip is hardcoded
-`'Dendroid — Bind'` at `unitEffects.ts:145`, which is wrong on a Gorgon anyway
-and wants genericising regardless.
+The existing sprite is a bipedal, armoured, poison-breathing bull creature, not
+a classical Gorgon. Rename the unit to **Bilehorn** while retaining its current
+tier, statistics, size, and sprite. Remove Death Stare from this roster slot;
+Caustic Breath and Corrosive Carapace replace the complete legacy ability set.
 
-Instead make `bind` **leveled** in `ABILITY_CATALOG`: chance = 33%×level,
-`defaultLevel: 3` so the Dendroid keeps its current 100%, and the Gorgon takes
-`abilityLevels: { bind: 1 }`. This is exactly the precedent `defense_reduction`
-already set for the legacy Behemoth.
+Migrate persisted strategic army entries named `Gorgon` to `Bilehorn`. Keep a
+hidden legacy name alias for old saves and replay metadata, but new recruitment,
+tooltips, compendium entries, artifact requirements, and drafts use Bilehorn.
 
 ---
 
@@ -208,49 +257,42 @@ is more surprising than a dud.
 |---|---|---|
 | Ratchet Loader | Common | Scrap Frenzy returns the Gremlin at 65% ATB instead of 50%. |
 | Tinker's Kit | Common | Repair can target any friendly stack, not just constructs. |
-| Runed Ballast | Common | Mana Font stacks — every living Stone Golem stack gives +1 mana/round instead of a flat +1. |
-| Petrifier's Lens | Common | The Gorgon's Bind is level 2 (66%) instead of level 1 (33%). |
+| Hexfield Core | Common | Weakness Aura causes adjacent units to take triple magic damage instead of double. Multiple auras still do not stack. |
+| Pressurised Bile Sac | Common | Caustic Breath travels five cells instead of three. Every occupied cell in the extended line is resolved normally. |
 | Storm Fletching | Common | Lightning Strike splash deals 90% instead of 75% to everyone — including friendlies. |
 | Conduit Array | Rare | Friendly stacks adjacent to a Mage inherit Armour-Piercing. |
-| Golemancer's Sigil | Rare | When a construct stack dies, the hero immediately gains 5 mana. |
+| Prism of the Fallen | Rare | The Wizard hero deals 20% more damage for each non-hero stack that is currently dead. |
 | Overcharged Rods | Rare | Every unit hit by Lightning Strike loses its retaliation until its next turn, friendlies included. |
-| Basilisk Crown | Rare | Death Stare fires at 20% instead of 10%, and a Death Stare kill applies Bind regardless of the Bind roll. |
+| Vitriol Catalyst | Rare | Corroded units take 50% more magic damage. This multiplies with Weakness Aura and applies to fire before Fire Immunity. |
 | Serpent's Coil | Rare | The Naga's Double Strike also applies to its retaliations. |
 | Stormcrown | Epic | Lightning Strike becomes 5×5 at 50%. Still hits friendlies. |
 | The Animus Engine | Epic | Repair can rebuild a construct stack reduced to zero, at 1 creature. Once per stack per battle. |
 | Codex of the Unbound | Epic | Half of Arcane Conduit's spell-damage bonus is added to the damage of every Armour-Piercing attack. |
+
+#### Prism of the Fallen
+
+Count every friendly or enemy non-hero battle stack currently at zero
+creatures, including summoned and raised stacks. A stack that returns through
+rebirth or reconstruction stops contributing while it is alive.
+
+The bonus is additive by dead stack: multiplier = `1 + 0.2 × deadStacks`. Three
+dead stacks therefore make the Wizard hero deal 160% damage. It applies to the
+hero's normal attack and every direct damage packet from a spell or hero
+action, but never to unit damage, healing, or sacrifice costs.
+
+Snapshot the dead-stack count when the hero action begins. Every hit, arc, or
+area packet belonging to that action uses the same multiplier; deaths caused
+mid-action increase the next hero action instead of changing later victims in
+the current action.
 
 ### Wizard spell tomes
 
 | Artifact | Rarity | Grants |
 |---|---|---|
 | Scroll of Slowing | Common | **Slow** (2 mana) — −2 speed and −2 initiative on an enemy stack until its next turn. |
-| Tome of Chain Lightning | Rare | **Chain Lightning** (3 mana) — true damage to a target, arcing to the 2 nearest enemies at 50%. |
+| Tome of Chain Lightning | Rare | **Chain Lightning** (3 mana) — magic damage with the Lightning attribute to a target, arcing to the 2 nearest enemies at 50%. Each victim checks Weakness Aura separately. |
 | Sigil of Resurrection | Epic | **Resurrect** (5 mana) — heals a friendly stack for 30 + 10×hero level, reviving fallen creatures. Pure `applyHeal`. |
-| Tome of the Blizzard | Epic | **Blizzard** (5 mana) — 3×3 true damage, 100% centre / 60% surrounding, friendly fire included. Reuses the splash primitive. |
-
-### Knight
-
-Depends on the Knight ability package (uncapped Militia, Area Shot, Focus,
-Cleanse, Claim Blessing, Gallop, Ride-By Attack, Grand Joust, Overrun, and Large Shield), which is
-specified separately and is a prerequisite for these.
-
-| Artifact | Rarity | Effect |
-|---|---|---|
-| Muster Bell | Common | Militia gains +1 attack/defense per 8 Peasants instead of 10. Still uncapped. |
-| Blackpowder Fletching | Common | Area Shot deals 65% instead of 50% to everyone — including friendlies. |
-| Drillmaster's Manual | Common | Each use of Focus also grants +1 attack and defense. |
-| Silver Spurs | Common | Ride-By Attack's cooldown is reduced from 2 to 1, allowing it to be used every second Cavalier turn. |
-| Shieldwall Standard | Rare | Friendly stacks adjacent to a Swordsman inherit Large Shield. |
-| Barbed Volley | Rare | Every Area Shot survivor loses 2 defense until its next turn, including friendly units. |
-| Gryphon Talon Bracers | Rare | Griffin retaliations deal 50% more damage and advance the Griffin 10% ATB. |
-| Martyr's Banner | Rare | The first time a Peasant stack dies each battle, every surviving Knight stack gains +1 initiative and +1 damage. |
-| Consecrated Censer | Rare | A unit targeted by Cleanse cannot receive new negative combat effects until the start of its next turn. |
-| Stormlance | Epic | Champion penetration continues through every enemy in the line. Each secondary enemy takes 50% of the original hit. |
-| Manual of Perfect Form | Epic | Activating Focus applies one Focus stack to every living Swordsman stack. |
-| Royal Muster | Epic | Half the Peasant's uncapped Militia attack/defense bonus is granted to friendly stacks adjacent to the Peasants. |
-
----
+| Tome of the Blizzard | Epic | **Blizzard** (5 mana) — 3×3 magic damage with the Cold attribute, 100% centre / 60% surrounding, friendly fire included. Each victim checks Weakness Aura separately. Reuses the splash primitive. |
 
 ## Intended builds
 
@@ -260,11 +302,12 @@ the numbers are wrong.
 
 ### Wizard
 
-**The mana battery** — Stone Golems split across several stacks + Runed Ballast
-+ Golemancer's Sigil. Each golem stack feeds a mana per round; each one that
-dies dumps five more. Unlimited retaliation makes clearing them expensive, so
-the hero casts every round of a long fight. Splitting is the play — Runed
-Ballast is what turns off the non-stacking rule.
+**The arcane kill zone** — Stone Golem + Hexfield Core + Prism of the Fallen,
+backed by Lightning, Chain Lightning, or Blizzard. The Golem moves beside a
+priority cluster so exposed units take triple magic damage. Friendly units in
+the same eight cells are equally vulnerable, making the placement dangerous.
+As stacks die on either side, the Prism makes every later hero attack and
+damage spell 20% stronger per currently dead stack.
 
 **Storm artillery** — Titan + Stormcrown + Storm Fletching + Overcharged Rods,
 with Naga and Giant behind. The Titan blankets a 5×5 at 90% and strips
@@ -281,32 +324,12 @@ Golems. Gremlins rebuild construct stacks from zero, so the wall cannot be
 removed while a Gremlin lives. Inverts target priority: the enemy must hunt T1
 chaff first.
 
-**Petrified garden** — Gorgon + Petrifier's Lens + Basilisk Crown + Scroll of
-Slowing. Two thirds of Gorgon hits root, Death Stare kills root for free, and
-Slow handles the rest. The enemy line never reaches the shooters.
+**Vitriol breach** — Bilehorn + Pressurised Bile Sac + Vitriol Catalyst, backed
+by Titan, Naga, and damaging spells. A five-cell Caustic Breath line Corrodes a
+formation for three turns. Physical units then bypass the targets' defensive
+advantage while Wizard magic gains another 50% multiplier. Friendly fire and
+the Bilehorn's slow positioning keep the setup dangerous.
 
-### Knight
-
-**Bombard the shield wall** — Area Shot + Blackpowder Fletching + Shieldwall
-Standard. The player fires deliberately into their own formation, because
-protected allies take reduced damage while enemies absorb the full blast.
-
-**Patient army** — Focus + Drillmaster's Manual + Manual of Perfect Form behind
-a defensive Peasant and Griffin line. The army stands still and scales, forcing
-the enemy to commit before the Swordsmen accumulate too much.
-
-**Peasant engine** — Uncapped Militia + Muster Bell + Martyr's Banner + Royal
-Muster. Peasants start as a stat engine, support the surrounding army, and
-still pay out when destroyed.
-
-**Cavalry assault** — Gallop + Ride-By Attack + Silver Spurs + Grand Joust +
-Overrun + Stormlance. Cavaliers charge exposed targets and return to their
-starting positions, while the Champion commits to aligned enemies and drives
-penetration through the formation.
-
-**Retaliation fortress** — Griffins + Gryphon Talon Bracers + Swordsmen with
-Large Shield + Shieldwall Standard. Ranged attacks are blunted; melee attackers
-feed the Griffin damage and initiative.
 
 ---
 
@@ -349,9 +372,11 @@ for every faction, not just the Wizard.
 
 ### Phase 3 — Wizard abilities
 
-Trivial first (Armour-Piercing, Scrap Frenzy, Combat Casting, Bind level,
-Boulder Throw, and the free reuses), then Mana Font and Arcane Conduit (both
-need a presence check on the round-start and spell-damage paths), then Repair
+Trivial first (Armour-Piercing, Scrap Frenzy, Combat Casting,
+Boulder Throw, and the free reuses), then Weakness Aura and Arcane Conduit
+(both use shared spell-damage queries; Weakness Aura also needs live adjacency
+checks on each victim), then Bilehorn Caustic Breath and Corrosive Carapace,
+then Repair
 (active ability templated on `absorb_skeleton`, plus an AI branch — `ai.ts:14`
 currently only reaches for active abilities when *itself* is wounded).
 

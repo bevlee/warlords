@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { initBattle, applyAction } from '../battle';
+import { aiTakeTurn } from '../ai';
+import { setOccupant } from '../grid';
 import { stepsFromLogEntry } from '../../ui/animSteps';
 import { statusIconFor } from '../../ui/statusIcons';
 import { WOLF_RIDER, GOBLIN, OGRE } from '../barbarian';
@@ -18,10 +20,7 @@ function runBattle(seed: number, morale: number, luck: number): BattleState {
   while (state.result === 'ongoing' && i < 300) {
     const id = state.currentUnitId;
     if (!id) break;
-    const unit = state.units.find(u => u.id === id)!;
-    const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
-    if (!enemies.length) break;
-    state = applyAction(state, { type: 'attack', targetId: enemies[0].id });
+    state = applyAction(state, aiTakeTurn(state, id));
     i++;
   }
   return state;
@@ -76,13 +75,14 @@ describe('luck + morale reach the fx layer across many battles', () => {
       ...state,
       currentUnitId: attacker.id,
       log: [],
-      units: state.units.map(u => (u.id === attacker.id ? { ...u, hp: 1, morale: 3 } : u)),
+      grid: setOccupant(setOccupant(state.grid, attacker.pos, null), { col: defender.pos.col - 1, row: defender.pos.row }, attacker.id),
+      units: state.units.map(u => (u.id === attacker.id ? { ...u, pos: { col: defender.pos.col - 1, row: defender.pos.row }, hp: 1, morale: 3 } : u)),
+      phase: 'combat',
     };
 
     const next = applyAction(state, {
       type: 'attack',
       targetId: defender.id,
-      moveTo: { col: defender.pos.col - 1, row: defender.pos.row },
     });
 
     expect(next.units.find(u => u.id === attacker.id)?.count).toBe(0);

@@ -36,5 +36,5 @@ const bySlug = new Map(
 
 /** Sheet URL for a unit name, or undefined to fall back to the vector standee. */
 export function sheetFor(name: string): string | undefined {
-  return bySlug.get(unitSlug(name));
+  return bySlug.get(unitSlug(name === 'Bilehorn' ? 'Gorgon' : name));
 }

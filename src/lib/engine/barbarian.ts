@@ -4,43 +4,43 @@ export const BARBARIAN_UNITS: UnitDef[] = [
   {
     name: 'Goblin', tier: 1, speed: 5, initiative: 11, hp: 5,
     attack: 2, defense: 1, minDamage: 1, maxDamage: 2,
-    shots: 0, range: 0, isLarge: false, abilities: [],
+    shots: 0, range: 0, isLarge: false, abilities: ['mob_rule', 'blood_rush'],
   },
   {
     name: 'Wolf Rider', tier: 2, speed: 7, initiative: 13, hp: 20,
     attack: 5, defense: 3, minDamage: 2, maxDamage: 5,
-    shots: 0, range: 0, isLarge: false, abilities: [],
+    shots: 0, range: 0, isLarge: false, abilities: ['double_strike', 'pounce'],
   },
   {
     name: 'Orc', tier: 3, speed: 4, initiative: 10, hp: 35,
     attack: 7, defense: 5, minDamage: 4, maxDamage: 8,
-    shots: 4, range: 7, isLarge: false, abilities: [],
+    shots: 4, range: 7, isLarge: false, abilities: ['marking_shot', 'quickdraw'],
   },
   {
     name: 'Ogre', tier: 4, speed: 4, initiative: 9, hp: 75,
     attack: 10, defense: 7, minDamage: 7, maxDamage: 14,
-    shots: 0, range: 0, isLarge: false, abilities: [],
+    shots: 0, range: 0, isLarge: false, abilities: ['bully', 'follow_through'],
   },
   {
     name: 'Ram Rider', tier: 4, speed: 6, initiative: 10, hp: 55,
     attack: 9, defense: 6, minDamage: 6, maxDamage: 10,
-    shots: 0, range: 0, isLarge: false, abilities: ['defense_reduction'],
+    shots: 0, range: 0, isLarge: false, abilities: ['defense_reduction', 'battering_ram'],
     abilityLevels: { defense_reduction: 4 },
   },
   {
     name: 'Cyclops', tier: 5, speed: 6, initiative: 10, hp: 100,
     attack: 15, defense: 10, minDamage: 12, maxDamage: 24,
-    shots: 3, range: 8, isLarge: false, abilities: [],
+    shots: 3, range: 8, isLarge: false, abilities: ['boulder_burst', 'marked_quarry'],
   },
   {
     name: 'Thunderbird', tier: 6, speed: 9, initiative: 14, hp: 150,
     attack: 20, defense: 12, minDamage: 18, maxDamage: 30,
-    shots: 0, range: 0, isLarge: false, abilities: ['flying'],
+    shots: 0, range: 0, isLarge: false, abilities: ['flying', 'thunder_dive'],
   },
   {
     name: 'Behemoth', tier: 7, speed: 6, initiative: 9, hp: 300,
     attack: 30, defense: 18, minDamage: 30, maxDamage: 55,
-    shots: 0, range: 0, isLarge: false, abilities: ['defense_reduction'],
+    shots: 0, range: 0, isLarge: false, abilities: ['defense_reduction', 'rampage'],
   },
 ];
 
@@ -50,6 +50,7 @@ export const GOBLIN = byName('Goblin');
 export const WOLF_RIDER = byName('Wolf Rider');
 export const ORC = byName('Orc');
 export const OGRE = byName('Ogre');
+export const RAM_RIDER = byName('Ram Rider');
 export const CYCLOPS = byName('Cyclops');
 export const THUNDERBIRD = byName('Thunderbird');
 export const BEHEMOTH = byName('Behemoth');

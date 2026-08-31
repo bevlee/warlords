@@ -47,12 +47,6 @@ export function parseClientMessage(value: unknown): ClientMessage | null {
         ? { type: 'deploy.move', unitId: value.unitId, to }
         : null;
     }
-    case 'deploy.split': {
-      const to = parsePos(value.to);
-      return isNonEmptyString(value.unitId) && isPositiveInteger(value.amount) && to
-        ? { type: 'deploy.split', unitId: value.unitId, amount: value.amount, to }
-        : null;
-    }
     case 'deploy.confirm':
       return { type: 'deploy.confirm' };
     case 'battle.action': {
@@ -83,9 +77,11 @@ function parseBattleAction(value: unknown): BattleAction | null {
     }
     case 'attack': {
       if (!isNonEmptyString(value.targetId)) return null;
-      if (value.moveTo === undefined) return { type: 'attack', targetId: value.targetId };
+      if (value.moveTo === undefined) return value.retreatTo === undefined ? { type: 'attack', targetId: value.targetId } : null;
       const moveTo = parsePos(value.moveTo);
-      return moveTo ? { type: 'attack', targetId: value.targetId, moveTo } : null;
+      const retreatTo = value.retreatTo === undefined ? undefined : parsePos(value.retreatTo);
+      if (!moveTo || (value.retreatTo !== undefined && !retreatTo)) return null;
+      return { type: 'attack', targetId: value.targetId, moveTo, ...(retreatTo ? { retreatTo } : {}) };
     }
     case 'shoot':
       return isNonEmptyString(value.targetId) ? { type: 'shoot', targetId: value.targetId } : null;
@@ -96,9 +92,27 @@ function parseBattleAction(value: unknown): BattleAction | null {
     case 'ability':
       // Shape check only — whether this stack may use it right now is
       // isLegalAction's job, against the authoritative state.
-      return isNonEmptyString(value.abilityId) && value.abilityId in UNIT_ABILITIES
-        ? { type: 'ability', abilityId: value.abilityId }
-        : null;
+      if (!isNonEmptyString(value.abilityId) || !(value.abilityId in UNIT_ABILITIES)) return null;
+      if (value.targetId !== undefined && !isNonEmptyString(value.targetId)) return null;
+      const abilityTo = value.to === undefined ? undefined : parsePos(value.to);
+      if (value.to !== undefined && !abilityTo) return null;
+      return {
+        type: 'ability',
+        abilityId: value.abilityId,
+        ...(value.targetId === undefined ? {} : { targetId: value.targetId }),
+        ...(abilityTo ? { to: abilityTo } : {}),
+      };
+    case 'hero_action': {
+      if (!isNonEmptyString(value.actionId)) return null;
+      if (value.targetId !== undefined && !isNonEmptyString(value.targetId)) return null;
+      if (value.area !== undefined && (!Array.isArray(value.area) || value.area.some(pos => !parsePos(pos)))) return null;
+      return {
+        type: 'hero_action',
+        actionId: value.actionId,
+        ...(value.targetId === undefined ? {} : { targetId: value.targetId }),
+        ...(value.area === undefined ? {} : { area: value.area.map(pos => parsePos(pos)!) }),
+      };
+    }
     case 'defend':
       return { type: 'defend' };
     case 'wait':
@@ -138,5 +152,6 @@ function isPositiveInteger(value: unknown): value is number {
 }
 
 function isSpellId(value: unknown): value is SpellId {
-  return value === 'lightning' || value === 'bloodlust' || value === 'stoneskin';
+  return value === 'lightning' || value === 'bloodlust' || value === 'stoneskin' || value === 'slow' ||
+    value === 'chain_lightning' || value === 'resurrect' || value === 'blizzard';
 }

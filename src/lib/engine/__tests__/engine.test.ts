@@ -3,6 +3,7 @@ import { mulberry32 } from '../rng';
 import { calculateDamage, applyDamage, canRetaliate, checkMorale } from '../combat';
 import { createGrid, findPath, chebyshevDistance } from '../grid';
 import { initBattle, applyAction, checkBattleEnd } from '../battle';
+import { aiTakeTurn } from '../ai';
 import { GOBLIN, WOLF_RIDER, ORC, BEHEMOTH } from '../barbarian';
 import { CAVALIER, ARCHER } from '../knight';
 import { GORGON, MAGE } from '../wizard';
@@ -209,10 +210,7 @@ describe('luck events', () => {
     while (state.result === 'ongoing' && iterations < 400) {
       const unitId = state.currentUnitId;
       if (!unitId) break;
-      const unit = state.units.find(u => u.id === unitId)!;
-      const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
-      if (enemies.length === 0) break;
-      state = applyAction(state, { type: 'attack', targetId: enemies[0].id });
+      state = applyAction(state, aiTakeTurn(state, unitId));
       iterations++;
     }
 
@@ -244,14 +242,7 @@ describe('full battle simulation', () => {
     while (state.result === 'ongoing' && iterations < 2000) {
       const unitId = state.currentUnitId;
       if (!unitId) break;
-      const unit = state.units.find(u => u.id === unitId)!;
-      // Simple: always attack the first enemy
-      const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
-      if (enemies.length === 0) break;
-      const action = unit.shotsLeft > 0
-        ? { type: 'shoot' as const, targetId: enemies[0].id }
-        : { type: 'attack' as const, targetId: enemies[0].id };
-      state = applyAction(state, action);
+      state = applyAction(state, aiTakeTurn(state, unitId));
       iterations++;
     }
 
@@ -273,13 +264,7 @@ describe('full battle simulation', () => {
     while (state.result === 'ongoing' && iterations < 2000) {
       const unitId = state.currentUnitId;
       if (!unitId) break;
-      const unit = state.units.find(u => u.id === unitId)!;
-      const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0);
-      if (enemies.length === 0) break;
-      const action = unit.shotsLeft > 0
-        ? { type: 'shoot' as const, targetId: enemies[0].id }
-        : { type: 'attack' as const, targetId: enemies[0].id };
-      state = applyAction(state, action);
+      state = applyAction(state, aiTakeTurn(state, unitId));
       iterations++;
     }
 

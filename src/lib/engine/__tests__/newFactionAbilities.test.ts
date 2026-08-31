@@ -1,274 +1,124 @@
 import { describe, it, expect } from 'vitest';
 import { initBattle, applyAction } from '../battle';
-import { calculateDamage } from '../combat';
-import { effectiveSpeed } from '../selectors';
-import { updateFactionSkills } from '../factionSkills';
-import { CURSE_SHOT_PENALTY } from '../abilityCatalog';
+import { resolveDamagePacket } from '../combat';
+import { setOccupant } from '../grid';
+import { getDartingRetreatCells, getReachableCells } from '../selectors';
 import { GOBLIN } from '../barbarian';
-import { ZOMBIE, GHOST, VAMPIRE, BLACK_KNIGHT, LICH } from '../necromancer';
-import { DENDROID, UNICORN, GRAND_ELF } from '../ranger';
-import { EFREET, IMP } from '../demon';
-import type { BattleState, Hero, UnitStack } from '../types';
+import { DENDROID, GRAND_ELF, SPRITE, UNICORN } from '../ranger';
+import { EFREET } from '../demon';
+import type { BattleState, Hero, Pos } from '../types';
 
-function baseHero(overrides: Partial<Hero> = {}): Hero {
-  return updateFactionSkills({
-    class: 'necromancer', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [],
-    ...overrides,
-  });
+function hero(className: Hero['class']): Hero {
+  return { class: className, level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [] };
 }
 
-function makeStack(overrides: Partial<UnitStack>): UnitStack {
-  return {
-    id: 'test-' + Math.random(),
-    definition: GOBLIN,
-    count: 10,
-    startCount: 10,
-    hp: GOBLIN.hp,
-    pos: { col: 0, row: 0 },
-    side: 'player',
-    hasRetaliated: false,
-    shotsLeft: 0,
-    morale: 0,
-    luck: 0,
-    atb: 0,
-    isDefending: false,
-    ...overrides,
-  };
+function relocate(state: BattleState, id: string, to: Pos): BattleState {
+  const unit = state.units.find(candidate => candidate.id === id)!;
+  const grid = setOccupant(setOccupant(state.grid, unit.pos, null), to, id);
+  return { ...state, phase: 'combat', grid, units: state.units.map(candidate => candidate.id === id ? { ...candidate, pos: to } : candidate) };
 }
 
-function sequenceRng(values: number[]) {
-  let i = 0;
-  return () => values[Math.min(i++, values.length - 1)];
+function adjacentBattle(attackerDef: typeof GOBLIN, className: Hero['class'], rank = 1): { state: BattleState; attackerId: string; targetId: string } {
+  let state = initBattle([{ unit: attackerDef, count: 5 }], [{ unit: GOBLIN, count: 100 }], hero(className), 3, [], undefined, { gauntletRound: rank });
+  const attacker = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
+  const target = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
+  state = relocate(state, attacker.id, { col: 4, row: 4 });
+  state = relocate(state, target.id, { col: 5, row: 4 });
+  return { state: { ...state, currentUnitId: attacker.id }, attackerId: attacker.id, targetId: target.id };
 }
 
-describe('Ghost drain_morale', () => {
-  it('reduces the target stack morale by 1 on hit', () => {
-    const hero = baseHero();
-    const state = initBattle([{ unit: GHOST, count: 5 }], [{ unit: GOBLIN, count: 100 }], hero, 1);
-    const ghost = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const goblin = state.units.find(u => u.side === 'enemy')!;
-    const next = applyAction({ ...state, currentUnitId: ghost.id }, { type: 'attack', targetId: goblin.id });
-    expect(next.units.find(u => u.id === goblin.id)!.morale).toBe(-1);
-  });
-
-  it('caps morale at -3', () => {
-    const hero = baseHero();
-    let state = initBattle([{ unit: GHOST, count: 5 }], [{ unit: GOBLIN, count: 100 }], hero, 1);
-    state = { ...state, units: state.units.map(u => (u.side === 'enemy' ? { ...u, morale: -3 } : u)) };
-    const ghost = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const goblin = state.units.find(u => u.side === 'enemy')!;
-    const next = applyAction({ ...state, currentUnitId: ghost.id }, { type: 'attack', targetId: goblin.id });
-    expect(next.units.find(u => u.id === goblin.id)!.morale).toBe(-3);
-  });
-});
-
-describe('Vampire life_drain', () => {
-  it("heals the striker's top creature by damage/count, capped at full HP", () => {
-    const hero = baseHero();
-    let state = initBattle([{ unit: VAMPIRE, count: 4 }], [{ unit: GOBLIN, count: 100 }], hero, 2);
-    state = { ...state, units: state.units.map(u => (u.definition.name === 'Vampire' ? { ...u, hp: 5 } : u)) };
-    const vampire = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const goblin = state.units.find(u => u.side === 'enemy')!;
-    const next = applyAction({ ...state, currentUnitId: vampire.id }, { type: 'attack', targetId: goblin.id });
-    const updated = next.units.find(u => u.id === vampire.id)!;
-    expect(updated.hp).toBeGreaterThan(5);
-    expect(updated.hp).toBeLessThanOrEqual(VAMPIRE.hp);
-  });
-});
-
-describe('Efreet burn', () => {
-  it("sets burn on melee hit, and it ticks down on the victim's own turn", () => {
-    const hero = baseHero({ class: 'demon' });
-    const state = initBattle([{ unit: EFREET, count: 1 }], [{ unit: GOBLIN, count: 100 }], hero, 3);
-    const efreet = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const goblin = state.units.find(u => u.side === 'enemy')!;
-    const afterHit = applyAction({ ...state, currentUnitId: efreet.id }, { type: 'attack', targetId: goblin.id });
-    const burned = afterHit.units.find(u => u.id === goblin.id)!;
-    expect(burned.burnDamage).toBe(3);
+describe('redesigned faction abilities', () => {
+  it('scales Burn from the stored actual Gauntlet Rank', () => {
+    const { state, attackerId, targetId } = adjacentBattle(EFREET, 'demon', 4);
+    const afterHit = applyAction(state, { type: 'attack', targetId });
+    const burned = afterHit.units.find(unit => unit.id === targetId)!;
+    expect(burned.burnDamage).toBe(12);
     expect(burned.burnRoundsLeft).toBe(2);
 
-    const beforeTotalHp = (burned.count - 1) * GOBLIN.hp + burned.hp;
-    const afterTick = applyAction({ ...afterHit, currentUnitId: goblin.id }, { type: 'wait' });
-    const ticked = afterTick.units.find(u => u.id === goblin.id)!;
-    expect(ticked.burnRoundsLeft).toBe(1);
-    const afterTotalHp = (ticked.count - 1) * GOBLIN.hp + ticked.hp;
-    expect(beforeTotalHp - afterTotalHp).toBe(3);
+    const beforeHp = (burned.count - 1) * burned.definition.hp + burned.hp;
+    const afterTick = applyAction({ ...afterHit, currentUnitId: targetId }, { type: 'wait' });
+    const ticked = afterTick.units.find(unit => unit.id === targetId)!;
+    const afterHp = (ticked.count - 1) * ticked.definition.hp + ticked.hp;
+    expect(beforeHp - afterHp).toBe(12);
+    expect(afterTick.units.find(unit => unit.id === attackerId)).toBeTruthy();
   });
-});
 
-describe('Dendroid bind', () => {
-  it("blocks the bound unit's move exactly once, then clears", () => {
-    const hero = baseHero({ class: 'ranger' });
-    const state = initBattle([{ unit: DENDROID, count: 1 }], [{ unit: GOBLIN, count: 100 }], hero, 4);
-    const dendroid = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const goblin = state.units.find(u => u.side === 'enemy')!;
-    const afterHit = applyAction({ ...state, currentUnitId: dendroid.id }, { type: 'attack', targetId: goblin.id });
-    const bound = afterHit.units.find(u => u.id === goblin.id)!;
-    expect(bound.boundUntilRound).toBeDefined();
+  it('keeps Dendroid Bind until that source Dendroid moves', () => {
+    const { state, attackerId, targetId } = adjacentBattle(DENDROID, 'ranger');
+    const boundState = applyAction(state, { type: 'attack', targetId });
+    const bound = boundState.units.find(unit => unit.id === targetId)!;
+    expect(bound.effects?.some(effect => effect.kind === 'bind' && effect.sourceStackId === attackerId)).toBe(true);
 
-    const originalPos = bound.pos;
-    const moveTarget = { col: originalPos.col + 1, row: originalPos.row };
-    const blockedMove = applyAction({ ...afterHit, currentUnitId: goblin.id }, { type: 'move', to: moveTarget });
-    const afterBlocked = blockedMove.units.find(u => u.id === goblin.id)!;
-    expect(afterBlocked.pos).toEqual(originalPos);
-    expect(afterBlocked.boundUntilRound).toBeUndefined();
+    const rejected = applyAction({ ...boundState, currentUnitId: targetId }, { type: 'move', to: { col: 6, row: 4 } });
+    expect(rejected.units.find(unit => unit.id === targetId)?.pos).toEqual(bound.pos);
+    expect(rejected.actionSeq).toBe(boundState.actionSeq);
 
-    const secondMove = applyAction({ ...blockedMove, currentUnitId: goblin.id }, { type: 'move', to: moveTarget });
-    expect(secondMove.units.find(u => u.id === goblin.id)!.pos).toEqual(moveTarget);
+    const source = boundState.units.find(unit => unit.id === attackerId)!;
+    const destination = getReachableCells(boundState.grid, source)[0];
+    expect(destination).toBeTruthy();
+    const sourceMoved = applyAction({ ...boundState, currentUnitId: attackerId }, { type: 'move', to: destination });
+    expect(sourceMoved.units.find(unit => unit.id === targetId)?.effects?.some(effect => effect.kind === 'bind')).toBe(false);
   });
-});
 
-describe('Zombie slow_on_hit', () => {
-  it("has a chance to reduce the target's speed for the rest of the round", () => {
-    const hero = baseHero();
-    let proced = false;
-    for (let seed = 1; seed <= 50 && !proced; seed++) {
-      const state = initBattle([{ unit: ZOMBIE, count: 3 }], [{ unit: GOBLIN, count: 100 }], hero, seed);
-      const zombie = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const goblin = state.units.find(u => u.side === 'enemy')!;
-      const next = applyAction({ ...state, currentUnitId: zombie.id }, { type: 'attack', targetId: goblin.id });
-      const updated = next.units.find(u => u.id === goblin.id)!;
-      if (updated.speedPenalty === 1) {
-        proced = true;
-        expect(effectiveSpeed(updated)).toBe(GOBLIN.speed - 1);
-      }
+  it('gives the whole Ranger army Luck while a Unicorn lives', () => {
+    const state = initBattle([{ unit: UNICORN, count: 1 }, { unit: GRAND_ELF, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero('ranger'), 1);
+    for (const unit of state.units.filter(candidate => candidate.side === 'player' && !candidate.isHero)) {
+      expect(unit.luck).toBe(1);
     }
-    expect(proced).toBe(true);
   });
 
-  it('clears once a new round begins', () => {
-    const hero = baseHero();
-    let found: { state: BattleState; goblinId: string } | null = null;
-    for (let seed = 1; seed <= 50 && !found; seed++) {
-      const state = initBattle([{ unit: ZOMBIE, count: 3 }], [{ unit: GOBLIN, count: 100 }], hero, seed);
-      const zombie = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const goblin = state.units.find(u => u.side === 'enemy')!;
-      const next = applyAction({ ...state, currentUnitId: zombie.id }, { type: 'attack', targetId: goblin.id });
-      const updated = next.units.find(u => u.id === goblin.id)!;
-      if (updated.speedPenalty === 1) found = { state: next, goblinId: goblin.id };
-    }
-    expect(found).not.toBeNull();
+  it('resists hostile magic damage but not physical damage', () => {
+    const state = initBattle([{ unit: UNICORN, count: 1 }], [{ unit: GOBLIN, count: 20 }], hero('ranger'), 1);
+    const unicorn = state.units.find(unit => unit.definition.name === 'Unicorn')!;
+    const source = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
+    const magic = resolveDamagePacket(state, {
+      sourceId: source.id, targetId: unicorn.id, amount: 30, type: 'magic', attributes: ['fire'],
+      delivery: 'primary', direct: true, ranged: false, canTriggerOnHit: false, canLifeDrain: false,
+    }, () => 0);
+    expect(magic.outcome.resisted).toBe(true);
+    expect(magic.outcome.finalDamage).toBe(0);
 
-    let { state } = found!;
-    const startRound = state.round;
-    let iterations = 0;
-    while (state.round === startRound && iterations < 100) {
-      state = applyAction(state, { type: 'wait' });
-      iterations++;
-    }
-    expect(state.round).toBeGreaterThan(startRound);
-    expect(state.units.find(u => u.id === found!.goblinId)!.speedPenalty).toBeUndefined();
-  });
-});
-
-describe('Unicorn blind_on_hit', () => {
-  it('can blind the target, causing it to skip its next turn', () => {
-    const hero = baseHero({ class: 'ranger' });
-    let procState: BattleState | null = null;
-    let blindedId = '';
-    for (let seed = 1; seed <= 80 && !procState; seed++) {
-      const state = initBattle([{ unit: UNICORN, count: 3 }], [{ unit: GOBLIN, count: 100 }], hero, seed);
-      const unicorn = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const goblin = state.units.find(u => u.side === 'enemy')!;
-      const next = applyAction({ ...state, currentUnitId: unicorn.id }, { type: 'attack', targetId: goblin.id });
-      const updated = next.units.find(u => u.id === goblin.id)!;
-      if (updated.blindedUntilRound !== undefined) {
-        procState = next;
-        blindedId = goblin.id;
-      }
-    }
-    expect(procState).not.toBeNull();
-
-    const skip = applyAction({ ...procState!, currentUnitId: blindedId }, { type: 'wait' });
-    expect(skip.currentUnitId).not.toBe(blindedId);
-    const blindEvent = skip.log.find(
-      e => e.type === 'status' && e.data.effect === 'blind' && e.data.unitId === blindedId
-    );
-    expect(blindEvent).toBeDefined();
-    expect(skip.units.find(u => u.id === blindedId)!.blindedUntilRound).toBeUndefined();
-  });
-});
-
-describe('Black Knight death_blow', () => {
-  it('doubles damage on proc', () => {
-    const attacker = makeStack({ definition: BLACK_KNIGHT, count: 1 });
-    const defender = makeStack({ definition: GOBLIN, side: 'enemy', count: 100 });
-    const damage = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.1]));
-    const withoutProc = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.5]));
-    expect(damage).toBe(withoutProc * 2);
+    const physical = resolveDamagePacket(state, {
+      sourceId: source.id, targetId: unicorn.id, amount: 30, type: 'physical', attributes: [],
+      delivery: 'primary', direct: true, ranged: false, canTriggerOnHit: false, canLifeDrain: false,
+    }, () => 0);
+    expect(physical.outcome.finalDamage).toBe(30);
   });
 
-  it('does not apply to units without death_blow', () => {
-    const attacker = makeStack({ definition: GOBLIN, count: 1 });
-    const defender = makeStack({ definition: GOBLIN, side: 'enemy', count: 100 });
-    const damage = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.01]));
-    const base = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.5]));
-    expect(damage).toBe(base);
+  it('keeps Grand Elf double shot while adding per-arrow Focus Fire', () => {
+    const state = initBattle([{ unit: GRAND_ELF, count: 5 }], [{ unit: GOBLIN, count: 200 }], hero('ranger'), 5);
+    const elf = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
+    const target = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
+    const next = applyAction({ ...state, phase: 'combat', currentUnitId: elf.id }, { type: 'shoot', targetId: target.id });
+    const shots = next.log.filter(event => event.type === 'shoot');
+    expect(shots).toHaveLength(2);
+    expect(Number(shots[1].data.damage)).toBeGreaterThan(Number(shots[0].data.damage));
   });
-});
 
-describe('Grand Elf double_shot', () => {
-  it('fires twice and consumes 2 shots', () => {
-    const hero = baseHero({ class: 'ranger' });
-    const state = initBattle([{ unit: GRAND_ELF, count: 5 }], [{ unit: GOBLIN, count: 200 }], hero, 5);
-    const elf = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const goblin = state.units.find(u => u.side === 'enemy')!;
-    const next = applyAction({ ...state, currentUnitId: elf.id }, { type: 'shoot', targetId: goblin.id });
-    expect(next.log.filter(e => e.type === 'shoot').length).toBe(2);
-    expect(next.units.find(u => u.id === elf.id)!.shotsLeft).toBe(GRAND_ELF.shots - 2);
-  });
-});
-
-describe('Lich curse_shot', () => {
-  it('reduces only the target attack by 5 with every shot', () => {
-    const hero = baseHero();
+  it('lets Blinkwing Mantle spend unused movement on a chosen Darting Assault retreat', () => {
     let state = initBattle(
-      [{ unit: LICH, count: 3 }],
-      [{ unit: GOBLIN, count: 50 }, { unit: GOBLIN, count: 50 }],
-      hero,
-      6
+      [{ unit: SPRITE, count: 5 }],
+      [{ unit: GOBLIN, count: 100 }],
+      hero('ranger'),
+      8,
+      [],
+      undefined,
+      { artifacts: { player: ['blinkwing_mantle'] } },
     );
-    const lich = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const [target, otherEnemy] = state.units.filter(u => u.side === 'enemy');
+    const sprite = state.units.find(unit => unit.definition.name === 'Sprite')!;
+    const target = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
+    state = relocate(state, sprite.id, { col: 1, row: 4 });
+    state = relocate(state, target.id, { col: 5, row: 4 });
+    state = { ...state, currentUnitId: sprite.id };
+    const movedSprite = state.units.find(unit => unit.id === sprite.id)!;
+    const attackCell = { col: 4, row: 4 };
+    const retreatTo = { col: 2, row: 2 };
 
-    state = applyAction({ ...state, currentUnitId: lich.id }, { type: 'shoot', targetId: target.id });
-    expect(state.units.find(u => u.id === target.id)!.attackBuff).toBe(-CURSE_SHOT_PENALTY);
-    expect(state.units.find(u => u.id === otherEnemy.id)!.attackBuff).toBeUndefined();
+    expect(getDartingRetreatCells(state, movedSprite, attackCell)).toContainEqual(retreatTo);
+    const next = applyAction(state, { type: 'attack', targetId: target.id, moveTo: attackCell, retreatTo });
 
-    state = applyAction({ ...state, currentUnitId: lich.id }, { type: 'shoot', targetId: target.id });
-    expect(state.units.find(u => u.id === target.id)!.attackBuff).toBe(-2 * CURSE_SHOT_PENALTY);
-    expect(state.units.find(u => u.id === target.id)!.modifierSources).toContainEqual({
-      id: 'curse_shot',
-      label: 'Lich — Curse Shot',
-      stats: { attack: -2 * CURSE_SHOT_PENALTY },
-      stacks: 2,
-    });
-    expect(state.log.filter(e => e.type === 'status' && e.data.effect === 'curse')).toHaveLength(2);
-  });
-});
-
-describe('Demon Gating', () => {
-  it('never revives a fallen Demon unit without the skill unlocked', () => {
-    const hero = baseHero({ class: 'demon', level: 1 }); // gating unlocks at level 5
-    for (let seed = 1; seed <= 15; seed++) {
-      const state = initBattle([{ unit: IMP, count: 1 }], [{ unit: GOBLIN, count: 100 }], hero, seed);
-      const imp = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const goblin = state.units.find(u => u.side === 'enemy')!;
-      const next = applyAction({ ...state, currentUnitId: goblin.id }, { type: 'attack', targetId: imp.id });
-      expect(next.units.find(u => u.id === imp.id)!.count).toBe(0);
-    }
-  });
-
-  it('has a chance to revive a fallen Demon unit once unlocked', () => {
-    const hero = baseHero({ class: 'demon', level: 15 }); // gating level 3 => 60% chance
-    let revived = false;
-    for (let seed = 1; seed <= 40 && !revived; seed++) {
-      const state = initBattle([{ unit: IMP, count: 1 }], [{ unit: GOBLIN, count: 100 }], hero, seed);
-      const imp = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const goblin = state.units.find(u => u.side === 'enemy')!;
-      const next = applyAction({ ...state, currentUnitId: goblin.id }, { type: 'attack', targetId: imp.id });
-      if (next.units.find(u => u.id === imp.id)!.count === 1) revived = true;
-    }
-    expect(revived).toBe(true);
+    expect(next.units.find(unit => unit.id === sprite.id)?.pos).toEqual(retreatTo);
+    expect(next.grid.cells[retreatTo.row][retreatTo.col].occupantId).toBe(sprite.id);
+    expect(next.log.some(event => event.type === 'retaliate')).toBe(false);
   });
 });

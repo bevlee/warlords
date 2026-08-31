@@ -21,7 +21,6 @@ export const DEBUG_ABILITY_IDS = [
   'bravery',
   'burn',
   'death_blow',
-  'death_stare',
   'defense_reduction',
   'double_shot',
   'double_strike',

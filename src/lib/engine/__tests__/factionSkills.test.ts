@@ -5,121 +5,51 @@ import {
   applyArmorerBonus,
   getMoraleBonus,
   getSorceryMultiplier,
+  maxMana,
   updateFactionSkills,
 } from '../factionSkills';
 import type { Hero } from '../types';
 
-function makeHero(overrides: Partial<Hero>): Hero {
+const skill = (id: string, level: 1 | 2 | 3) => ({ id, level, name: id, description: id });
+
+function makeHero(overrides: Partial<Hero> = {}): Hero {
   return {
-    class: 'barbarian',
-    level: 1,
-    xp: 0,
-    attack: 0,
-    defense: 0,
-    statPoints: 0,
-    factionSkills: [],
-    ...overrides,
+    class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1,
+    statPoints: 0, factionSkills: [], ...overrides,
   };
 }
 
-describe('updateFactionSkills', () => {
-  it('barbarian: only offense unlocked at level 1', () => {
-    const hero = updateFactionSkills(makeHero({ level: 1 }));
-    expect(hero.factionSkills.map(s => s.id)).toEqual(['offense']);
-    expect(hero.factionSkills[0].level).toBe(1);
+describe('explicit faction-skill compatibility', () => {
+  it('does not manufacture silent combat bonuses as the hero levels', () => {
+    for (const heroClass of ['barbarian', 'knight', 'wizard', 'ranger', 'demon', 'necromancer'] as const) {
+      expect(updateFactionSkills(makeHero({ class: heroClass, level: 50 })).factionSkills).toEqual([]);
+    }
   });
 
-  it('barbarian: armorer unlocks at level 3, leadership at level 5', () => {
-    const l3 = updateFactionSkills(makeHero({ level: 3 }));
-    expect(l3.factionSkills.map(s => s.id).sort()).toEqual(['armorer', 'offense']);
-
-    const l5 = updateFactionSkills(makeHero({ level: 5 }));
-    expect(l5.factionSkills.map(s => s.id).sort()).toEqual(['armorer', 'leadership', 'offense']);
-  });
-
-  it('skill level advances every 3 levels above unlock, capped at 3', () => {
-    const atUnlock = updateFactionSkills(makeHero({ level: 1 }));
-    expect(atUnlock.factionSkills.find(s => s.id === 'offense')?.level).toBe(1);
-
-    const plus3 = updateFactionSkills(makeHero({ level: 4 }));
-    expect(plus3.factionSkills.find(s => s.id === 'offense')?.level).toBe(2);
-
-    const plus6 = updateFactionSkills(makeHero({ level: 7 }));
-    expect(plus6.factionSkills.find(s => s.id === 'offense')?.level).toBe(3);
-
-    const plus99 = updateFactionSkills(makeHero({ level: 50 }));
-    expect(plus99.factionSkills.find(s => s.id === 'offense')?.level).toBe(3);
-  });
-
-  it('knight and wizard have their own skill sets', () => {
-    const knight = updateFactionSkills(makeHero({ class: 'knight', level: 1 }));
-    expect(knight.factionSkills.map(s => s.id)).toEqual(['tactics']);
-
-    const wizard = updateFactionSkills(makeHero({ class: 'wizard', level: 1 }));
-    expect(wizard.factionSkills.map(s => s.id)).toEqual(['sorcery']);
-  });
-});
-
-describe('getSkillLevel', () => {
-  it('returns 0 when the skill has not been unlocked', () => {
-    const hero = updateFactionSkills(makeHero({ level: 1 }));
-    expect(getSkillLevel(hero, 'armorer')).toBe(0);
-  });
-
-  it('returns the unlocked level', () => {
-    const hero = updateFactionSkills(makeHero({ level: 4 }));
+  it('preserves an explicitly persisted legacy skill without levelling it', () => {
+    const hero = makeHero({ factionSkills: [skill('offense', 2)] });
+    expect(updateFactionSkills({ ...hero, level: 20 }).factionSkills).toEqual([skill('offense', 2)]);
     expect(getSkillLevel(hero, 'offense')).toBe(2);
   });
-});
 
-describe('applyOffenseBonus', () => {
-  it('adds no bonus when offense is not unlocked', () => {
-    const hero = makeHero({ factionSkills: [] });
-    expect(applyOffenseBonus(100, hero)).toBe(100);
+  it('keeps compatibility helpers scoped to explicit skills', () => {
+    const plain = makeHero();
+    expect(applyOffenseBonus(100, plain)).toBe(100);
+    expect(applyArmorerBonus(100, plain)).toBe(100);
+    expect(getMoraleBonus(plain)).toBe(0);
+    expect(getSorceryMultiplier(plain)).toBe(1);
+
+    const skilled = makeHero({ factionSkills: [
+      skill('offense', 2), skill('armorer', 1), skill('leadership', 3), skill('sorcery', 1),
+    ] });
+    expect(applyOffenseBonus(100, skilled)).toBe(106);
+    expect(applyArmorerBonus(100, skilled)).toBe(97);
+    expect(getMoraleBonus(skilled)).toBe(3);
+    expect(getSorceryMultiplier(skilled)).toBe(1.05);
   });
 
-  it('adds 3% per skill level for barbarians', () => {
-    const hero = updateFactionSkills(makeHero({ level: 1 })); // offense lvl 1
-    expect(applyOffenseBonus(100, hero)).toBe(103);
-  });
-});
-
-describe('applyArmorerBonus', () => {
-  it('reduces damage by 3% per level for barbarians', () => {
-    const hero = updateFactionSkills(makeHero({ level: 3 })); // armorer lvl 1
-    expect(applyArmorerBonus(100, hero)).toBe(97);
-  });
-
-  it('reduces damage by 5% per level for knights', () => {
-    const hero = updateFactionSkills(makeHero({ class: 'knight', level: 2 })); // armorer lvl 1
-    expect(applyArmorerBonus(100, hero)).toBe(95);
-  });
-
-  it('never reduces damage below 1', () => {
-    const hero = updateFactionSkills(makeHero({ level: 3 }));
-    expect(applyArmorerBonus(1, hero)).toBe(1);
-  });
-});
-
-describe('getMoraleBonus', () => {
-  it('is 0 before leadership unlocks', () => {
-    const hero = updateFactionSkills(makeHero({ level: 1 }));
-    expect(getMoraleBonus(hero)).toBe(0);
-  });
-
-  it('matches the leadership skill level once unlocked', () => {
-    const hero = updateFactionSkills(makeHero({ level: 5 })); // leadership lvl 1
-    expect(getMoraleBonus(hero)).toBe(1);
-  });
-});
-
-describe('getSorceryMultiplier', () => {
-  it('is 1 with no sorcery', () => {
-    expect(getSorceryMultiplier(makeHero({ class: 'wizard', factionSkills: [] }))).toBe(1);
-  });
-
-  it('adds 5% per level for wizards', () => {
-    const hero = updateFactionSkills(makeHero({ class: 'wizard', level: 1 })); // sorcery lvl 1
-    expect(getSorceryMultiplier(hero)).toBe(1.05);
+  it('only gives mana to Wizard heroes', () => {
+    expect(maxMana(makeHero({ class: 'barbarian', level: 20 }))).toBe(0);
+    expect(maxMana(makeHero({ class: 'wizard', level: 2 }))).toBe(11);
   });
 });

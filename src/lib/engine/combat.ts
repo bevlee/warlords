@@ -1,8 +1,11 @@
-import type { BattleEvent, UnitStack, Hero } from './types.ts';
+import type { BattleEvent, BattleState, DamageAttribute, DamageOutcome, DamagePacket, UnitStack, Hero } from './types.ts';
 import { abilityLevel, defenseReductionMult, BLOOD_FRENZY_DAMAGE } from './abilityCatalog.ts';
 import type { Rng } from './rng.ts';
 import { chebyshevDistance } from './grid.ts';
 import { addModifierSource } from './unitModifiers.ts';
+import { controllerOfUnit, hasArtifact } from './artifacts.ts';
+import { trainingBonus } from './training.ts';
+import { incomingMarkMultiplier } from './marks.ts';
 
 /**
  * A stack's attack and defense as the damage formula sees them: base, plus the
@@ -22,6 +25,113 @@ export function effectiveAttack(stack: UnitStack, heroAttack = 0): number {
 
 export function effectiveDefense(stack: UnitStack): number {
   return Math.max(0, stack.definition.defense + (stack.defenseBuff ?? 0));
+}
+
+export function effectiveAttackInBattle(state: BattleState, stack: UnitStack): number {
+  const controller = controllerOfUnit(stack);
+  const hero = stack.controllerId ? state.heroes?.[stack.controllerId] : stack.side === 'player' ? state.hero : undefined;
+  const controllerAttack = state.controllerStats?.[controller]?.attack ?? 0;
+  let derived = 0;
+  if (stack.definition.abilities.includes('militia')) {
+    const divisor = hasArtifact(state, stack, 'muster_bell') ? 8 : 10;
+    derived += Math.floor(stack.count / divisor);
+  }
+  const royalPeasant = state.units.find(unit => unit.count > 0 && unit.definition.abilities.includes('militia') && unit.side === stack.side &&
+    chebyshevDistance(unit.pos, stack.pos) === 1 && hasArtifact(state, unit, 'royal_muster'));
+  if (royalPeasant) derived += Math.floor(Math.floor(royalPeasant.count / (hasArtifact(state, royalPeasant, 'muster_bell') ? 8 : 10)) / 2);
+  return Math.max(0, stack.definition.attack + (stack.attackBuff ?? 0) + (hero?.attack ?? 0) + controllerAttack + trainingBonus(state, stack).attack + derived);
+}
+
+export function effectiveDefenseInBattle(state: BattleState, stack: UnitStack): number {
+  const controller = controllerOfUnit(stack);
+  const hero = stack.controllerId ? state.heroes?.[stack.controllerId] : stack.side === 'player' ? state.hero : undefined;
+  const controllerDefense = state.controllerStats?.[controller]?.defense ?? 0;
+  let derived = 0;
+  if (stack.definition.abilities.includes('militia')) {
+    const divisor = hasArtifact(state, stack, 'muster_bell') ? 8 : 10;
+    derived += Math.floor(stack.count / divisor);
+  }
+  const royalPeasant = state.units.find(unit => unit.count > 0 && unit.definition.abilities.includes('militia') && unit.side === stack.side &&
+    chebyshevDistance(unit.pos, stack.pos) === 1 && hasArtifact(state, unit, 'royal_muster'));
+  if (royalPeasant) derived += Math.floor(Math.floor(royalPeasant.count / (hasArtifact(state, royalPeasant, 'muster_bell') ? 8 : 10)) / 2);
+  return Math.max(0, stack.definition.defense + (stack.defenseBuff ?? 0) + (hero?.defense ?? 0) + controllerDefense + trainingBonus(state, stack).defense + derived);
+}
+
+export function modifiedDamageInBattle(
+  state: BattleState,
+  attacker: UnitStack,
+  defender: UnitStack,
+  dmgPerCreature: number,
+  options: { type?: DamagePacket['type']; armourPiercing?: boolean } = {},
+): number {
+  let total = (dmgPerCreature + (attacker.damageBonus ?? 0)) * attacker.count;
+  if ((options.type ?? 'physical') !== 'physical') return total;
+  const attack = effectiveAttackInBattle(state, attacker);
+  let defense = effectiveDefenseInBattle(state, defender);
+  if (defender.isDefending) defense = Math.floor(defense * 1.3);
+  const reduction = attacker.definition.abilities.includes('crushing_blows') ? 6 : abilityLevel(attacker.definition, 'defense_reduction');
+  if (reduction) defense = Math.floor(defense * defenseReductionMult(reduction));
+  const corroded = (defender.effects ?? []).some(effect => effect.kind === 'corroded');
+  const conduitPiercing = state.units.some(unit => unit.count > 0 && unit.definition.name === 'Mage' && unit.side === attacker.side &&
+    chebyshevDistance(unit.pos, attacker.pos) === 1 && hasArtifact(state, unit, 'conduit_array'));
+  const piercing = !!options.armourPiercing || attacker.definition.abilities.includes('armour_piercing') || conduitPiercing || corroded;
+  if (piercing) defense = Math.min(defense, attack);
+  if (attack > defense) total *= 1 + 0.05 * (attack - defense);
+  else if (defense > attack) total /= 1 + 0.05 * (defense - attack);
+  if (piercing && hasArtifact(state, attacker, 'codex_of_the_unbound')) total *= 1.05;
+  return total;
+}
+
+const ATTRIBUTE_ORDER: DamageAttribute[] = ['fire', 'lightning', 'cold', 'acid'];
+export function normalizeDamageAttributes(attributes: DamageAttribute[] | undefined): DamageAttribute[] | undefined {
+  if (!attributes?.length) return undefined;
+  const set = new Set(attributes);
+  return ATTRIBUTE_ORDER.filter(attribute => set.has(attribute));
+}
+
+export function normalizeDamagePacket(packet: DamagePacket): DamagePacket {
+  return { ...packet, attributes: normalizeDamageAttributes(packet.attributes) };
+}
+
+/** Apply packet-level incoming modifiers and resistance, then mutate only HP. */
+export function resolveDamagePacket(
+  state: BattleState,
+  packetInput: DamagePacket,
+  rng: Rng,
+): { target: UnitStack; outcome: DamageOutcome } {
+  const packet = normalizeDamagePacket(packetInput);
+  const target = state.units.find(unit => unit.id === packet.targetId);
+  if (!target || target.count <= 0) {
+    return { target: target!, outcome: { finalDamage: 0, killed: 0, overkill: 0, soulReaperKills: 0, survived: false } };
+  }
+  const source = packet.sourceId ? state.units.find(unit => unit.id === packet.sourceId) : undefined;
+  let amount = packet.amount;
+  if (source) amount *= incomingMarkMultiplier(state, source, target, packet.ranged);
+  if (packet.type === 'magic') {
+    const adjacentAura = state.units.some(unit => unit.count > 0 && unit.definition.abilities.includes('weakness_aura') && chebyshevDistance(unit.pos, target.pos) === 1);
+    if (adjacentAura) {
+      const aura = state.units.find(unit => unit.count > 0 && unit.definition.abilities.includes('weakness_aura') && chebyshevDistance(unit.pos, target.pos) === 1)!;
+      amount *= hasArtifact(state, aura, 'hexfield_core') ? 3 : 2;
+    }
+    if ((target.effects ?? []).some(effect => effect.kind === 'corroded') && source && hasArtifact(state, source, 'vitriol_catalyst')) amount *= 1.5;
+    if (target.definition.abilities.includes('magic_resistance') && source?.side !== target.side && rng() < 0.5) {
+      return { target, outcome: { finalDamage: 0, killed: 0, overkill: 0, soulReaperKills: 0, survived: true, resisted: true } };
+    }
+  }
+  if (packet.attributes?.includes('fire') && target.definition.abilities.includes('fire_immunity')) amount = 0;
+  const finalDamage = Math.max(0, Math.round(amount));
+  const beforeHp = (target.count - 1) * target.definition.hp + target.hp;
+  const result = damageStack(target, finalDamage, state);
+  return {
+    target: result.remaining,
+    outcome: {
+      finalDamage,
+      killed: result.killed,
+      overkill: Math.max(0, finalDamage - beforeHp),
+      soulReaperKills: 0,
+      survived: result.remaining.count > 0,
+    },
+  };
 }
 
 /**
@@ -45,7 +155,7 @@ export function modifiedDamage(
   }
 
   // Defense reduction: −5% target defense per level (legacy Behemoth = level 8 = 40%).
-  const drLevel = abilityLevel(attacker.definition, 'defense_reduction');
+  const drLevel = attacker.definition.abilities.includes('crushing_blows') ? 6 : abilityLevel(attacker.definition, 'defense_reduction');
   if (drLevel > 0) {
     def = Math.floor(def * defenseReductionMult(drLevel));
   }
@@ -101,16 +211,31 @@ export function calculateDamage(
     if (luckSink) luckSink.luck = 'bad';
   }
 
-  // Wizard Gorgon Death Stare: 10% chance to instantly kill the top defending creature.
-  if (attacker.definition.abilities.includes('death_stare') && rng() < 0.1) {
-    totalDamage += defender.definition.hp;
-  }
-
   // Necromancer Black Knight Death Blow: 20% chance to deal double damage.
   if (attacker.definition.abilities.includes('death_blow') && rng() < 0.2) {
     totalDamage *= 2;
   }
 
+  return Math.max(1, Math.round(totalDamage));
+}
+
+export function calculateDamageInBattle(
+  state: BattleState,
+  attacker: UnitStack,
+  defender: UnitStack,
+  rng: Rng,
+  luckSink?: LuckSink,
+): number {
+  const perCreature = attacker.definition.minDamage + Math.floor(rng() * (attacker.definition.maxDamage - attacker.definition.minDamage + 1));
+  let totalDamage = modifiedDamageInBattle(state, attacker, defender, perCreature);
+  if (attacker.luck > 0 && rng() < 0.125 * attacker.luck) {
+    totalDamage *= 2;
+    if (luckSink) luckSink.luck = 'good';
+  } else if (attacker.luck < 0 && rng() < 0.125 * Math.abs(attacker.luck)) {
+    totalDamage *= 0.5;
+    if (luckSink) luckSink.luck = 'bad';
+  }
+  if (attacker.definition.abilities.includes('death_blow') && rng() < 0.2) totalDamage *= 2;
   return Math.max(1, Math.round(totalDamage));
 }
 
@@ -155,6 +280,7 @@ export function applyDamage(defender: UnitStack, damage: number): DamageResult {
  *  produced. Callers already build a log array per hit, so they just spread it. */
 export interface StrikeResult extends DamageResult {
   events: BattleEvent[];
+  soulReaperKills: number;
 }
 
 /**
@@ -164,12 +290,12 @@ export interface StrikeResult extends DamageResult {
  * spell — which is why it lives on the shared damage wrappers below rather
  * than in applyOnHitEffects (that only sees attacks).
  */
-function frenzy(stack: UnitStack, damage: number): { stack: UnitStack; events: BattleEvent[] } {
+function frenzy(stack: UnitStack, damage: number, bonus = BLOOD_FRENZY_DAMAGE): { stack: UnitStack; events: BattleEvent[] } {
   if (damage <= 0 || stack.count <= 0) return { stack, events: [] };
   if (!stack.definition.abilities.includes('blood_frenzy')) return { stack, events: [] };
   const grown = addModifierSource(
-    { ...stack, damageBonus: (stack.damageBonus ?? 0) + BLOOD_FRENZY_DAMAGE },
-    { id: 'blood_frenzy', label: 'Blood Frenzy', stats: { damage: BLOOD_FRENZY_DAMAGE } },
+    { ...stack, damageBonus: (stack.damageBonus ?? 0) + bonus },
+    { id: 'blood_frenzy', label: 'Blood Frenzy', stats: { damage: bonus } },
   );
   return {
     stack: grown,
@@ -183,10 +309,16 @@ function frenzy(stack: UnitStack, damage: number): { stack: UnitStack; events: B
  * function because damagePreview and the animation replay call it too, and
  * neither may accrue battle state.
  */
-export function damageStack(defender: UnitStack, damage: number): StrikeResult {
+export function damageStack(defender: UnitStack, damage: number, state?: BattleState): StrikeResult {
   const hit = applyDamage(defender, damage);
-  const { stack, events } = frenzy(hit.remaining, damage);
-  return { killed: hit.killed, remaining: stack, events };
+  let bonus = BLOOD_FRENZY_DAMAGE;
+  if (state && hasArtifact(state, defender, 'crimson_needle')) bonus = 4;
+  if (state && hasArtifact(state, defender, 'red_moon_covenant')) bonus *= 2;
+  const { stack, events } = frenzy(hit.remaining, damage, bonus);
+  const remaining = stack.count === 0
+    ? { ...stack, abilityState: { ...(stack.abilityState ?? {}), lastDamageStartCount: defender.count } }
+    : stack;
+  return { killed: hit.killed, remaining, events, soulReaperKills: 0 };
 }
 
 /**
@@ -197,22 +329,31 @@ export function damageStack(defender: UnitStack, damage: number): StrikeResult {
  * kill anything still takes one. The extra creature dies whole, so the next
  * one steps up at full HP rather than inheriting the leftover damage.
  */
-export function applyStrike(attacker: UnitStack, defender: UnitStack, damage: number): StrikeResult {
+export function applyStrike(attacker: UnitStack, defender: UnitStack, damage: number, state?: BattleState): StrikeResult {
   const hit = applyDamage(defender, damage);
   let { killed, remaining } = hit;
+  let soulReaperKills = 0;
   if (attacker.definition.abilities.includes('soul_reaper') && remaining.count > 0) {
     const reaped = applyDamage(remaining, remaining.hp);
     killed += reaped.killed;
+    soulReaperKills += reaped.killed;
     remaining = reaped.remaining;
   }
-  const { stack, events } = frenzy(remaining, damage);
-  return { killed, remaining: stack, events };
+  let bonus = BLOOD_FRENZY_DAMAGE;
+  if (state && hasArtifact(state, defender, 'crimson_needle')) bonus = 4;
+  if (state && hasArtifact(state, defender, 'red_moon_covenant')) bonus *= 2;
+  const { stack, events } = frenzy(remaining, damage, bonus);
+  const tracked = stack.count === 0
+    ? { ...stack, abilityState: { ...(stack.abilityState ?? {}), lastDamageStartCount: defender.count } }
+    : stack;
+  return { killed, remaining: tracked, events, soulReaperKills };
 }
 
 export interface HealResult {
   stack: UnitStack;
   healed: number;   // HP actually restored (after clamping to startCount)
   revived: number;  // creatures brought back (newCount - oldCount)
+  overheal: number;
 }
 
 /**
@@ -222,7 +363,7 @@ export interface HealResult {
  * `healed` is what was actually restored after clamping.
  */
 export function applyHeal(stack: UnitStack, heal: number): HealResult {
-  if (stack.count <= 0 || heal <= 0) return { stack, healed: 0, revived: 0 };
+  if (stack.count <= 0 || heal <= 0) return { stack, healed: 0, revived: 0, overheal: Math.max(0, heal) };
 
   const fullHp = stack.definition.hp;
   const currentTotal = (stack.count - 1) * fullHp + stack.hp;
@@ -236,6 +377,7 @@ export function applyHeal(stack: UnitStack, heal: number): HealResult {
     stack: { ...stack, count: newCount, hp: newHp },
     healed: newTotal - currentTotal,
     revived: newCount - stack.count,
+    overheal: Math.max(0, heal - (newTotal - currentTotal)),
   };
 }
 

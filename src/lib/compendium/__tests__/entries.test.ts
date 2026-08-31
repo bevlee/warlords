@@ -115,8 +115,10 @@ describe('entries read from their sources rather than restating them', () => {
   });
 
   it('cross-references abilities to the units that have them', () => {
-    const gorgon = entriesOfKind('ability').find(e => e.id === 'death_stare');
-    expect(gorgon?.kind === 'ability' && gorgon.units).toContain('gorgon');
+    const breath = entriesOfKind('ability').find(e => e.id === 'caustic_breath');
+    expect(breath?.kind === 'ability' && breath.units).toContain('bilehorn');
+    const deathStare = entriesOfKind('ability').find(e => e.id === 'death_stare');
+    expect(deathStare?.kind === 'ability' ? deathStare.units : []).toEqual([]);
 
     for (const entry of entriesOfKind('ability')) {
       if (entry.kind !== 'ability') continue;

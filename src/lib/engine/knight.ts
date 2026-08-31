@@ -5,12 +5,12 @@ export const KNIGHT_UNITS: UnitDef[] = [
   {
     name: 'Peasant', tier: 1, speed: 3, initiative: 9, hp: 5,
     attack: 1, defense: 1, minDamage: 1, maxDamage: 1,
-    shots: 0, range: 0, isLarge: false, abilities: [],
+    shots: 0, range: 0, isLarge: false, abilities: ['militia', 'spearwall'],
   },
   {
     name: 'Archer', tier: 2, speed: 4, initiative: 9, hp: 15,
     attack: 5, defense: 3, minDamage: 2, maxDamage: 3,
-    shots: 12, range: 10, isLarge: false, abilities: [],
+    shots: 12, range: 10, isLarge: false, abilities: ['area_shot'],
   },
   {
     name: 'Griffin', tier: 3, speed: 7, initiative: 14, hp: 35,
@@ -26,22 +26,22 @@ export const KNIGHT_UNITS: UnitDef[] = [
   {
     name: 'Swordsman', tier: 4, speed: 5, initiative: 8, hp: 55,
     attack: 10, defense: 12, minDamage: 6, maxDamage: 9,
-    shots: 0, range: 0, isLarge: false, abilities: [],
+    shots: 0, range: 0, isLarge: false, abilities: ['large_shield', 'focus'],
   },
   {
     name: 'Monk', tier: 5, speed: 5, initiative: 9, hp: 70,
     attack: 12, defense: 7, minDamage: 10, maxDamage: 12,
-    shots: 8, range: 10, isLarge: false, abilities: ['no_retaliation'],
+    shots: 8, range: 10, isLarge: false, abilities: ['cleanse', 'claim_blessing'],
   },
   {
     name: 'Cavalier', tier: 6, speed: 8, initiative: 11, hp: 100,
     attack: 15, defense: 15, minDamage: 15, maxDamage: 20,
-    shots: 0, range: 0, isLarge: true, abilities: ['jousting'],
+    shots: 0, range: 0, isLarge: true, abilities: ['gallop', 'ride_by_attack'],
   },
   {
     name: 'Champion', tier: 7, speed: 7, initiative: 12, hp: 130,
     attack: 20, defense: 20, minDamage: 20, maxDamage: 25,
-    shots: 0, range: 0, isLarge: true, abilities: ['jousting'],
+    shots: 0, range: 0, isLarge: true, abilities: ['grand_joust', 'overrun'],
   },
 ];
 
