@@ -1,6 +1,6 @@
 import type WebSocket from 'ws';
 import { aiTakeTurn } from '../src/lib/engine/ai.ts';
-import { beginCombat, deployMove, initBattle, splitStack } from '../src/lib/engine/battle.ts';
+import { beginCombat, deployMove, initBattle } from '../src/lib/engine/battle.ts';
 import { FACTION_UNITS } from '../src/lib/engine/factions.ts';
 import { updateFactionSkills } from '../src/lib/engine/factionSkills.ts';
 import { budgetForLevel, xpToReach } from '../src/lib/engine/progression.ts';
@@ -8,6 +8,7 @@ import { armyCost, MAX_STACKS, mergeArmySlots } from '../src/lib/engine/recruit.
 import { canShootTarget, getAttackOrigins, getReachableCells, isShootingBlocked } from '../src/lib/engine/selectors.ts';
 import type { BattleAction, BattleState } from '../src/lib/engine/types.ts';
 import { canActivate } from '../src/lib/engine/unitAbilities.ts';
+import { validateAction } from '../src/lib/engine/actions.ts';
 import type {
   AuthenticatedClientMessage,
   CoopLoadout,
@@ -118,13 +119,10 @@ export class RoomOrchestrator {
           this.prepareDeploy(room);
           break;
         }
-        case 'deploy.move':
-        case 'deploy.split': {
+        case 'deploy.move': {
           const room = this.requiredRoom(playerId, 'deploy');
           const controller = this.controllerFor(room, playerId);
-          const next = message.type === 'deploy.move'
-            ? deployMove(room.deployState!, message.unitId, message.to, controller)
-            : splitStack(room.deployState!, message.unitId, message.amount, message.to, controller);
+          const next = deployMove(room.deployState!, message.unitId, message.to, controller);
           if (next === room.deployState) throw new RoomError('invalid_deploy', 'deployment operation rejected');
           this.rooms.updateDeploy(room.code, next);
           this.broadcastDeploy(room);
@@ -366,7 +364,8 @@ function parseLoadout(value: unknown): CoopLoadout | null {
   if (
     !hero || !['barbarian', 'knight', 'wizard', 'necromancer', 'ranger', 'demon'].includes(hero.class ?? '') ||
     !Number.isInteger(hero.level) || hero.level! < 1 || !Number.isInteger(hero.xp) || hero.xp! < xpToReach(hero.level!) ||
-    hero.xp! >= xpToReach(hero.level! + 1) || hero.attack !== hero.level! + 1 || hero.defense !== hero.level ||
+    hero.xp! >= xpToReach(hero.level! + 1) || !Number.isInteger(hero.attack) || hero.attack! < 0 || hero.attack! > 100 ||
+    !Number.isInteger(hero.defense) || hero.defense! < 0 || hero.defense! > 100 ||
     hero.statPoints !== 0 || !Array.isArray(loadout.army) || loadout.army.length === 0 || loadout.army.length > MAX_STACKS
   ) return null;
   const faction = hero.class as CoopLoadout['hero']['class'];
@@ -400,23 +399,10 @@ function requireLoadout(value: unknown): CoopLoadout {
 }
 
 function isLegalAction(state: BattleState, action: BattleAction): boolean {
-  const actor = state.units.find(unit => unit.id === state.currentUnitId);
-  if (!actor || actor.count <= 0) return false;
   // Debug actions are accepted only by the solo history uploader; the co-op
   // protocol never parses them and the authoritative room rejects them here.
   if (action.type === 'debug') return false;
-  if (action.type === 'wait' || action.type === 'defend' || action.type === 'cast') return true;
-  if (action.type === 'ability') return canActivate(state, actor, action.abilityId);
-  if (action.type === 'move') {
-    return isPos(action.to) && getReachableCells(state.grid, actor).some(pos => samePos(pos, action.to));
-  }
-  const target = state.units.find(unit => unit.id === action.targetId);
-  if (!target || target.count <= 0 || target.side === actor.side || target.isHero) return false;
-  if (action.type === 'shoot') return canShootTarget(actor, target) && !isShootingBlocked(state, actor);
-  const origins = getAttackOrigins(state, actor, target);
-  return action.moveTo && isPos(action.moveTo)
-    ? origins.some(pos => samePos(pos, action.moveTo!))
-    : origins.some(pos => samePos(pos, actor.pos));
+  return validateAction(state, action);
 }
 
 function isPos(value: unknown): value is { col: number; row: number } {

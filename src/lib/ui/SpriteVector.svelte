@@ -213,7 +213,7 @@
       <circle cx="35" cy="16" r="2" fill="#facc15" stroke="none" />
       <circle cx="29" cy="26" r="1.4" fill="#3f2d20" stroke="none" />
       <circle cx="35" cy="26" r="1.4" fill="#3f2d20" stroke="none" />
-    {:else if name === 'Gorgon'}
+    {:else if name === 'Gorgon' || name === 'Bilehorn'}
       <path d="M18 62 l-3 14 h9 M44 62 l3 14 h-9" fill="none" stroke="#166534" stroke-width="2" />
       <path d="M16 36 q16 -12 30 0 l3 26 h-36 z" fill="#4d7c0f" />
       <path d="M14 40 q-8 8 -3 18 l6 -1" fill="#4d7c0f" />

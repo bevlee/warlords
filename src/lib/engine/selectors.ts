@@ -1,10 +1,15 @@
 import type { BattleState, Grid, Pos, UnitStack } from './types.ts';
 import { getNeighbours, chebyshevDistance, manhattanDistance } from './grid.ts';
-import { modifiedDamage, applyDamage, applyStrike } from './combat.ts';
+import { modifiedDamage, modifiedDamageInBattle, applyDamage, applyStrike } from './combat.ts';
+import { hasArtifact } from './artifacts.ts';
 
 /** Movement range for this turn: base speed, plus Logistics, minus any active slow (Zombie slow_on_hit). */
-export function effectiveSpeed(unit: UnitStack): number {
-  return Math.max(0, unit.definition.speed + (unit.speedBonus ?? 0) - (unit.speedPenalty ?? 0));
+export function effectiveSpeed(unit: UnitStack, state?: BattleState): number {
+  const effectSpeed = (unit.effects ?? []).reduce((sum, effect) => sum + Number(effect.data?.speed ?? 0), 0);
+  const tormentPenalty = state && (unit.burnRoundsLeft ?? 0) > 0 && state.units.some(
+    aura => aura.count > 0 && aura.side !== unit.side && aura.definition.abilities.includes('torment_aura') && hasArtifact(state, aura, 'tormentors_brand'),
+  ) ? 1 : 0;
+  return Math.max(0, unit.definition.speed + (unit.speedBonus ?? 0) - (unit.speedPenalty ?? 0) + effectSpeed - tormentPenalty);
 }
 
 /**
@@ -12,14 +17,16 @@ export function effectiveSpeed(unit: UnitStack): number {
  * at most `speed` steps. Walkers cannot path through occupants; flyers
  * pass over them but cannot land on them. The start cell is excluded.
  */
-export function getReachableCells(grid: Grid, unit: UnitStack): Pos[] {
-  const flying = unit.definition.abilities.includes('flying');
+export function getReachableCells(grid: Grid, unit: UnitStack, state?: BattleState): Pos[] {
+  const teleport = unit.definition.abilities.includes('teleport');
+  const flying = unit.definition.abilities.includes('flying') || teleport;
   const key = (p: Pos) => `${p.col},${p.row}`;
   const visited = new Set<string>([key(unit.pos)]);
   const reachable: Pos[] = [];
   let frontier: Pos[] = [unit.pos];
 
-  for (let step = 0; step < effectiveSpeed(unit); step++) {
+  const movement = teleport ? Math.max(grid.width, grid.height) : effectiveSpeed(unit, state);
+  for (let step = 0; step < movement; step++) {
     const next: Pos[] = [];
     for (const pos of frontier) {
       for (const nb of getNeighbours(grid, pos.col, pos.row)) {
@@ -38,6 +45,23 @@ export function getReachableCells(grid: Grid, unit: UnitStack): Pos[] {
     frontier = next;
   }
   return reachable;
+}
+
+/** Blinkwing Mantle destinations available after a Sprite spends part of its
+ * movement reaching an attack cell. The ordinary Darting Assault return to
+ * the starting cell remains available by omitting `retreatTo`; these are the
+ * optional destinations paid for with movement the Sprite did not spend. */
+export function getDartingRetreatCells(state: BattleState, unit: UnitStack, attackCell: Pos): Pos[] {
+  if (!unit.definition.abilities.includes('darting_assault') || !hasArtifact(state, unit, 'blinkwing_mantle')) return [];
+  const unusedMovement = Math.max(0, effectiveSpeed(unit, state) - chebyshevDistance(unit.pos, attackCell));
+  if (unusedMovement === 0) return [];
+  const cells: Pos[] = [];
+  for (const row of state.grid.cells) for (const cell of row) {
+    const occupiedByOther = cell.occupantId !== null && cell.occupantId !== unit.id;
+    if (cell.blocked || occupiedByOther || (cell.col === attackCell.col && cell.row === attackCell.row)) continue;
+    if (chebyshevDistance(attackCell, cell) <= unusedMovement) cells.push({ col: cell.col, row: cell.row });
+  }
+  return cells.sort((a, b) => a.row - b.row || a.col - b.col);
 }
 
 /** Living enemy stacks adjacent to the unit (Chebyshev distance 1). Heroes are untargetable. */
@@ -110,8 +134,35 @@ export function damagePreview(
   return { min, max, killsMin: kills(min), killsMax: kills(max) };
 }
 
+/** Live forecast including controller stats, enemy Veterancy and Rank Training. */
+export function damagePreviewInBattle(
+  state: BattleState,
+  attacker: UnitStack,
+  defender: UnitStack,
+  ranged = false,
+): DamagePreview {
+  const penalized = ranged && isBeyondRange(attacker, defender);
+  const areaFraction = attacker.definition.abilities.includes('area_shot')
+    ? (hasArtifact(state, attacker, 'blackpowder_fletching') ? 0.65 : 0.5)
+    : 1;
+  const roll = (per: number) => {
+    const base = Math.max(1, Math.round(modifiedDamageInBattle(state, attacker, defender, per) * areaFraction));
+    return penalized ? Math.max(1, Math.round(base / 2)) : base;
+  };
+  const min = roll(attacker.definition.minDamage);
+  const max = roll(attacker.definition.maxDamage);
+  const kills = (damage: number) => ranged ? applyDamage(defender, damage).killed : applyStrike(attacker, defender, damage).killed;
+  return { min, max, killsMin: kills(min), killsMax: kills(max) };
+}
+
 /** LordsWM rule: a living enemy directly adjacent disables shooting. */
 export function isShootingBlocked(state: BattleState, unit: UnitStack): boolean {
+  if (unit.definition.abilities.includes('no_melee_penalty') || unit.definition.abilities.includes('combat_casting')) return false;
+  const sheltered = state.units.some(
+    ally => ally.count > 0 && ally.side === unit.side && ally.definition.abilities.includes('sheltering_boughs') &&
+      chebyshevDistance(ally.pos, unit.pos) <= (hasArtifact(state, ally, 'thornwall_seed') ? 2 : 1)
+  );
+  if (sheltered) return false;
   return state.units.some(
     u => u.side !== unit.side && u.count > 0 && chebyshevDistance(unit.pos, u.pos) === 1
   );
@@ -127,7 +178,7 @@ export function getAttackOrigins(state: BattleState, unit: UnitStack, target: Un
   if (chebyshevDistance(unit.pos, target.pos) === 1) {
     origins.push({ col: unit.pos.col, row: unit.pos.row });
   }
-  for (const cell of getReachableCells(state.grid, unit)) {
+  for (const cell of getReachableCells(state.grid, unit, state)) {
     if (chebyshevDistance(cell, target.pos) === 1) origins.push(cell);
   }
   return origins;
@@ -142,7 +193,7 @@ export function getAttackOrigins(state: BattleState, unit: UnitStack, target: Un
 export function getMeleeApproaches(state: BattleState, unit: UnitStack): Map<string, Pos | null> {
   const approaches = new Map<string, Pos | null>();
   const enemies = state.units.filter(u => u.side !== unit.side && u.count > 0 && !u.isHero);
-  const reachable = getReachableCells(state.grid, unit);
+  const reachable = getReachableCells(state.grid, unit, state);
 
   for (const enemy of enemies) {
     if (chebyshevDistance(unit.pos, enemy.pos) === 1) {

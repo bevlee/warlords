@@ -3,7 +3,7 @@ import { FACTION_UNITS, FACTION_INFO } from '../engine/factions';
 import { MAX_STACKS, UNIT_COSTS } from '../engine/recruit';
 import { updateFactionSkills } from '../engine/factionSkills';
 import { mixSeed, mulberry32, type Rng } from '../engine/rng';
-import { itemDraftOptions, type ItemId } from './items';
+import { addItem, itemDraftOptions, starterItemsForFaction, type ItemId } from './items';
 import { skillDraftOptions, canLearnSkill, type SkillId, type UnitSkills } from './skills';
 import { addAbilityLevels, isUnique } from '../engine/abilityCatalog';
 
@@ -18,7 +18,7 @@ export interface UnitCard {
 }
 
 export interface RunState {
-  version: 1;
+  version: 2;
   seed: number;
   faction: FactionClass;
   encounterIndex: number; // next battle, 1..10
@@ -34,15 +34,60 @@ export interface RunState {
   battlesWon: number;
   startedAt: number;
   endlessDepth: number;
+  savedFormation?: SavedFormation;
+}
+
+export interface SavedFormation {
+  version: 1;
+  units: Record<string, { col: number; row: number }>;
+}
+
+const migratedUnitName = (name: string): string => name === 'Gorgon' ? 'Bilehorn' : name;
+
+/** Bring pre-redesign runs forward without retaining stale unit definitions.
+ * Unknown/corrupt payloads are rejected by returning null. */
+export function migrateRunState(value: unknown): RunState | null {
+  if (!value || typeof value !== 'object') return null;
+  const old = value as Partial<RunState> & { version?: number };
+  if (!old.faction || !FACTION_UNITS[old.faction] || !old.hero || !Array.isArray(old.army)) return null;
+  const roster = FACTION_UNITS[old.faction];
+  const army = old.army.flatMap(slot => {
+    const name = migratedUnitName(slot?.unit?.name ?? '');
+    const unit = roster.find(candidate => candidate.name === name);
+    return unit && Number.isInteger(slot.count) && slot.count > 0 ? [{ unit, count: slot.count }] : [];
+  });
+  if (!army.length) return null;
+  const renameRecord = <T>(record: Record<string, T> | undefined): Record<string, T> => Object.fromEntries(
+    Object.entries(record ?? {}).map(([name, data]) => [migratedUnitName(name), data]),
+  );
+  const starters = starterItemsForFaction(old.faction);
+  return {
+    version: 2,
+    seed: Number.isFinite(old.seed) ? old.seed! : Date.now(),
+    faction: old.faction,
+    encounterIndex: Math.max(1, Math.floor(old.encounterIndex ?? 1)),
+    hero: updateFactionSkills(old.hero),
+    army,
+    pendingDraft: (old.pendingDraft ?? null)?.map(card => ({ ...card, unitName: migratedUnitName(card.unitName) })) ?? null,
+    pendingItems: old.pendingItems ?? null,
+    pendingSkills: old.pendingSkills ?? null,
+    items: [...new Set([...starters, ...(old.items ?? [])])],
+    unitSkills: renameRecord(old.unitSkills),
+    status: old.status ?? 'map',
+    battlesWon: Math.max(0, Math.floor(old.battlesWon ?? 0)),
+    startedAt: old.startedAt ?? Date.now(),
+    endlessDepth: Math.max(0, Math.floor(old.endlessDepth ?? 0)),
+    ...(old.savedFormation ? { savedFormation: { version: 1, units: renameRecord(old.savedFormation.units) } } : {}),
+  };
 }
 
 export function actOf(n: number): 1 | 2 | 3 {
   return n <= 3 ? 1 : n <= 7 ? 2 : 3;
 }
 
-/** Power budget: 90 × 1.32^(n−1), bosses (3/7/10) pay a 10% premium. */
+/** Power budget: 90 × 1.25^(rank−1), bosses (3/7/10) pay a 10% premium. */
 export function encounterBudget(n: number): number {
-  const base = 90 * 1.32 ** (n - 1);
+  const base = 90 * 1.25 ** (n - 1);
   return Math.round(BOSS_NODES.has(n) ? base * 1.1 : base);
 }
 
@@ -64,7 +109,7 @@ export function newRun(faction: FactionClass, seed = Date.now()): RunState {
     factionSkills: [],
   });
   return {
-    version: 1,
+    version: 2,
     seed,
     faction,
     encounterIndex: 1,
@@ -73,7 +118,7 @@ export function newRun(faction: FactionClass, seed = Date.now()): RunState {
     pendingDraft: null,
     pendingItems: null,
     pendingSkills: null,
-    items: [],
+    items: starterItemsForFaction(faction),
     unitSkills: {},
     status: 'map',
     battlesWon: 0,
@@ -84,14 +129,18 @@ export function newRun(faction: FactionClass, seed = Date.now()): RunState {
 
 const FACTIONS = Object.keys(FACTION_INFO) as FactionClass[];
 
-function buildArmy(roster: typeof FACTION_UNITS.barbarian, budget: number, rng: Rng): ArmySlot[] {
+function buildArmy(roster: typeof FACTION_UNITS.barbarian, budget: number, rng: Rng, rank: number): ArmySlot[] {
   const slots: ArmySlot[] = [];
   let remaining = budget;
-  const picks = 3 + Math.floor(rng() * 3);
+  const picks = 3 + Math.floor(rng() * 2);
   for (let i = 0; i < picks; i++) {
     const affordable = roster.filter(u => UNIT_COSTS[u.name] <= remaining);
     if (affordable.length === 0) break;
-    const unit = affordable[Math.floor(rng() * affordable.length)];
+    // Later ranks increasingly favour quality. A squared roll biases toward
+    // the high end without removing deterministic variety.
+    const ordered = [...affordable].sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
+    const qualityRoll = 1 - (1 - rng()) ** (1 + Math.min(3, rank / 4));
+    const unit = ordered[Math.min(ordered.length - 1, Math.floor(qualityRoll * ordered.length))];
     const cost = UNIT_COSTS[unit.name];
     const share = remaining * (i === picks - 1 ? 0.95 : 0.3 + rng() * 0.4);
     const count = Math.max(1, Math.min(Math.floor(remaining / cost), Math.round(share / cost)));
@@ -100,16 +149,7 @@ function buildArmy(roster: typeof FACTION_UNITS.barbarian, budget: number, rng: 
     else slots.push({ unit, count });
     remaining -= count * cost;
   }
-  // Top up with the roster's cheapest unit.
-  const cheapest = [...roster].sort((a, b) => UNIT_COSTS[a.name] - UNIT_COSTS[b.name])[0];
-  const cheapCost = UNIT_COSTS[cheapest.name];
-  if (remaining >= cheapCost && (slots.length < MAX_STACKS || slots.some(s => s.unit.name === cheapest.name))) {
-    const count = Math.floor(remaining / cheapCost);
-    const existing = slots.find(s => s.unit.name === cheapest.name);
-    if (existing) existing.count += count;
-    else slots.push({ unit: cheapest, count });
-  }
-  return slots;
+  return slots.slice(0, 4);
 }
 
 export interface GauntletEncounter {
@@ -117,6 +157,8 @@ export interface GauntletEncounter {
   budget: number;
   army: ArmySlot[];
   isBoss: boolean;
+  veterancy: number;
+  rank: number;
 }
 
 /** Deterministic enemy for the run's current node. */
@@ -128,7 +170,18 @@ export function generateGauntletEnemy(run: RunState): GauntletEncounter {
   const maxTier = act === 1 ? 3 : act === 2 ? 5 : 7;
   const roster = FACTION_UNITS[faction].filter(u => u.tier <= maxTier);
   const budget = encounterBudget(n);
-  return { faction, budget, army: buildArmy(roster, budget, rng), isBoss: BOSS_NODES.has(n) };
+  return {
+    faction,
+    budget,
+    army: buildArmy(roster, budget, rng, n),
+    isBoss: BOSS_NODES.has(n),
+    veterancy: enemyVeterancy(n),
+    rank: n,
+  };
+}
+
+export function enemyVeterancy(rank: number): number {
+  return Math.floor((Math.max(1, rank) - 1) / 2);
 }
 
 /** Three distinct own-faction unit cards, tier-gated by node progression. */
@@ -191,7 +244,7 @@ function stillDrafting(run: RunState): 'draft' | 'map' {
 export function applyItemPick(run: RunState, itemId: ItemId): RunState {
   return {
     ...run,
-    items: [...run.items, itemId],
+    items: addItem(run.items, itemId),
     pendingItems: null,
     status: stillDrafting({ ...run, pendingItems: null }),
   };
@@ -222,8 +275,6 @@ export function recordBattle(run: RunState, won: boolean): RunState {
   const hero = updateFactionSkills({
     ...run.hero,
     level: run.hero.level + 1,
-    attack: run.hero.attack + 1,
-    defense: run.hero.defense + 1,
   });
   const next: RunState = {
     ...run,

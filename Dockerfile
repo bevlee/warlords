@@ -27,6 +27,11 @@ COPY --from=builder /app/src/lib ./src/lib
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
+# Kubernetes supplies fsGroup 1000 for the mounted PVC. Creating the path in
+# the image also keeps a plain `docker run` non-root and writable.
+RUN mkdir -p /data && chown node:node /data
+USER node
+
 EXPOSE 3000
 # Node 26 strips types natively (strip-only, on by default); server/ runs
 # without a build step. Node dropped --experimental-transform-types, so the

@@ -4,7 +4,14 @@ import { ABILITY_CATALOG, addAbilityLevels, isUnique } from '../engine/abilityCa
 import { FACTION_UNITS } from '../engine/factions';
 import type { RunState } from './run';
 
-export type SkillId = 'life_drain' | 'double_strike' | 'no_retaliation' | 'fleet_footwork' | 'bravery';
+export type SkillId =
+  | 'weapon_training'
+  | 'armour_training'
+  | 'life_drain'
+  | 'double_strike'
+  | 'no_retaliation'
+  | 'fleet_footwork'
+  | 'bravery';
 
 /** unitName → granted skill levels (unique skills are level 1). */
 export type UnitSkills = Record<string, Partial<Record<SkillId, number>>>;
@@ -20,6 +27,8 @@ export interface UnitSkillDef {
  *  engine ability catalog) stack additively per pick; unique ones are
  *  once-only. Melee/ranged-penalty style abilities are excluded by design. */
 export const UNIT_SKILLS: Record<SkillId, UnitSkillDef> = {
+  weapon_training: { id: 'weapon_training', name: 'Weapon Training', description: '+Gauntlet Rank Attack.' },
+  armour_training: { id: 'armour_training', name: 'Armour Training', description: '+Gauntlet Rank Defence.' },
   life_drain: { id: 'life_drain', name: 'Lifesteal', description: 'Heals the stack for 10% of damage dealt per level.' },
   double_strike: { id: 'double_strike', name: 'Double Strike', description: 'Melee attacks land a second blow after the retaliation.' },
   no_retaliation: { id: 'no_retaliation', name: 'No Retaliation', description: 'Targets this unit hits cannot retaliate.' },
@@ -47,9 +56,14 @@ export function canLearnSkill(slot: ArmySlot, unitSkills: UnitSkills, id: SkillI
  *  learn (unique and universally owned, or leveled and universally capped). */
 export function skillDraftOptions(run: RunState): SkillId[] {
   const unitSkills = run.unitSkills ?? {};
-  const pool = SKILL_IDS.filter(id => run.army.some(slot => canLearnSkill(slot, unitSkills, id)));
+  const training = (['weapon_training', 'armour_training'] as SkillId[])
+    .filter(id => run.army.some(slot => canLearnSkill(slot, unitSkills, id)));
+  const pool = SKILL_IDS.filter(id =>
+    !training.includes(id) && run.army.some(slot => canLearnSkill(slot, unitSkills, id))
+  );
   const rng = mulberry32(mixSeed(run.seed, run.battlesWon * 4271 + 17));
   const picks: SkillId[] = [];
+  if (training.length > 0) picks.push(training[Math.floor(rng() * training.length)]);
   const bag = [...pool];
   while (picks.length < SKILL_OFFER_COUNT && bag.length > 0) {
     picks.push(bag.splice(Math.floor(rng() * bag.length), 1)[0]);
@@ -75,6 +89,10 @@ export function applyUnitSkills(army: ArmySlot[], unitSkills: UnitSkills, factio
 
     for (const [id, lvl] of Object.entries(grants) as [SkillId, number][]) {
       if (!lvl) continue;
+      if (id === 'weapon_training' || id === 'armour_training') {
+        grantedList.push(id);
+        continue;
+      }
       if (isUnique(id) && abilities.includes(id)) continue; // innate unique — nothing to add
       const baseLevel = abilities.includes(id)
         ? (abilityLevels[id] ?? ABILITY_CATALOG[id]?.defaultLevel ?? 1)

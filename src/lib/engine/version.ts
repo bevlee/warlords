@@ -1,3 +1,2 @@
-/** Replay compatibility stamp. Bump whenever engine behavior or emitted event
- * count changes, because action RNG is derived from the current log length. */
-export const ENGINE_VERSION = '2.1.0';
+/** Pre-redesign recorded battles are intentionally rejected, not migrated. */
+export const ENGINE_VERSION = '3.0.0';

@@ -71,7 +71,7 @@ describe('move logging', () => {
 });
 
 describe('attack with moveTo (move+attack)', () => {
-  it('relocates the actor, then resolves the melee with retaliation', () => {
+  it('relocates the actor, resolves melee, and lets Pounce suppress retaliation', () => {
     const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
     const goblins = makeStack(GOBLIN, { col: 6, row: 1 }, 'enemy', { count: 30 });
     const state = makeState([rider, goblins]);
@@ -86,7 +86,7 @@ describe('attack with moveTo (move+attack)', () => {
     const hurtGoblins = next.units.find(u => u.id === goblins.id)!;
     expect(hurtGoblins.count).toBeLessThan(30);
     expect(next.log.some(e => e.type === 'attack')).toBe(true);
-    expect(next.log.some(e => e.type === 'retaliate')).toBe(true);
+    expect(next.log.some(e => e.type === 'retaliate')).toBe(false);
   });
 });
 

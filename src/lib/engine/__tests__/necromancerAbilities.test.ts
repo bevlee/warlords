@@ -7,6 +7,7 @@ import { updateFactionSkills } from '../factionSkills';
 import { UNIT_ABILITIES, activatedAbilitiesOf } from '../unitAbilities';
 import { INFECT_PENALTY, BLOOD_FRENZY_DAMAGE } from '../abilityCatalog';
 import { GOBLIN } from '../barbarian';
+import { setOccupant } from '../grid';
 import { ZOMBIE, SKELETON, BLACK_KNIGHT, BONE_DRAGON, VAMPIRE, BLOOD_ACOLYTE } from '../necromancer';
 import type { BattleState, Hero, UnitStack } from '../types';
 
@@ -46,7 +47,19 @@ function meleeSetup(attackerDef: typeof GOBLIN, defenderDef: typeof GOBLIN, coun
   );
   const attacker = state.units.find(u => u.side === 'player' && !u.isHero)!;
   const defender = state.units.find(u => u.side === 'enemy')!;
-  return { state: { ...state, currentUnitId: attacker.id } as BattleState, attacker, defender };
+  const to = [
+    { col: defender.pos.col - 1, row: defender.pos.row },
+    { col: defender.pos.col - 1, row: defender.pos.row - 1 },
+    { col: defender.pos.col - 1, row: defender.pos.row + 1 },
+  ].find(pos => state.grid.cells[pos.row]?.[pos.col] && !state.grid.cells[pos.row][pos.col].blocked && !state.grid.cells[pos.row][pos.col].occupantId)!;
+  const adjacent = {
+    ...state,
+    grid: setOccupant(setOccupant(state.grid, attacker.pos, null), to, attacker.id),
+    units: state.units.map(unit => unit.id === attacker.id ? { ...unit, pos: to } : unit),
+    currentUnitId: attacker.id,
+    phase: 'combat' as const,
+  };
+  return { state: adjacent as BattleState, attacker: adjacent.units.find(unit => unit.id === attacker.id)!, defender };
 }
 
 describe('Zombie infecting strike', () => {
@@ -69,7 +82,11 @@ describe('Zombie infecting strike', () => {
     let { state, defender } = meleeSetup(ZOMBIE, GOBLIN);
     const zombie = state.units.find(u => u.side === 'player' && !u.isHero)!;
     for (let i = 0; i < 3; i++) {
-      state = applyAction({ ...state, currentUnitId: zombie.id }, { type: 'attack', targetId: defender.id });
+      state = applyAction({
+        ...state,
+        currentUnitId: zombie.id,
+        units: state.units.map(unit => unit.id === defender.id ? { ...unit, hasRetaliated: true } : unit),
+      }, { type: 'attack', targetId: defender.id });
     }
     const hit = state.units.find(u => u.id === defender.id)!;
     expect(hit.attackBuff).toBe(-3 * INFECT_PENALTY);

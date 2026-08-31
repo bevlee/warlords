@@ -6,6 +6,10 @@ export const SPELL_META: Record<SpellId, { glyph: string; label: string }> = {
   lightning: { glyph: '⚡', label: 'Lightning' },
   bloodlust: { glyph: '💪', label: 'Bloodlust' },
   stoneskin: { glyph: '🗿', label: 'Stoneskin' },
+  slow: { glyph: '🐌', label: 'Slow' },
+  chain_lightning: { glyph: '🌩️', label: 'Chain Lightning' },
+  resurrect: { glyph: '✨', label: 'Resurrect' },
+  blizzard: { glyph: '❄️', label: 'Blizzard' },
 };
 
 /** Damage size tiers, shared by the log and the battlefield floaters:

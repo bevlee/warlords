@@ -1,144 +1,54 @@
 import { describe, it, expect } from 'vitest';
-import { initBattle, applyAction, lightningDamage } from '../battle';
+import { initBattle, applyAction } from '../battle';
+import { maxMana } from '../factionSkills';
+import { effectiveAttackInBattle, effectiveDefenseInBattle } from '../combat';
 import { GOBLIN } from '../barbarian';
 import { CAVALIER } from '../knight';
-import { updateFactionSkills, maxMana } from '../factionSkills';
 import type { Hero } from '../types';
 
-function baseHero(overrides: Partial<Hero> = {}): Hero {
-  return updateFactionSkills({
-    class: 'barbarian', level: 1, xp: 0, attack: 0, defense: 0, statPoints: 0, factionSkills: [],
-    ...overrides,
-  });
+function hero(overrides: Partial<Hero> = {}): Hero {
+  return { class: 'barbarian', level: 1, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [], ...overrides };
 }
 
-describe('faction skills wiring into battle', () => {
-  it('Leadership boosts starting morale for player units only, not enemies', () => {
-    const withLeadership = baseHero({ level: 5 }); // barbarian leadership unlocks at level 5
-    const state = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: GOBLIN, count: 5 }], withLeadership, 1);
-    const player = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const enemy = state.units.find(u => u.side === 'enemy')!;
-
-    expect(player.morale).toBe(1); // leadership skill level 1
-    expect(enemy.morale).toBe(0);
-  });
-
-  it('no morale bonus before leadership unlocks', () => {
-    const noLeadership = baseHero({ level: 1 });
-    const state = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: GOBLIN, count: 5 }], noLeadership, 1);
-    const player = state.units.find(u => u.side === 'player' && !u.isHero)!;
+describe('redesigned progression wiring', () => {
+  it('does not derive old faction passives from hero level', () => {
+    const state = initBattle([{ unit: GOBLIN, count: 5 }], [{ unit: GOBLIN, count: 5 }], hero({ level: 50 }), 1);
+    const player = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
     expect(player.morale).toBe(0);
+    expect(player.luck).toBe(0);
+    expect(player.speedBonus ?? 0).toBe(0);
   });
 
-  it('Offense increases outgoing player attack damage', () => {
-    const plain = baseHero({ level: 1, class: 'wizard' }); // no offense skill on this class
-    const withOffense = baseHero({ level: 1, class: 'barbarian' }); // offense unlocks at level 1
-
-    function firstAttackDamage(hero: Hero): number {
-      const state = initBattle([{ unit: GOBLIN, count: 20 }], [{ unit: GOBLIN, count: 20 }], hero, 5);
-      const attacker = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const enemy = state.units.find(u => u.side === 'enemy')!;
-      const acting = { ...state, currentUnitId: attacker.id };
-      const next = applyAction(acting, { type: 'attack', targetId: enemy.id });
-      const attackEvent = next.log.find(e => e.type === 'attack')!;
-      return attackEvent.data.damage as number;
-    }
-
-    expect(firstAttackDamage(withOffense)).toBeGreaterThan(firstAttackDamage(plain));
+  it('keeps mana exclusive to Wizard', () => {
+    expect(maxMana(hero({ class: 'barbarian', level: 20 }))).toBe(0);
+    const wizard = hero({ class: 'wizard', level: 2 });
+    expect(maxMana(wizard)).toBe(11);
+    expect(initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], wizard, 1).hero.mana).toBe(11);
   });
 
-  it('Armorer reduces incoming damage to player-side stacks', () => {
-    const plain = baseHero({ level: 1, class: 'wizard' }); // no armorer skill on this class
-    const withArmorer = baseHero({ level: 3, class: 'barbarian' }); // barbarian armorer unlocks at level 3
-
-    function incomingDamage(hero: Hero): number {
-      const state = initBattle([{ unit: GOBLIN, count: 20 }], [{ unit: GOBLIN, count: 20 }], hero, 5);
-      const defender = state.units.find(u => u.side === 'player' && !u.isHero)!;
-      const attacker = state.units.find(u => u.side === 'enemy')!;
-      const acting = { ...state, currentUnitId: attacker.id };
-      const next = applyAction(acting, { type: 'attack', targetId: defender.id });
-      const attackEvent = next.log.find(e => e.type === 'attack')!;
-      return attackEvent.data.damage as number;
-    }
-
-    expect(incomingDamage(withArmorer)).toBeLessThan(incomingDamage(plain));
+  it('applies enemy Veterancy and controller-scoped Rank Training to effective stats', () => {
+    const state = initBattle(
+      [{ unit: GOBLIN, count: 5 }], [{ unit: GOBLIN, count: 5 }], hero(), 1, [], undefined,
+      {
+        gauntletRound: 7,
+        enemyVeterancy: 3,
+        training: { player: { Goblin: { weapon: true, armour: true } } },
+      },
+    );
+    const player = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
+    const enemy = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
+    expect(effectiveAttackInBattle(state, player)).toBe(GOBLIN.attack + 2 + 7);
+    expect(effectiveDefenseInBattle(state, player)).toBe(GOBLIN.defense + 1 + 7);
+    expect(effectiveAttackInBattle(state, enemy)).toBe(GOBLIN.attack + 3);
+    expect(effectiveDefenseInBattle(state, enemy)).toBe(GOBLIN.defense + 3);
   });
 
-  it('records lastMovedFrom on a plain move', () => {
-    const hero = baseHero({ level: 1 });
-    const state = initBattle([{ unit: CAVALIER, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 3);
-    const cavalier = state.units.find(u => u.side === 'player' && !u.isHero)!;
+  it('records movement origin on a legal move for positional abilities', () => {
+    const state = initBattle([{ unit: CAVALIER, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero({ class: 'knight' }), 3);
+    const cavalier = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
     const from = cavalier.pos;
-    const acting = { ...state, currentUnitId: cavalier.id };
     const to = { col: from.col + 1, row: from.row };
-
-    const next = applyAction(acting, { type: 'move', to });
-    const moved = next.units.find(u => u.id === cavalier.id)!;
-    expect(moved.lastMovedFrom).toEqual(from);
-    expect(moved.pos).toEqual(to);
-  });
-
-  it('records lastMovedFrom on a combined move+attack, enabling jousting', () => {
-    const hero = baseHero({ level: 1 });
-    const state = initBattle([{ unit: CAVALIER, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 3);
-    const cavalier = state.units.find(u => u.side === 'player' && !u.isHero)!;
-    const enemy = state.units.find(u => u.side === 'enemy')!;
-    const from = cavalier.pos;
-    // stand a couple of cells away and attack-with-move so a jousting bonus is measurable
-    const moveTo = { col: enemy.pos.col + (enemy.pos.col > from.col ? -1 : 1), row: enemy.pos.row };
-    const acting = { ...state, currentUnitId: cavalier.id };
-
-    const next = applyAction(acting, { type: 'attack', targetId: enemy.id, moveTo });
-    const moved = next.units.find(u => u.id === cavalier.id)!;
-    expect(moved.lastMovedFrom).toEqual(from);
-  });
-
-  it('Tactics shifts the Knight player army toward the enemy by the skill level', () => {
-    const hero = baseHero({ class: 'knight', level: 1 }); // tactics lvl 1 unlocks at level 1
-    const withoutTactics = baseHero({ class: 'wizard', level: 1 });
-
-    const shifted = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 9);
-    const plain = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], withoutTactics, 9);
-
-    const shiftedCol = shifted.units.find(u => u.side === 'player' && !u.isHero)!.pos.col;
-    const plainCol = plain.units.find(u => u.side === 'player' && !u.isHero)!.pos.col;
-    expect(shiftedCol).toBe(plainCol + 1);
-  });
-
-  it('Intelligence adds to the hero\'s starting/max mana', () => {
-    const hero = baseHero({ class: 'wizard', level: 2 }); // intelligence lvl 1 unlocks at level 2
-    expect(maxMana(hero)).toBe(5 + 3 * 2 + 2);
-
-    const state = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 1);
-    expect(state.hero.mana).toBe(maxMana(hero));
-  });
-
-  it('Sorcery scales Lightning damage', () => {
-    const hero = baseHero({ class: 'wizard', level: 1 }); // sorcery lvl 1 unlocks at level 1
-    let state = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 20 }], hero, 4);
-    for (let i = 0; i < 20 && !state.units.find(u => u.id === state.currentUnitId)?.isHero; i++) {
-      state = applyAction(state, { type: 'wait' });
-    }
-    const enemy = state.units.find(u => u.side === 'enemy' && u.count > 0)!;
-
-    const next = applyAction(state, { type: 'cast', spell: 'lightning', targetId: enemy.id });
-    const castEvent = next.log.find(e => e.type === 'cast')!;
-    expect(castEvent.data.damage).toBe(Math.round(lightningDamage(hero.level) * 1.05));
-  });
-
-  it('Mysticism regenerates mana at the start of each new round', () => {
-    const hero = baseHero({ class: 'wizard', level: 4 }); // mysticism lvl 1 unlocks at level 4
-    let state = initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], hero, 1);
-    const startMana = state.hero.mana;
-    const startRound = state.round;
-
-    let iterations = 0;
-    while (state.round === startRound && iterations < 50) {
-      state = applyAction(state, { type: 'wait' });
-      iterations++;
-    }
-
-    expect(state.round).toBeGreaterThan(startRound);
-    expect(state.hero.mana).toBe((startMana ?? 0) + 1);
+    const next = applyAction({ ...state, phase: 'combat', currentUnitId: cavalier.id }, { type: 'move', to });
+    expect(next.units.find(unit => unit.id === cavalier.id)?.lastMovedFrom).toEqual(from);
   });
 });

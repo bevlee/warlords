@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, splitStack, beginCombat, heroFor } from '$lib/engine/battle';
+  import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, beginCombat, heroFor } from '$lib/engine/battle';
   import { getTacticsShift } from '$lib/engine/factionSkills';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
+    getDartingRetreatCells,
     getRangeCells,
     getMeleeApproaches,
     getAttackOrigins,
@@ -12,7 +13,7 @@
     canShootTarget,
     isBeyondRange,
     isShootingBlocked,
-    damagePreview,
+    damagePreviewInBattle,
   } from '$lib/engine/selectors';
   import type {
     ArmyBonuses,
@@ -27,7 +28,8 @@
     UnitDef,
     UnitStack,
   } from '$lib/engine/types';
-  import { UNIT_ABILITIES, activatedAbilitiesOf } from '$lib/engine/unitAbilities';
+  import { UNIT_ABILITIES, activatedAbilitiesOf, canActivate } from '$lib/engine/unitAbilities';
+  import { abilityReady, displayedCooldown } from '$lib/engine/cooldowns';
   import { abilityInfo } from './abilities';
   import { describeEvent, SPELL_META } from './logLines';
   import BattleGrid from './BattleGrid.svelte';
@@ -47,6 +49,8 @@
   import { postSoloBattle, type SoloController } from '$lib/net/api';
   import { createDebugStackTemplate, debugSnapshot, templateFromStack } from '$lib/engine/debugBattle';
   import BattleDebugDrawer from './BattleDebugDrawer.svelte';
+  import { formationFromBattle, type SavedFormation } from '$lib/engine/deployment';
+  import { validateAction } from '$lib/engine/actions';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -58,6 +62,10 @@
     exitLabel?: string;
     armyBonuses?: ArmyBonuses;
     items?: ItemId[];
+    gauntletRound?: number;
+    enemyVeterancy?: number;
+    savedFormation?: SavedFormation;
+    onformation?: (formation: SavedFormation) => void;
     initialState?: BattleState;
     localControllerId?: 'host' | 'guest';
     waitingForPeer?: boolean;
@@ -71,7 +79,6 @@
     };
     online?: {
       deployMove: (unitId: string, to: Pos) => void;
-      deploySplit: (unitId: string, amount: number, to: Pos) => void;
       confirmDeploy: () => void;
       action: (action: BattleAction) => void;
       chat: (text: string) => void;
@@ -92,6 +99,10 @@
     exitLabel = 'Change army',
     armyBonuses,
     items = [],
+    gauntletRound = 1,
+    enemyVeterancy = 0,
+    savedFormation,
+    onformation,
     initialState,
     localControllerId,
     waitingForPeer = false,
@@ -115,8 +126,21 @@
     stacks: 1,
   }));
   // svelte-ignore state_referenced_locally
+  const training = Object.fromEntries(playerArmy.flatMap(slot => {
+    const grants = new Set(slot.unit.grantedAbilities ?? []);
+    if (!grants.has('weapon_training') && !grants.has('armour_training')) return [];
+    return [[slot.unit.name, { weapon: grants.has('weapon_training'), armour: grants.has('armour_training') }]];
+  }));
+  // svelte-ignore state_referenced_locally
   let battle: BattleState = $state(
-    initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, { modifierSources })
+    initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, {
+      modifierSources,
+      gauntletRound,
+      enemyVeterancy,
+      savedFormation,
+      artifacts: { player: items },
+      training: { player: training },
+    })
   );
   // The pristine deploy layout, for the Reset button. Deploy ops are pure
   // (they return new states), so this reference stays untouched. Restart
@@ -146,8 +170,6 @@
   );
   const tacticsShift = $derived(getTacticsShift(deployHero));
   let selectedDeployId = $state<string | null>(null);
-  let splitArmed = $state(false); // next empty-cell click splits rather than moves
-  let splitAmount = $state(1);
   const selectedDeployUnit = $derived(
     selectedDeployId ? (battle.units.find(u => u.id === selectedDeployId) ?? null) : null
   );
@@ -178,31 +200,25 @@
 
   function selectDeploy(id: string | null) {
     selectedDeployId = id;
-    splitArmed = false;
-    const u = id ? battle.units.find(s => s.id === id) : null;
-    splitAmount = u ? Math.max(1, Math.floor(u.count / 2)) : 1;
   }
 
   function handleDeployUnit(unit: UnitStack) {
     if (unit.side !== 'player' || unit.isHero || (online ? unit.controllerId !== localControllerId : unit.isAlly)) return;
     if (selectedDeployId === unit.id) return selectDeploy(null); // click again to deselect
-    if (selectedDeployId && !splitArmed) {
+    if (selectedDeployId) {
       battle = deployMove(battle, selectedDeployId, unit.pos); // swap
       return selectDeploy(null);
     }
-    selectDeploy(unit.id); // (a stack click cancels an armed split)
+    selectDeploy(unit.id);
   }
 
   function handleDeployCell(pos: Pos) {
     if (!selectedDeployId) return;
     if (online) {
-      if (splitArmed) online.deploySplit(selectedDeployId, splitAmount, pos);
-      else online.deployMove(selectedDeployId, pos);
+      online.deployMove(selectedDeployId, pos);
       return selectDeploy(null);
     }
-    battle = splitArmed
-      ? splitStack(battle, selectedDeployId, splitAmount, pos)
-      : deployMove(battle, selectedDeployId, pos);
+    battle = deployMove(battle, selectedDeployId, pos);
     selectDeploy(null);
   }
 
@@ -211,6 +227,7 @@
       online.confirmDeploy();
       return selectDeploy(null);
     }
+    onformation?.(formationFromBattle($state.snapshot(battle) as BattleState));
     battle = beginCombat(battle);
     recorder = createSoloBattleRecorder($state.snapshot(battle) as BattleState);
     // Deployment mutations are already baked into the recorder's initial
@@ -416,7 +433,7 @@
 
   const reachableKeys = $derived(
     isPlayerTurn && activeUnit && !animating
-      ? new Set(getReachableCells(battle.grid, activeUnit).map(p => `${p.col},${p.row}`))
+      ? new Set(getReachableCells(battle.grid, activeUnit, battle).map(p => `${p.col},${p.row}`))
       : new Set<string>()
   );
 
@@ -459,8 +476,43 @@
 
   const isHeroTurn = $derived(isPlayerTurn && !!activeUnit?.isHero);
 
+  const HERO_ACTIONS: Record<Hero['class'], Array<{ id: string; label: string; description: string }>> = {
+    knight: [
+      { id: 'hold_the_line', label: 'Hold the Line', description: 'Units that finish a turn without moving become Braced.' },
+      { id: 'ready_the_counterattack', label: 'Counterattack', description: 'Each unit’s first retaliation deals 50% more damage and advances it 10% ATB.' },
+      { id: 'advance_by_ranks', label: 'Advance by Ranks', description: 'Long move-only actions beside an ally return at 50% ATB.' },
+    ],
+    ranger: [
+      { id: 'name_the_quarry', label: 'Name the Quarry', description: 'Choose an enemy; each ally’s first primary hit advances it 10% ATB.' },
+      { id: 'set_the_ambush', label: 'Set the Ambush', description: 'Choose a 3×3 area for stronger, safer opening attacks.' },
+      { id: 'open_an_escape_route', label: 'Escape Route', description: 'Choose a 3×3 area where move-only actions return at 75% ATB.' },
+    ],
+    barbarian: [
+      { id: 'charge', label: 'Charge!', description: 'Empower every friendly melee unit for its next turn.' },
+      { id: 'loose', label: 'Loose!', description: 'Empower each shooter’s next attack and save its ammunition.' },
+      { id: 'blood_for_blood', label: 'Blood for Blood!', description: 'Friendly units deal and take 50% more damage until the hero’s next turn.' },
+    ],
+    demon: [
+      { id: 'blood_offering', label: 'Blood Offering', description: 'Sacrifice 10% of a friendly stack to advance the rest of the army.' },
+      { id: 'feed_the_fire', label: 'Feed the Fire', description: 'Consume a Burn tick now and spread Burn to adjacent units.' },
+      { id: 'demonic_bargain', label: 'Demonic Bargain', description: 'Sacrifice HP to double a friendly stack’s next attack.' },
+    ],
+    necromancer: [
+      { id: 'reknit_the_dead', label: 'Reknit the Dead', description: 'Consume Skeletons to heal a wounded undead stack.' },
+      { id: 'grasping_dead', label: 'Grasping Dead', description: 'Consume five Skeletons to pin an enemy for its next turn.' },
+      { id: 'death_march', label: 'Death March', description: 'Consume ten Skeletons to advance every other undead stack.' },
+    ],
+    wizard: [],
+  };
+
   // Spell targeting: pick a spell on the hero's turn, then click a stack.
   let pendingSpell: SpellId | null = $state(null);
+  let pendingActivated: { id: string; hero: boolean } | null = $state(null);
+  let pendingDarting: { targetId: string; moveTo: Pos; cells: Pos[] } | null = $state(null);
+  const dartingRetreatKeys = $derived.by(() => {
+    const pending = pendingDarting as { targetId: string; moveTo: Pos; cells: Pos[] } | null;
+    return new Set<string>((pending?.cells ?? []).map((pos: Pos) => `${pos.col},${pos.row}`));
+  });
   const spellTargetIds = $derived.by(() => {
     if (!pendingSpell || !isHeroTurn) return null;
     const friendly = SPELLS[pendingSpell].friendly;
@@ -471,9 +523,52 @@
     );
   });
 
+  const activatedTargetIds = $derived.by(() => {
+    if (!pendingActivated || !activeUnit || !isPlayerTurn) return null;
+    const id = pendingActivated.id;
+    const ids = new Set<string>();
+    for (const unit of battle.units) {
+      if (unit.isHero || (unit.count <= 0 && id !== 'repair')) continue;
+      if (pendingActivated.hero) {
+        if (validateAction(battle, { type: 'hero_action', actionId: id, targetId: unit.id })) ids.add(unit.id);
+      } else if (id === 'cleanse' || id === 'repair') {
+        if (UNIT_ABILITIES[id].canUse(battle, activeUnit, unit.id)) ids.add(unit.id);
+      } else if (id === 'ride_by_attack') {
+        if (getAttackOrigins(battle, activeUnit, unit).some(to => UNIT_ABILITIES[id].canUse(battle, activeUnit, unit.id, to))) ids.add(unit.id);
+      } else if (id === 'caustic_breath' && Math.max(Math.abs(unit.pos.col - activeUnit.pos.col), Math.abs(unit.pos.row - activeUnit.pos.row)) === 1) {
+        ids.add(unit.id);
+      }
+    }
+    return ids;
+  });
+
+  const activatedCellKeys = $derived.by(() => {
+    const keys = new Set<string>();
+    if (!pendingActivated || !activeUnit || !isPlayerTurn) return keys;
+    if (!pendingActivated.hero && pendingActivated.id === 'gate') {
+      for (const row of battle.grid.cells) for (const cell of row) {
+        const to = { col: cell.col, row: cell.row };
+        if (UNIT_ABILITIES.gate.canUse(battle, activeUnit, undefined, to)) keys.add(`${cell.col},${cell.row}`);
+      }
+    } else if (!pendingActivated.hero && pendingActivated.id === 'caustic_breath') {
+      for (const row of battle.grid.cells) for (const cell of row) {
+        if (Math.max(Math.abs(cell.col - activeUnit.pos.col), Math.abs(cell.row - activeUnit.pos.row)) === 1) keys.add(`${cell.col},${cell.row}`);
+      }
+    } else if (pendingActivated.hero && (pendingActivated.id === 'set_the_ambush' || pendingActivated.id === 'open_an_escape_route')) {
+      for (let row = 1; row < battle.grid.height - 1; row++) for (let col = 1; col < battle.grid.width - 1; col++) keys.add(`${col},${row}`);
+    }
+    return keys;
+  });
+
   // What the grid highlights: spell targeting overrides attack targeting.
-  const gridTargetIds = $derived(spellTargetIds ?? targetIds);
+  const gridTargetIds = $derived(pendingDarting ? new Set<string>() : spellTargetIds ?? activatedTargetIds ?? targetIds);
   const gridActionIcons = $derived.by(() => {
+    if (pendingDarting) return new Map<string, 'melee' | 'shoot' | 'spell'>();
+    if (activatedTargetIds) {
+      const icons = new Map<string, 'melee' | 'shoot' | 'spell'>();
+      for (const id of activatedTargetIds) icons.set(id, pendingActivated?.id === 'ride_by_attack' ? 'melee' : 'spell');
+      return icons;
+    }
     if (!spellTargetIds) return actionIcons;
     const icons = new Map<string, 'melee' | 'shoot' | 'spell'>();
     for (const id of spellTargetIds) icons.set(id, 'spell');
@@ -484,7 +579,14 @@
   // can pick the landing tile from the cursor angle.
   const originsByTarget = $derived.by(() => {
     const map = new Map<string, Pos[]>();
-    if (!isPlayerTurn || !activeUnit) return map;
+    if (!isPlayerTurn || !activeUnit || pendingDarting) return map;
+    if (pendingActivated?.id === 'ride_by_attack') {
+      for (const id of activatedTargetIds ?? []) {
+        const target = battle.units.find(unit => unit.id === id)!;
+        map.set(id, getAttackOrigins(battle, activeUnit, target).filter(to => UNIT_ABILITIES.ride_by_attack.canUse(battle, activeUnit, id, to)));
+      }
+      return map;
+    }
     for (const u of battle.units) {
       if (u.side !== 'enemy' || u.count === 0 || u.isHero) continue;
       if (!meleeApproaches.has(u.id)) continue;
@@ -496,7 +598,7 @@
   // Damage forecast for the aiming tooltip; far shots preview at half damage.
   // While aiming a spell, forecast the spell itself (buffs show no numbers).
   const previews = $derived.by(() => {
-    const map = new Map<string, ReturnType<typeof damagePreview>>();
+    const map = new Map<string, ReturnType<typeof damagePreviewInBattle>>();
     if (!isPlayerTurn || !activeUnit) return map;
     if (pendingSpell) {
       for (const id of spellTargetIds ?? []) {
@@ -508,7 +610,7 @@
     }
     for (const id of actionIcons.keys()) {
       const target = battle.units.find(u => u.id === id);
-      if (target) map.set(id, damagePreview(activeUnit, target, heroFor(battle, activeUnit).attack, actionIcons.get(id) === 'shoot'));
+      if (target) map.set(id, damagePreviewInBattle(battle, activeUnit, target, actionIcons.get(id) === 'shoot'));
     }
     return map;
   });
@@ -525,7 +627,7 @@
       ? battle.units.find(u => u.id === hovered!.id && u.count > 0)
       : undefined;
     if (!fresh) return new Set<string>();
-    return new Set(getReachableCells(battle.grid, fresh).map(p => `${p.col},${p.row}`));
+    return new Set(getReachableCells(battle.grid, fresh, battle).map(p => `${p.col},${p.row}`));
   });
   const hoverShootingKeys = $derived.by(() => {
     if (animating) return new Set<string>();
@@ -642,6 +744,7 @@
   $effect(() => {
     void battle.currentUnitId;
     pendingSpell = null;
+    pendingActivated = null;
     spellbookOpen = false;
   });
 
@@ -694,6 +797,14 @@
 
   function attackFrom(targetId: string, origin: Pos) {
     const inPlace = activeUnit && origin.col === activeUnit.pos.col && origin.row === activeUnit.pos.row;
+    if (activeUnit && !inPlace) {
+      const cells = getDartingRetreatCells(battle, activeUnit, origin);
+      if (cells.length > 0) {
+        pendingDarting = { targetId, moveTo: origin, cells };
+        hovered = null;
+        return;
+      }
+    }
     takeAction(
       inPlace ? { type: 'attack', targetId } : { type: 'attack', targetId, moveTo: origin },
       'host'
@@ -710,8 +821,30 @@
 
   function handleCellClick(pos: Pos) {
     if (!isPlayerTurn || animating) return;
+    if (pendingDarting) {
+      if (dartingRetreatKeys.has(`${pos.col},${pos.row}`)) {
+        takeAction({ type: 'attack', targetId: pendingDarting.targetId, moveTo: pendingDarting.moveTo, retreatTo: pos }, 'host');
+        pendingDarting = null;
+      }
+      return;
+    }
     if (pendingSpell) {
       pendingSpell = null; // clicking empty ground cancels the cast
+      return;
+    }
+    if (pendingActivated) {
+      if (!activatedCellKeys.has(`${pos.col},${pos.row}`)) {
+        pendingActivated = null;
+        return;
+      }
+      if (pendingActivated.hero) {
+        const area: Pos[] = [];
+        for (let row = pos.row - 1; row <= pos.row + 1; row++) for (let col = pos.col - 1; col <= pos.col + 1; col++) area.push({ col, row });
+        takeAction({ type: 'hero_action', actionId: pendingActivated.id, area }, 'host');
+      } else {
+        takeAction({ type: 'ability', abilityId: pendingActivated.id, to: pos }, 'host');
+      }
+      pendingActivated = null;
       return;
     }
     if (!reachableKeys.has(`${pos.col},${pos.row}`)) return;
@@ -721,15 +854,40 @@
   // The grid resolved an aimed melee: move to the chosen tile and strike.
   function handleMeleeAim(targetId: string, origin: Pos) {
     if (!isPlayerTurn || animating || !activeUnit) return;
+    if (pendingActivated?.id === 'ride_by_attack') {
+      takeAction({ type: 'ability', abilityId: 'ride_by_attack', targetId, to: origin }, 'host');
+      pendingActivated = null;
+      return;
+    }
     attackFrom(targetId, origin);
   }
 
   function handleUnitClick(unit: UnitStack, _shift = false) {
     if (!isPlayerTurn || animating || !activeUnit) return;
+    if (pendingDarting) return;
 
     if (pendingSpell) {
       if (spellTargetIds?.has(unit.id)) castAt(unit);
       else pendingSpell = null;
+      return;
+    }
+
+    if (pendingActivated) {
+      if (!activatedTargetIds?.has(unit.id)) {
+        pendingActivated = null;
+        return;
+      }
+      if (pendingActivated.id === 'ride_by_attack') {
+        const origin = originsByTarget.get(unit.id)?.[0];
+        if (origin) takeAction({ type: 'ability', abilityId: pendingActivated.id, targetId: unit.id, to: origin }, 'host');
+      } else if (pendingActivated.id === 'caustic_breath') {
+        takeAction({ type: 'ability', abilityId: pendingActivated.id, to: unit.pos }, 'host');
+      } else if (pendingActivated.hero) {
+        takeAction({ type: 'hero_action', actionId: pendingActivated.id, targetId: unit.id }, 'host');
+      } else {
+        takeAction({ type: 'ability', abilityId: pendingActivated.id, targetId: unit.id }, 'host');
+      }
+      pendingActivated = null;
       return;
     }
 
@@ -762,18 +920,45 @@
   // acting stack owns, greyed by the engine's own canUse so the button and the
   // rule can never disagree.
   const unitAbilities = $derived.by(() => {
-    if (!activeUnit || activeUnit.isHero) return [];
+    if (!activeUnit) return [];
+    if (activeUnit.isHero) return HERO_ACTIONS[heroFor(battle, activeUnit).class].map(action => {
+      const targeted = ['name_the_quarry', 'blood_offering', 'feed_the_fire', 'demonic_bargain', 'reknit_the_dead', 'grasping_dead'].includes(action.id);
+      const area = ['set_the_ambush', 'open_an_escape_route'].includes(action.id);
+      const legal = area || (targeted
+        ? battle.units.some(unit => validateAction(battle, { type: 'hero_action', actionId: action.id, targetId: unit.id }))
+        : validateAction(battle, { type: 'hero_action', actionId: action.id }));
+      return {
+        id: action.id,
+        info: { label: action.label, description: action.description },
+        enabled: isPlayerTurn && !animating && legal,
+      };
+    });
     return activatedAbilitiesOf(activeUnit).map(id => ({
       id,
-      info: abilityInfo(id),
-      enabled: isPlayerTurn && !animating && UNIT_ABILITIES[id].canUse(battle, activeUnit),
+      info: {
+        ...abilityInfo(id),
+        label: displayedCooldown(activeUnit, id) > 0 ? `${abilityInfo(id).label} (${displayedCooldown(activeUnit, id)})` : abilityInfo(id).label,
+      },
+      enabled: isPlayerTurn && !animating && (
+        ['cleanse', 'repair', 'ride_by_attack', 'caustic_breath', 'gate'].includes(id)
+          ? abilityReady(activeUnit, id)
+          : canActivate(battle, activeUnit, id)
+      ),
     }));
   });
 
   function handleAbility(abilityId: string) {
     if (!isPlayerTurn || animating) return;
     pendingSpell = null;
-    takeAction({ type: 'ability', abilityId }, 'host');
+    const heroAction = !!activeUnit?.isHero;
+    const targeted = heroAction
+      ? ['name_the_quarry', 'set_the_ambush', 'open_an_escape_route', 'blood_offering', 'feed_the_fire', 'demonic_bargain', 'reknit_the_dead', 'grasping_dead'].includes(abilityId)
+      : ['cleanse', 'repair', 'ride_by_attack', 'caustic_breath', 'gate'].includes(abilityId);
+    if (targeted) {
+      pendingActivated = { id: abilityId, hero: heroAction };
+      return;
+    }
+    takeAction(heroAction ? { type: 'hero_action', actionId: abilityId } : { type: 'ability', abilityId }, 'host');
   }
 
   function handleForfeit() {
@@ -838,7 +1023,14 @@
     pendingSpell = null;
     resultAnnounced = false;
     recorder = null;
-    battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, { modifierSources });
+    battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, {
+      modifierSources,
+      gauntletRound,
+      enemyVeterancy,
+      savedFormation,
+      artifacts: { player: items },
+      training: { player: training },
+    });
     deployBaseline = battle; // restart re-enters deploy with a fresh layout
     originalDeployBaseline = structuredClone($state.snapshot(battle) as BattleState);
     deploymentDebugNotes = [];
@@ -862,9 +1054,19 @@
     if (autoBattle && shouldAutomateTurn(activeUnit, true, !!online, localControllerId)) {
       return `Auto battle — ${activeUnit.definition.name}s are acting…`;
     }
+    if (pendingDarting) {
+      return 'Blinkwing Mantle — choose a highlighted retreat cell, or press Esc to return to the starting cell.';
+    }
     if (pendingSpell) {
       const friendly = SPELLS[pendingSpell].friendly;
       return `Casting ${SPELL_META[pendingSpell].label} — click ${friendly ? 'one of your stacks' : 'an enemy'}, or click elsewhere to cancel.`;
+    }
+    if (pendingActivated) {
+      if (pendingActivated.id === 'set_the_ambush' || pendingActivated.id === 'open_an_escape_route') return 'Choose the centre of a highlighted 3×3 area, or press Esc to cancel.';
+      if (pendingActivated.id === 'gate') return 'Choose a highlighted adjacent empty tile for the summoned Imps.';
+      if (pendingActivated.id === 'caustic_breath') return 'Choose one of the eight highlighted directions for Caustic Breath.';
+      if (pendingActivated.id === 'ride_by_attack') return 'Choose an enemy and a highlighted charge position for Ride-By Attack.';
+      return `Choose a highlighted target for ${pendingActivated.id.replaceAll('_', ' ')}.`;
     }
     if (meleeTargeting === 'drag') {
       return 'Release over a highlighted tile to attack — drag back over the enemy to cancel.';
@@ -905,7 +1107,12 @@
     if (logOpen) logOpen = false;
     else if (debugPlacement) debugPlacement = null;
     else if (debugOpen) closeDebug();
+    else if (pendingDarting) {
+      takeAction({ type: 'attack', targetId: pendingDarting.targetId, moveTo: pendingDarting.moveTo }, 'host');
+      pendingDarting = null;
+    }
     else if (pendingSpell) pendingSpell = null;
+    else if (pendingActivated) pendingActivated = null;
     else if (selectedId) selectedId = null;
   }
 </script>
@@ -934,29 +1141,9 @@
   <div class="status-band">
     {#if inDeploy}
       <div class="status-card deploy">
-        {#if selectedDeployUnit && selectedDeployUnit.count > 1}
-          <span class="status-note">{selectedDeployUnit.definition.name}: split off</span>
-          <input
-            type="range"
-            min="1"
-            max={selectedDeployUnit.count - 1}
-            bind:value={splitAmount}
-            class="w-28 accent-amber-400"
-            aria-label="split amount"
-          />
-          <span class="status-amount font-mono text-amber-200">{splitAmount}</span>
-          <button
-            type="button"
-            class="status-button {splitArmed ? 'armed' : ''}"
-            onclick={() => (splitArmed = !splitArmed)}
-          >
-            {splitArmed ? 'Click a cell…' : 'Split'}
-          </button>
-        {:else}
-          <p class="status-text text-sm font-medium text-slate-100">
-            Deploy your troops — click a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
-          </p>
-        {/if}
+        <p class="status-text text-sm font-medium text-slate-100">
+          Rank {gauntletRound} · Enemy Veterancy +{enemyVeterancy} Attack/Defence — reposition whole stacks by clicking a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
+        </p>
         {#if !online}
           <button type="button" class="status-button ml-auto" disabled={debugOpen} onclick={resetDeploy}>Reset</button>
         {/if}
@@ -1084,7 +1271,7 @@
       <div class="board-fit">
         <BattleGrid
           state={battle}
-          reachableKeys={pendingSpell ? new Set() : reachableKeys}
+          reachableKeys={pendingDarting ? dartingRetreatKeys : pendingSpell ? new Set() : pendingActivated ? activatedCellKeys : reachableKeys}
           movementRangeKeys={hoverMovementKeys}
           shootingRangeKeys={hoverShootingKeys}
           targetIds={gridTargetIds}
@@ -1096,8 +1283,8 @@
           debugPlacementMode={debugOpen && !!debugPlacement}
           {debugPlaceableKeys}
           actionIcons={gridActionIcons}
-          penalizedShotIds={pendingSpell || animating ? new Set() : penalizedShotIds}
-          originsByTarget={pendingSpell ? new Map() : originsByTarget}
+          penalizedShotIds={pendingDarting || pendingSpell || animating ? new Set() : penalizedShotIds}
+          originsByTarget={pendingDarting || pendingSpell ? new Map() : originsByTarget}
           {previews}
           hoveredId={hovered?.id ?? null}
           {activeSteps}
@@ -1536,16 +1723,6 @@
     text-wrap: pretty;
   }
 
-  .status-note {
-    font-size: calc(11.5 * var(--fx));
-    color: #cbd5e1;
-  }
-
-  .status-amount {
-    width: calc(30 * var(--fx));
-    font-size: calc(13 * var(--fx));
-  }
-
   .status-button {
     flex: none;
     border-radius: calc(4 * var(--fx));
@@ -1558,11 +1735,6 @@
 
   .status-button:hover {
     background: #475569;
-  }
-
-  .status-button.armed {
-    background: #f59e0b;
-    color: #0f172a;
   }
 
   .status-button.primary {

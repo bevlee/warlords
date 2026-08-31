@@ -21,22 +21,21 @@ export function recruitBudget(hero: Hero): number {
 }
 
 /**
- * Add XP and resolve any level-ups (+1 attack, +1 defense per level).
+ * Add XP and resolve level-ups. Attack and Defence are explicit hero stats and
+ * no longer grow automatically with level.
  * Returns the updated hero and how many levels were gained.
  */
 export function applyXp(hero: Hero, gained: number): { hero: Hero; levels: number } {
   const xp = hero.xp + gained;
-  let { level, attack, defense } = hero;
+  let { level } = hero;
   let levels = 0;
 
   while (xp >= xpToReach(level + 1)) {
     level += 1;
-    attack += 1;
-    defense += 1;
     levels += 1;
   }
 
-  return { hero: { ...hero, xp, level, attack, defense }, levels };
+  return { hero: { ...hero, xp, level }, levels };
 }
 
 /** Victory rewards in one step: XP (with level-ups) plus gold credited to the

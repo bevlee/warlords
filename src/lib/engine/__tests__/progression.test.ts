@@ -12,14 +12,14 @@ describe('progression', () => {
     expect(xpToReach(4)).toBe(1200);
   });
 
-  it('applyXp levels up once with +1 attack/defense', () => {
+  it('applyXp levels up once without silently changing combat stats', () => {
     const { hero, levels } = applyXp(freshHero, 250);
 
     expect(levels).toBe(1);
     expect(hero.level).toBe(2);
     expect(hero.xp).toBe(250);
-    expect(hero.attack).toBe(3);
-    expect(hero.defense).toBe(2);
+    expect(hero.attack).toBe(2);
+    expect(hero.defense).toBe(1);
   });
 
   it('applyXp handles multi-level jumps', () => {
@@ -27,8 +27,8 @@ describe('progression', () => {
 
     expect(levels).toBe(2);
     expect(hero.level).toBe(3);
-    expect(hero.attack).toBe(4);
-    expect(hero.defense).toBe(3);
+    expect(hero.attack).toBe(2);
+    expect(hero.defense).toBe(1);
   });
 
   it('applyXp below the threshold changes nothing but xp', () => {

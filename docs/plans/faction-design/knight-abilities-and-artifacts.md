@@ -19,7 +19,7 @@ The Knight faction rewards patient formations, risky friendly-fire attacks, reta
 
 ### Monk effect rules
 
-Cleanse removes every removable negative effect currently applied to the chosen friendly unit, including Burn, Bind, Blind, Pinning, Infection, Curse, reduced Morale, and temporary combat penalties.
+Cleanse removes every removable negative effect currently applied to the chosen friendly unit, including Burn, Bind, Blind, Corroded, Pinning, Infection, Curse, reduced Morale, and temporary combat penalties.
 
 - Monk may target itself.
 - Cleanse does not restore lost creatures or HP.
@@ -64,14 +64,15 @@ Ride-By Attack begins battle ready. After use, it enters a **2-turn cooldown**:
 - It becomes ready again on Cavalier's third turn after the original use.
 - Each Cavalier stack tracks its own cooldown.
 - The cooldown is spent only after a legal Ride-By Attack resolves; cancelling or submitting an invalid target does not consume it.
+- A path shorter than three legal movement cells is rejected without spending the turn and never converts into a normal attack.
 
-The UI should show **Ready**, **2**, or **1** on the ability button. Cavalier repeatedly charges out and returns to safety, while Champion wants to drive forward through an enemy line with Grand Joust and Overrun.
+The UI should show **Ready**, **2**, or **1** on the ability button. It offers Ride-By only when at least one legal path exists and highlights only landing cells and targets that satisfy the three-cell minimum. Cavalier repeatedly charges out and returns to safety, while Champion wants to drive forward through an enemy line with Grand Joust and Overrun.
 
 ## Proposed Knight hero mechanic: Standing Orders
 
 Knight heroes have **no mana and cannot cast spells**. Instead, the hero may spend its turn issuing one Standing Order. Only one Order can be active at a time, and it remains active until the hero replaces it. Orders have no charges; their cost is giving up the hero's attack whenever the battle calls for a different formation.
 
-Orders are not spells. Spell resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect them.
+Orders are non-magical hero actions. Magic Resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect them.
 
 The starting values below are deliberately simple:
 

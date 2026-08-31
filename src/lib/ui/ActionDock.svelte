@@ -58,7 +58,9 @@
   const SLOT_COUNT = 3;
   const abilitySlots = $derived.by(() => {
     const filled: ({ kind: 'spell' } | { kind: 'ability'; ability: (typeof abilities)[number] })[] =
-      isHeroTurn ? [{ kind: 'spell' }] : abilities.map(ability => ({ kind: 'ability', ability }));
+      isHeroTurn && abilities.length === 0
+        ? [{ kind: 'spell' }]
+        : abilities.map(ability => ({ kind: 'ability', ability }));
     return Array.from({ length: Math.max(SLOT_COUNT, filled.length) }, (_, i) => filled[i] ?? null);
   });
 </script>

@@ -25,7 +25,7 @@ export const UNIT_COSTS: Record<string, number> = {
   Gremlin: 3,
   'Stone Golem': 20,
   Mage: 25,
-  Gorgon: 40,
+  Bilehorn: 40,
   Naga: 65,
   'Siege Golem': 68,
   Giant: 90,

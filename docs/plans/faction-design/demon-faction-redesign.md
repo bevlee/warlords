@@ -101,7 +101,7 @@ Every unit has two readable ideas. A few of the abilities contain multiple close
 
 Every successful Imp melee attack applies **Burn** to the primary target.
 
-- Base Burn: 3 damage at the start of the target's next two turns.
+- Base Burn: `3 × the current one-based gauntlet encounter number` damage at the start of the target's next two turns. Non-gauntlet battles use encounter 1.
 - Reapplying Burn refreshes its duration unless an artifact allows it to stack.
 - Fire-immune units cannot receive Burn.
 
@@ -315,7 +315,14 @@ For AI use: prefer the highest-value burning target that Doomstep can kill. If n
 
 ### Fire damage
 
-Fire should be a real damage tag rather than flavour text.
+Fire is an attribute of magic damage rather than a separate damage type.
+Represent it as a semantic magic-damage packet carrying the Fire attribute.
+
+- Magic-damage bonuses, vulnerabilities, and resistance apply to fire.
+- Weakness Aura doubles fire damage, or triples it with Hexfield Core.
+- Fire Immunity then prevents the fire packet entirely.
+- True and sacrifice damage are not fire unless explicitly tagged, even when
+  their animation uses flames.
 
 Fire sources in this design:
 
@@ -324,13 +331,14 @@ Fire sources in this design:
 - Gog secondary splash
 - artifact-created explosions
 
-The physical primary hit from an Efreet or Gog remains physical unless explicitly changed by an artifact.
+The physical primary hit from an Efreet or Gog remains physical unless explicitly changed by an artifact. Their Burn, splash, and other stated fire components are magic damage carrying the Fire attribute.
 
 ### Burn
 
 Default Burn rules:
 
-- 3 damage (multiplied by the guantlet round number) at the start of the victim's turn 
+- `3 × gauntletRound` magic damage with the Fire attribute at the start of the victim's turn
+- `gauntletRound` is the actual one-based encounter number supplied when the battle is created (`battlesWon + 1`), stored in battle/replay/co-op state, and defaults to 1 outside gauntlet
 - 2 remaining ticks when first applied
 - reapplication refreshes the duration to 2
 - does not stack by default
@@ -363,7 +371,11 @@ Artifact and ritual effects should check explicit unit faction metadata or the u
 
 Demon heroes have **no mana and cannot cast spells**. Instead, they perform Infernal Rites. A Rite spends the hero's turn and may be used repeatedly, but every use consumes part of the Demon army or its existing Burn. The decision is not whether the hero can afford mana; it is how much battlefield material the player is willing to sacrifice.
 
-Rites are not spells. Spell resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect them.
+Rites are not spells, so Sorcery, Silence, mana effects, and spell artifacts do
+not modify the Rite itself. Their resulting damage still uses its semantic
+packet type: Feed the Fire resolves the consumed Burn tick as hostile magic
+with the Fire attribute and can therefore be stopped by Magic Resistance or
+Fire Immunity.
 
 The starting ideas are:
 
@@ -491,7 +503,7 @@ This is the centrepiece Gate-swarm artifact. It is intentionally capable of fill
 **Faction:** Demon  
 **Effect:** Burn applications stack their damage instead of replacing it. Every new application also refreshes the combined Burn to two ticks.
 
-Example: a target with 3-damage Burn struck by two more Burn sources now takes 9 damage per tick.
+Example at gauntlet round 1: a target with 3-damage Burn struck by two more Burn sources now takes 9 damage per tick. At later gauntlet rounds, each application uses that round's higher base value.
 
 #### Brand of Damnation
 
@@ -564,7 +576,7 @@ Fast Hell Hounds dive into dense formations and damage three stacks without reta
 
 ### Phase 0 — Shared combat primitives
 
-1. Add a generic damage-type or `fire` flag.
+1. Add semantic magic damage with optional attributes, including Fire.
 2. Route all Burn applications and ticks through fire-immunity checks.
 3. Build the reusable 3×3 splash helper with friendly-fire and target-filter options.
 4. Add a consistent death-resolution hook and stable death-trigger ordering.
@@ -642,7 +654,7 @@ This phase produces a playable Demon identity before summon or global-movement w
 | Haste Ritual | Medium | Active state and army-wide stat modifier |
 | Torment Aura | Low–Medium | Final-damage modifier check |
 | Flying | Existing | Already implemented |
-| Living Flame | Low | Fire tag and immunity-aware Burn |
+| Living Flame | Low | Fire attribute and immunity-aware Burn |
 | Teleport | Medium | Unit-specific global reachability |
 | Doomstep | Low | Burn-status check and damage multiplier |
 

@@ -3,6 +3,11 @@ kind: Config
 metadata:
   name: warlords
 build:
+  # Keep release deployments on an explicit, human-readable image version
+  # instead of Skaffold's default Git-derived tag.
+  tagPolicy:
+    envTemplate:
+      template: "0.0.2"
   artifacts:
     - image: docker.io/bevdev1/warlords
       docker:
@@ -11,10 +16,6 @@ deploy:
   kubectl:
     defaultNamespace: warlords
 manifests:
-  rawYaml:
-    - k8s/certificate.yaml
-    - k8s/deployment.yaml
-    - k8s/ingress.yaml
-    - k8s/namespace.yaml
-    - k8s/pvc.yaml
-    - k8s/service.yaml
+  kustomize:
+    paths:
+      - k8s
