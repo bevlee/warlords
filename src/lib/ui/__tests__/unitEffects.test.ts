@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GOBLIN } from '$lib/engine/barbarian';
-import type { Hero, UnitStack } from '$lib/engine/types';
+import type { BattleState, Hero, UnitStack } from '$lib/engine/types';
 import { activeEffects, signedModifier } from '../unitEffects';
 
 function makeStack(overrides: Partial<UnitStack> = {}): UnitStack {
@@ -100,6 +100,92 @@ describe('activeEffects', () => {
       value: '−3 HP',
       detail: 'Damage at turn start; 2 turns remaining.',
       tone: 'debuff',
+    });
+  });
+
+  it('shows marks with their actual artifact-upgraded values and descriptions', () => {
+    const unit = makeStack({
+      marks: [
+        {
+          kind: 'ranged_mark',
+          ownerTeamId: 'player',
+          sourceControllerId: 'ranger',
+          sourceId: 'orc',
+        },
+        {
+          kind: 'marked_for_death',
+          ownerTeamId: 'player',
+          sourceControllerId: 'barbarian',
+          sourceId: 'hero',
+        },
+      ],
+    });
+    const battle = { artifacts: { ranger: ['red_fletched_arrows'] } } as unknown as BattleState;
+
+    expect(activeEffects(unit, null, battle)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: 'Ranged Mark',
+        value: 'RANGED TAKEN +45%',
+        detail: expect.stringContaining('every unit allied with the marking unit'),
+        tone: 'debuff',
+      }),
+      expect.objectContaining({
+        label: 'Marked for Death',
+        value: 'DMG TAKEN +20%',
+        detail: expect.stringContaining('every unit allied with the marking unit'),
+        tone: 'debuff',
+      }),
+    ]));
+  });
+
+  it('explains the full opening Banner effect instead of showing an anonymous speed modifier', () => {
+    const unit = makeStack({
+      side: 'player',
+      controllerId: 'player',
+      empoweredTurnsRemaining: 2,
+      speedBonus: 4,
+      abilityState: { bannerSpeed: 4 },
+    });
+    const battle = {
+      artifacts: {
+        player: ['banner_of_the_first_raid', 'map_of_the_first_raid', 'banner_of_no_return', 'red_sunrise'],
+      },
+    } as unknown as BattleState;
+
+    const effects = activeEffects(unit, null, battle);
+    expect(effects).toContainEqual({
+      id: 'banner-of-the-first-raid',
+      label: 'Banner of the First Raid',
+      value: 'SPEED +4 · DMG +50%',
+      detail: 'Active during this unit’s opening 2 turns; 2 turns remaining.',
+      tone: 'buff',
+    });
+    expect(effects.some(effect => effect.label === 'Other speed modifier')).toBe(false);
+  });
+
+  it('adds descriptions to combat effects without duplicating their named stat source', () => {
+    const unit = makeStack({
+      initiativeBonus: 1,
+      damageBonus: 1,
+      modifierSources: [{ id: 'focus', label: 'Focus', stats: { initiative: 1, damage: 1 }, stacks: 1 }],
+      effects: [{
+        id: 'focus',
+        kind: 'focus',
+        sourceStackId: 'goblin',
+        positive: true,
+        innate: false,
+        removable: true,
+        stacks: 1,
+        stats: { initiative: 1, damage: 1 },
+      }],
+    });
+
+    const focus = activeEffects(unit).filter(effect => effect.label === 'Focus');
+    expect(focus).toHaveLength(1);
+    expect(focus[0]).toMatchObject({
+      value: 'DMG +1 · INIT +1',
+      detail: expect.stringContaining('spending this unit’s turn'),
+      tone: 'buff',
     });
   });
 

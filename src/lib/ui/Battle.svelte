@@ -1355,6 +1355,7 @@
         <UnitInfo
           unit={infoUnit}
           hero={heroFor(battle, infoUnit)}
+          {battle}
           pinned={!!selectedUnit}
           onunpin={() => (selectedId = null)}
           size="rail"
