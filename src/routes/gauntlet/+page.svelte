@@ -562,9 +562,10 @@
         <div>
           <dt class="font-semibold text-slate-300">{RUN_LENGTH} battles, one life</dt>
           <dd class="mt-1">
-            Pick a faction and fight through {RUN_LENGTH} encounters. Enemy armies grow about a third
-            stronger each node, and nodes {[...BOSS_NODES].join(', ')} are bosses that field more still.
-            A single defeat ends the run.
+            Pick a faction and fight through {RUN_LENGTH} encounters. Enemy armies grow about a
+            quarter stronger each node and pick up veteran attack and defence as the ranks climb;
+            nodes {[...BOSS_NODES].join(', ')} are bosses that field more still. A single defeat
+            ends the run.
           </dd>
         </div>
         <div>
@@ -580,7 +581,7 @@
           <dd class="mt-1">
             Victories offer a choice of reinforcements, and every third one adds an artifact for the
             whole army or a new skill for one of your unit types. Your hero gains a level each win,
-            which raises its attack and defense and deepens the faction skills on its own.
+            which sharpens its own attacks and deepens the faction skills on its own.
           </dd>
         </div>
         <div>
