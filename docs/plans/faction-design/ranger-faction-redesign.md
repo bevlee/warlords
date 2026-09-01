@@ -42,7 +42,9 @@
 8. Double Shot is already wired as a second ranged strike.
    - Focus Fire should be applied per arrow, allowing the Grand Elf's second arrow to benefit immediately.
 
-9. Magic Resistance needs a real hostile-spell check to justify keeping it on Unicorn.
+9. Magic Resistance needs a semantic hostile-magic check to justify keeping it on Unicorn.
+   - It applies to every hostile magic-damage packet, not only Wizard spells.
+   - Fire, Lightning, Cold, and Acid remain magic when they carry their narrower attributes.
 
 10. A shared effective-initiative helper will be useful.
    - Sprite artifacts need previews, ATB ordering, and the unit panel to agree about accumulated initiative.
@@ -94,7 +96,7 @@ This is useful to every playstyle:
 
 Ranger heroes have **no mana and cannot cast spells**. Instead, the hero may spend its turn choosing one Hunt Plan. The plan lasts until the hero's next turn, and only one plan can be active at a time.
 
-Hunt Plans are not spells. Spell resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect them.
+Hunt Plans are non-magical hero actions. Magic Resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect them.
 
 Hunt Plans have no charges. Their cost is the hero giving up a direct attack, and their value depends on choosing the right target or part of the battlefield.
 
@@ -104,7 +106,7 @@ Choose one enemy unit. Until the hero's next turn, the first time each friendly 
 
 - A multi-hit attack triggers the reward only once.
 - Secondary area damage does not trigger it.
-- The benefit is not restricted to Ranger units. The hero, summoned units, and friendly units from another faction may all trigger it if they are controlled by the player who named the Quarry.
+- The benefit is not restricted to Ranger units or one controller. The hero, summoned units, friendly units from another faction, and an allied co-op controller's units may all trigger it.
 - If the Quarry dies, the plan ends; the player cannot transfer it for free.
 
 This supports both a concentrated volley and a melee pursuit without simply adding another flat damage bonus.
@@ -328,11 +330,22 @@ Battle Dwarf is slower than the faction's cavalry, but turns the damage they cre
 
 #### Magic Resistance
 
-Unicorn has a **50% chance to ignore each hostile spell or magical status effect** that directly targets it.
+Unicorn has a **50% chance to ignore the damage from each hostile magic-damage
+packet** that affects it.
 
-- Physical attacks and non-magical unit abilities are unaffected.
-- Area spells roll separately for each Unicorn stack.
-- Beneficial friendly magic is never resisted.
+- The check uses the damage packet's base type. Fire, Lightning, Cold, Acid,
+  direct, secondary, area, and damage-over-time packets all qualify when their
+  base type is magic.
+- The source does not need to be a spell: unit abilities, hero actions,
+  artifacts, and Burn ticks are checked in the same way.
+- Each packet rolls separately. Area damage therefore rolls for each Unicorn
+  stack, and a multi-packet effect may have some packets resisted and others
+  resolved.
+- Physical, true, and sacrifice damage are unaffected.
+- Magic Resistance applies only to damage. Statuses and other effects attached
+  to the packet still apply normally even if the damage is resisted, subject to
+  their own legality and immunity rules.
+- Standalone status effects are never resisted by this ability.
 
 #### Fortune's Herald
 
@@ -576,7 +589,7 @@ Wood Elves Pin approaching enemies, Dendroids Bind anything that gets through, a
 
 1. Add artifact faction, unit, and starter gating.
 2. Grant Wayfarer's Compass in the Ranger new-run path.
-3. Track turns taken per original stack identity.
+3. Track a `hasTakenTurn` flag on each battle stack; no general turn counter is required.
 4. Add a shared effective-initiative helper used by ATB, AI, and UI.
 5. Make temporary movement penalties expire after the target finishes its next turn.
 6. Add source-aware persistent Bind and release hooks for Dendroid movement, displacement, and death.
@@ -590,7 +603,8 @@ Wood Elves Pin approaching enemies, Dendroids Bind anything that gets through, a
 4. Soaring Strike
 5. Focus Fire
 6. Executioner and Relentless
-7. Fortune's Herald and luck-trigger hooks
+7. Magic Resistance for every hostile magic-damage packet
+8. Fortune's Herald and luck-trigger hooks
 
 ### Phase 2 — Sprite movement
 
@@ -623,7 +637,7 @@ Wood Elves Pin approaching enemies, Dendroids Bind anything that gets through, a
 ## 10. Important Edge Rules
 
 - Move-only ATB refunds never trigger from deployment, forced movement, attack returns, or failed movement.
-- Turns taken follow the original stack through deployment splits so a unit cannot duplicate First Strike conditions.
+- Deployment cannot split stacks; First Strike reads the target stack's `hasTakenTurn` state directly.
 - Darting Assault's return is movement, but not a separate action and not a Wayfarer's Compass trigger.
 - If Sprite's starting cell is no longer legal, it remains beside the target unless Blinkwing Mantle supplies another retreat cell.
 - Safe-return initiative triggers check adjacency after every death and displacement from the attack resolves.
@@ -634,5 +648,5 @@ Wood Elves Pin approaching enemies, Dendroids Bind anything that gets through, a
 - Focus Fire counters key by stable target ID and reset when their owner intentionally attacks a different primary target.
 - Multi-arrow attacks stop when the target dies; remaining arrows are not spent and do not transfer to another target.
 - Ranger percentage bonuses multiply rather than add unless their text explicitly replaces a value.
-- Magic Resistance affects hostile magic only and must not block Battle Cries or non-magical unit abilities.
-- Marks belong to their target rather than the unit that created them. Unless a mark explicitly names a narrower attack type, any friendly combatant controlled by the mark's owner may benefit.
+- Magic Resistance affects the damage from every hostile magic packet, but never blocks its attached status or a standalone status effect.
+- Marks belong to their target rather than the unit that created them. Unless a mark explicitly names a narrower attack type, any combatant on the applying controller's allied team may benefit.

@@ -11,6 +11,16 @@ export function mulberry32(seed: number) {
 
 export type Rng = () => number;
 
+/** Stable UTF-16 hash used only to derive independent deterministic streams. */
+export function hashString(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
 /** Hash-mixes a run seed with a salt into a well-distributed 32-bit seed.
  *  Unlike a linear combination (seed*a + salt*b), this doesn't collide for
  *  seed/salt pairs a fixed offset apart — important since seeds are commonly
@@ -21,4 +31,20 @@ export function mixSeed(seed: number, salt: number): number {
   h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
   h = h ^ (h >>> 16);
   return h;
+}
+
+/**
+ * A gameplay stream belongs to one action/phase/definition/subject. Adding a
+ * combat-log line or an unrelated random handler therefore cannot move rolls
+ * consumed by an existing mechanic.
+ */
+export function rngFor(
+  seed: number,
+  actionSeq: number,
+  phase: string,
+  definitionId: string,
+  subjectId: string,
+): Rng {
+  const key = `${seed}:${actionSeq}:${phase}:${definitionId}:${subjectId}`;
+  return mulberry32(mixSeed(seed, hashString(key)));
 }

@@ -65,8 +65,26 @@ The production image uses `node:26-bookworm-slim` because `better-sqlite3` targe
 Kubernetes manifests in `k8s/` deliberately run one replica with a `Recreate` strategy and mount the
 SQLite PVC at `/data`. Traefik handles HTTP and WebSocket traffic through the same ingress.
 
-Deploy with the checked-in Skaffold configuration or build the Dockerfile directly. Apply
-`k8s/pvc.yaml` before the first rollout so `/data/warlords.db` can be mounted.
+The complete deployment has a single Kustomize entry point. Skaffold builds and tags the image
+with the explicit release version configured in `skaffold.yaml`,
+pushes it to `docker.io/bevdev1/warlords`, and deploys the rendered manifests:
+
+```sh
+skaffold run
+kubectl -n warlords rollout status deployment/warlords --timeout=5m
+```
+
+For a manifest-only install after separately publishing the image:
+
+```sh
+kubectl apply -k k8s
+kubectl -n warlords rollout status deployment/warlords --timeout=5m
+```
+
+The manifests create the namespace, PVC, service, one-pod deployment, certificate, and Traefik
+ingress for `https://warlords.bevsoft.com`. The pod runs as uid/gid 1000; `fsGroup` makes the
+mounted `/data` volume writable for SQLite. CPU/memory bounds and startup, readiness, and liveness
+probes are declared in `k8s/deployment.yaml`.
 
 The Node process writes a rotating weekday backup beside the database and drains HTTP/WebSocket
 connections on SIGTERM.

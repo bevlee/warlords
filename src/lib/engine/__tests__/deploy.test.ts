@@ -127,61 +127,12 @@ describe('deployMove', () => {
 });
 
 describe('splitStack', () => {
-  it('peels a smaller stack onto an empty in-zone cell', () => {
+  it('rejects every legacy split request and preserves the whole strategic stack', () => {
     const s = deployState();
     const g = playerStacks(s).find(u => u.definition.name === 'Goblin')!;
-    const to: Pos = { col: 2, row: 7 };
-
-    const next = splitStack(s, g.id, 4, to);
-    const src = next.units.find(u => u.id === g.id)!;
-    const created = next.units.find(u => u.id !== g.id && u.definition.name === 'Goblin' && u.pos.col === 2 && u.pos.row === 7)!;
-
-    expect(src.count).toBe(6);
-    expect(created.count).toBe(4);
-    expect(created.hp).toBe(GOBLIN.hp);
-    expect(cellOccupant(next, to)).toBe(created.id);
-    expect(created.id).toBe('u5');
-    expect(next.nextId).toBe(6);
-  });
-
-  it('mints the same id for the same split sequence', () => {
-    const split = (state: BattleState) => {
-      const goblins = playerStacks(state).find(u => u.definition.name === 'Goblin')!;
-      return splitStack(state, goblins.id, 2, { col: 2, row: 7 });
-    };
-
-    expect(split(deployState())).toEqual(split(deployState()));
-  });
-
-  it('rejects an amount at or above the stack size, or below 1', () => {
-    const s = deployState();
-    const g = playerStacks(s).find(u => u.definition.name === 'Goblin')!; // count 10
-    expect(splitStack(s, g.id, 10, { col: 2, row: 7 })).toBe(s);
-    expect(splitStack(s, g.id, 0, { col: 2, row: 7 })).toBe(s);
-  });
-
-  it('rejects splitting onto an occupied cell', () => {
-    const s = deployState();
-    const g = playerStacks(s).find(u => u.definition.name === 'Goblin')!;
-    const w = playerStacks(s).find(u => u.definition.name === 'Wolf Rider')!;
-    expect(splitStack(s, g.id, 3, w.pos)).toBe(s);
-  });
-
-  it('refuses to split past the field-stack cap', () => {
-    let s = deployState();
-    const g = playerStacks(s).find(u => u.definition.name === 'Goblin')!; // count 10
-    // Split off 1-count stacks into fresh cells until at the cap, then one more must fail.
-    let col = 0, row = 8;
-    for (let i = 0; playerStacks(s).length < MAX_FIELD_STACKS && i < 20; i++) {
-      const cur = playerStacks(s).find(u => u.id === g.id)!;
-      if (cur.count < 2) break;
-      s = splitStack(s, g.id, 1, { col, row });
-      col = (col + 1) % DEPLOY_COLS;
-      if (col === 0) row = row === 8 ? 9 : 0;
-    }
-    expect(playerStacks(s).length).toBe(MAX_FIELD_STACKS);
-    const over = splitStack(s, g.id, 1, { col: 2, row: 0 });
-    expect(over).toBe(s);
+    expect(splitStack(s, g.id, 4, { col: 2, row: 7 })).toBe(s);
+    expect(playerStacks(s).find(u => u.id === g.id)?.count).toBe(10);
+    expect(playerStacks(s)).toHaveLength(2);
   });
 });
 

@@ -20,7 +20,10 @@ export async function resetHero(): Promise<void> {
 export type SavedArmy = Record<string, number>;
 
 export async function loadArmy(): Promise<SavedArmy | null> {
-  return getSave<SavedArmy>('army');
+  const army = await getSave<SavedArmy>('army');
+  if (!army || army.Gorgon === undefined) return army;
+  const { Gorgon, ...rest } = army;
+  return { ...rest, Bilehorn: (rest.Bilehorn ?? 0) + Gorgon };
 }
 
 export async function saveArmy(counts: SavedArmy): Promise<void> {

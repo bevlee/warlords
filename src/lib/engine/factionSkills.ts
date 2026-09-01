@@ -71,6 +71,7 @@ export function getSorceryMultiplier(hero: Hero): number {
 
 /** Hero's max/starting mana: base regen curve plus Intelligence (wizard). */
 export function maxMana(hero: Hero): number {
+  if (hero.class !== 'wizard') return 0;
   return 5 + 3 * hero.level + 2 * getSkillLevel(hero, 'intelligence');
 }
 
@@ -134,13 +135,8 @@ export function necromancyBonusSkeletons(hero: Hero, enemyArmy: ArmySlot[]): num
 
 /** Unlock/level faction skills as the hero levels up. Called whenever hero.level changes. */
 export function updateFactionSkills(hero: Hero): Hero {
-  const defs = FACTION_SKILL_DEFS[hero.class];
-  const factionSkills: FactionSkill[] = [];
-  for (const def of defs) {
-    if (hero.level < def.unlockLevel) continue;
-    const levelsAboveUnlock = hero.level - def.unlockLevel;
-    const skillLevel = Math.min(3, 1 + Math.floor(levelsAboveUnlock / 3)) as 1 | 2 | 3;
-    factionSkills.push({ id: def.id, name: def.name, description: def.description, level: skillLevel });
-  }
-  return { ...hero, factionSkills };
+  // Faction powers are now explicit hero actions/artifacts rather than silent
+  // level-derived combat bonuses. Retain already-persisted skills so migrated
+  // runs remain loadable, but never manufacture or level them automatically.
+  return { ...hero, factionSkills: hero.factionSkills ?? [] };
 }

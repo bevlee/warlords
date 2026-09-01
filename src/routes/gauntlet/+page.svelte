@@ -21,6 +21,8 @@
     applySkillPick,
     generateGauntletEnemy,
     encounterBudget,
+    enemyVeterancy,
+    migrateRunState,
     actOf,
     BOSS_NODES,
     RUN_LENGTH,
@@ -82,15 +84,8 @@
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('load timed out')), 15000)),
       ]);
       // Saves from before the items feature lack these fields.
-      run = saved
-        ? {
-            ...saved,
-            items: saved.items ?? [],
-            pendingItems: saved.pendingItems ?? null,
-            unitSkills: migrateUnitSkills(saved.unitSkills ?? {}),
-            pendingSkills: saved.pendingSkills ?? null,
-          }
-        : null;
+      const migrated = migrateRunState(saved);
+      run = migrated ? { ...migrated, unitSkills: migrateUnitSkills(migrated.unitSkills) } : null;
     } catch (err) {
       // A save-service hiccup must not wedge the page on "Loading…" forever.
       // Surface a retry instead of an infinite spinner; the run is untouched
@@ -117,6 +112,12 @@
   function handleResult(result: 'player_wins' | 'enemy_wins', _finalUnits: UnitStack[]) {
     if (!run) return;
     run = recordBattle(run, result === 'player_wins');
+    void saveRun(run);
+  }
+
+  function saveFormation(formation: import('$lib/engine/deployment').SavedFormation) {
+    if (!run) return;
+    run = { ...run, savedFormation: formation };
     void saveRun(run);
   }
 
@@ -248,6 +249,10 @@
         hero={run.hero}
         armyBonuses={battleBonuses(run.items)}
         items={run.items}
+        gauntletRound={run.battlesWon + 1}
+        enemyVeterancy={encounter?.veterancy ?? 0}
+        savedFormation={run.savedFormation}
+        onformation={saveFormation}
         allowRestart={false}
         exitLabel="Continue"
         onexit={() => (inBattle = false)}
@@ -431,7 +436,7 @@
             </p>
             <div class="flex items-center gap-3">
               <span class="flex-1 text-sm text-slate-200">
-                {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(run.encounterIndex)}
+                Rank {run.encounterIndex} · {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(run.encounterIndex)} · Veterancy +{enemyVeterancy(run.encounterIndex)} Attack/Defence
               </span>
               <button
                 type="button"
@@ -460,7 +465,7 @@
               {#if current}
                 {@const enc = generateGauntletEnemy(run)}
                 <span class="flex-1 text-sm text-slate-200">
-                  {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(n)}
+                  Rank {n} · {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(n)} · Veterancy +{enemyVeterancy(n)} Attack/Defence
                   {#if enc.isBoss}<span class="ml-1 font-semibold text-red-400">BOSS</span>{/if}
                 </span>
                 <button

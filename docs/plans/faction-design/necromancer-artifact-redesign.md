@@ -34,7 +34,7 @@ Unlike the Demon faction, Necromancer does not want uncontrolled friendly destru
 
 Necromancer heroes have **no mana and cannot cast spells**. Instead, they use Corpsecraft by consuming actual friendly Skeletons on the battlefield. These are the same Skeletons used for blocking, Funeral Drum, Blood Tithe, and Absorb Skeleton, so every hero ability competes with the rest of the faction's bone economy.
 
-Corpsecraft is not spellcasting. Spell resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect it.
+Corpsecraft is a non-magical hero action. Magic Resistance, Sorcery, Silence, mana effects, and spell artifacts do not affect it.
 
 The starting ideas are:
 

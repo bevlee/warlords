@@ -181,7 +181,6 @@
       exitLabel="Return to co-op"
       online={{
         deployMove: (unitId, to) => void client?.send({ type: 'deploy.move', unitId, to }),
-        deploySplit: (unitId, amount, to) => void client?.send({ type: 'deploy.split', unitId, amount, to }),
         confirmDeploy: () => void client?.send({ type: 'deploy.confirm' }),
         action: action => void client?.send({ type: 'battle.action', lastSeq: client?.latestSeq ?? 0, action }),
         chat: text => void client?.send({ type: 'chat.send', text }),

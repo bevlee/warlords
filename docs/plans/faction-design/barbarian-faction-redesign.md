@@ -81,7 +81,7 @@ Exact rules:
 - Damage from all strikes belonging to the empowered action is increased, including Double Strike, cleave, boulder splash, and Thunder Dive.
 - Damage-over-time effects applied by that action are not increased on later turns.
 - The hero, summoned units, and stacks created after battle initialization do not receive the buff.
-- Split stacks share the original stack's opening state so deployment splitting cannot duplicate the effect.
+- Deployment only repositions whole stacks, so every strategic army stack receives exactly one opening empowerment.
 
 This artifact makes the faction promise visible: every unit gets one exceptional opportunity, and passive opening actions waste it.
 
@@ -562,7 +562,7 @@ With both weapons, the hero opens a priority target with a 15× attack and leave
 
 1. Add artifact faction, unit, and starter metadata.
 2. Grant Banner of the First Raid in `newRun('barbarian')`.
-3. Track first-turn use and Banner extensions per original stack identity.
+3. Track first-turn use and Banner extensions directly on each starting battle stack.
 4. Apply opening speed through the same effective-speed read path used by movement previews and AI.
 5. Apply opening damage through the shared final-damage path, including secondary strikes from the empowered action.
 6. Set Barbarian maximum/starting mana to zero and reject Barbarian spell actions in the engine.
@@ -605,16 +605,16 @@ With both weapons, the hero opens a priority target with a 15× attack and leave
 
 ## 10. Important Edge Rules
 
-- The first turn belongs to the original battle stack, not the current round.
-- Split stacks cannot duplicate Banner charges or once-per-battle abilities.
+- The first turn belongs to each starting battle stack, not the current round.
+- Deployment cannot split stacks or duplicate Banner charges and once-per-battle abilities.
 - Deployment actions do not consume the first turn.
 - A unit killed before acting never transfers its unused Banner effect.
 - If several ATB-setting effects trigger, use the highest resulting ATB value unless an artifact explicitly says to add.
 - Percentage damage bonuses multiply once each; UI previews must display the complete product.
 - Ranged Mark is a status, not a raw defense penalty, and increases ranged damage from every friendly shooter rather than only Orcs and Cyclopes.
 - Marked for Death is a separate status that increases all incoming damage by 20%; it can coexist with Ranged Mark.
-- Marks are stored on the target with the applying controller's ID. Their benefits are army-wide: the original source unit does not need to remain alive, and any friendly combatant meeting the mark's stated attack condition may use it.
+- Marks are stored on the target with the applying controller and allied team. Their benefits are team-wide: the original source unit does not need to remain alive, and any allied combatant—including a co-op partner's unit—may use the mark when it meets the stated attack condition.
 - Bloodletter Axe and Worldsplitter multiply with one another, producing a 15× hero attack before other modifiers.
-- Barbarian Battle Cries are not spells: Sorcery, spell resistance, Silence, mana regeneration, and spell artifacts do not affect them.
+- Barbarian Battle Cries are non-magical hero actions: Sorcery, Magic Resistance, Silence, mana regeneration, and spell artifacts do not affect them.
 - Co-op Barbarian heroes maintain separate cry charges and only buff units under their controller.
 - Artifact and ability splash effects resolve once; overlapping definitions choose the highest percentage rather than creating duplicate hits.

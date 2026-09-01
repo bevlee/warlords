@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: Service
-metadata: 
+metadata:
   name: warlords
   namespace: warlords
   labels:
     app: warlords
-spec: 
-  selector: 
+spec:
+  selector:
     app: warlords
   ports:
     - name: http
       port: 80
       targetPort: 3000
       protocol: TCP
-      
+      appProtocol: http

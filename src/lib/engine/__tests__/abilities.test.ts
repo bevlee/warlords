@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { modifiedDamage, calculateDamage, canRetaliate } from '../combat';
 import { initBattle, applyAction } from '../battle';
-import { CAVALIER, GRIFFIN } from '../knight';
-import { GORGON, NAGA } from '../wizard';
+import { CHAMPION, GRIFFIN } from '../knight';
+import { BILEHORN, NAGA } from '../wizard';
 import { GOBLIN } from '../barbarian';
+import { setOccupant } from '../grid';
 import type { Hero, UnitDef, UnitStack } from '../types';
 
 function makeStack(overrides: Partial<UnitStack>): UnitStack {
@@ -31,6 +32,20 @@ function sequenceRng(values: number[]) {
   return () => values[Math.min(i++, values.length - 1)];
 }
 
+function placeAdjacent(state: ReturnType<typeof initBattle>, attackerId: string, targetId: string) {
+  const attacker = state.units.find(unit => unit.id === attackerId)!;
+  const target = state.units.find(unit => unit.id === targetId)!;
+  const to = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
+    .map(([dc, dr]) => ({ col: target.pos.col + dc, row: target.pos.row + dr }))
+    .find(pos => state.grid.cells[pos.row]?.[pos.col] && !state.grid.cells[pos.row][pos.col].blocked && !state.grid.cells[pos.row][pos.col].occupantId)!;
+  return {
+    ...state,
+    phase: 'combat' as const,
+    grid: setOccupant(setOccupant(state.grid, attacker.pos, null), to, attacker.id),
+    units: state.units.map(unit => unit.id === attacker.id ? { ...unit, pos: to } : unit),
+  };
+}
+
 describe('attack/defense modifier (uncapped)', () => {
   const dmg = 10;
 
@@ -49,21 +64,21 @@ describe('attack/defense modifier (uncapped)', () => {
   });
 });
 
-describe('Jousting (Cavalier/Champion)', () => {
+describe('Grand Joust (Champion)', () => {
   // attack === defense cancels out the usual attack/defense modifier, isolating jousting.
-  const evenDefender = () => makeStack({ definition: { ...GOBLIN, defense: CAVALIER.attack }, side: 'enemy' });
+  const evenDefender = () => makeStack({ definition: { ...GOBLIN, defense: CHAMPION.attack }, side: 'enemy' });
 
   it('adds no bonus when the attacker has not moved', () => {
-    const attacker = makeStack({ definition: CAVALIER, pos: { col: 5, row: 5 } });
+    const attacker = makeStack({ definition: CHAMPION, pos: { col: 5, row: 5 } });
     const base = modifiedDamage(attacker, evenDefender(), 0, 20);
     expect(base).toBe(20 * attacker.count);
   });
 
-  it('adds +5% damage per cell moved before the attack', () => {
+  it('leaves positional Grand Joust scaling to battle action context', () => {
     const defender = evenDefender();
-    const stationary = makeStack({ definition: CAVALIER, pos: { col: 5, row: 5 } });
+    const stationary = makeStack({ definition: CHAMPION, pos: { col: 5, row: 5 } });
     const charged = makeStack({
-      definition: CAVALIER,
+      definition: CHAMPION,
       pos: { col: 8, row: 5 },
       lastMovedFrom: { col: 5, row: 5 }, // moved 3 cells
     });
@@ -71,7 +86,7 @@ describe('Jousting (Cavalier/Champion)', () => {
     const baseDamage = modifiedDamage(stationary, defender, 0, 20);
     const chargedDamage = modifiedDamage(charged, defender, 0, 20);
 
-    expect(chargedDamage).toBeCloseTo(baseDamage * 1.15, 5); // +5% * 3 cells
+    expect(chargedDamage).toBe(baseDamage);
   });
 
   it('does not apply to units without the jousting ability', () => {
@@ -85,32 +100,14 @@ describe('Jousting (Cavalier/Champion)', () => {
   });
 });
 
-describe('Death Stare (Gorgon)', () => {
-  it('adds a full creature worth of bonus damage on proc', () => {
-    const attacker = makeStack({ definition: GORGON, count: 1 });
+describe('Bilehorn replacement', () => {
+  it('has deterministic ordinary attack damage rather than Death Stare executions', () => {
+    const attacker = makeStack({ definition: BILEHORN, count: 1 });
     const defender = makeStack({ definition: GOBLIN, side: 'enemy', count: 10 });
-    // first call: damage roll fraction; second call: death-stare proc roll (< 0.1 procs)
-    const rng = sequenceRng([0, 0.05]);
-    const damage = calculateDamage(attacker, defender, 0, rng);
-    const withoutProc = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.5]));
-    expect(damage).toBe(withoutProc + GOBLIN.hp);
-  });
-
-  it('does not proc when the roll misses', () => {
-    const attacker = makeStack({ definition: GORGON, count: 1 });
-    const defender = makeStack({ definition: GOBLIN, side: 'enemy', count: 10 });
-    const rng = sequenceRng([0, 0.5]);
-    const damage = calculateDamage(attacker, defender, 0, rng);
-    const dmgPerCreature = GORGON.minDamage;
-    const expectedBase = Math.max(1, Math.round(modifiedDamage(attacker, defender, 0, dmgPerCreature)));
-    expect(damage).toBe(expectedBase);
-  });
-
-  it('does not apply to units without death_stare', () => {
-    const attacker = makeStack({ definition: GOBLIN, count: 1 });
-    const defender = makeStack({ definition: GOBLIN, side: 'enemy', count: 10 });
-    const damage = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.01]));
-    expect(damage).toBeLessThan(GOBLIN.hp); // no death-stare bonus tacked on
+    const lowSecondaryRoll = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.01]));
+    const highSecondaryRoll = calculateDamage(attacker, defender, 0, sequenceRng([0, 0.99]));
+    expect(lowSecondaryRoll).toBe(highSecondaryRoll);
+    expect(BILEHORN.abilities).not.toContain('death_stare');
   });
 });
 
@@ -209,11 +206,9 @@ describe('Double strike', () => {
       s = applyAction(s, { type: 'wait' });
     }
     const enemy = s.units.find(u => u.side === 'enemy')!;
-    const adj = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1]]
-      .map(([dc, dr]) => ({ col: enemy.pos.col + dc, row: enemy.pos.row + dr }))
-      .find(p => p.row >= 0 && p.row < s.grid.height && p.col >= 0 && p.col < s.grid.width
-        && !s.grid.cells[p.row][p.col].blocked && !s.grid.cells[p.row][p.col].occupantId)!;
-    const next = applyAction(s, { type: 'attack', targetId: enemy.id, moveTo: adj });
+    const attacker = s.units.find(u => u.definition.name === attackerDef.name)!;
+    s = placeAdjacent(s, attacker.id, enemy.id);
+    const next = applyAction(s, { type: 'attack', targetId: enemy.id });
     return { next, before: s, attackerId: s.units.find(u => u.definition.name === attackerDef.name)!.id };
   }
 
@@ -277,10 +272,9 @@ describe('leveled lifesteal', () => {
     const enemy = s.units.find(u => u.side === 'enemy')!;
     // Wound the striker first — the heal only logs when hp actually rises.
     s = { ...s, units: s.units.map(u => (u.definition.name === attackerDef.name ? { ...u, hp: 1 } : u)) };
-    const adj = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1]]
-      .map(([dc, dr]) => ({ col: enemy.pos.col + dc, row: enemy.pos.row + dr }))
-      .find(p => p.row >= 0 && p.row < s.grid.height && !s.grid.cells[p.row][p.col].blocked && !s.grid.cells[p.row][p.col].occupantId)!;
-    return applyAction(s, { type: 'attack', targetId: enemy.id, moveTo: adj });
+    const attacker = s.units.find(u => u.definition.name === attackerDef.name)!;
+    s = placeAdjacent(s, attacker.id, enemy.id);
+    return applyAction(s, { type: 'attack', targetId: enemy.id });
   }
 
   it('heals 10% per level of damage dealt', () => {
@@ -305,10 +299,9 @@ describe('leveled lifesteal', () => {
     const enemy = s.units.find(u => u.side === 'enemy')!;
     // Knock the vamp down to a single wounded creature (count 1, hp 5).
     s = { ...s, units: s.units.map(u => (u.definition.name === 'Vamp' ? { ...u, count: 1, hp: 5 } : u)) };
-    const adj = [[-1, 0], [-1, -1], [-1, 1], [0, -1], [0, 1]]
-      .map(([dc, dr]) => ({ col: enemy.pos.col + dc, row: enemy.pos.row + dr }))
-      .find(p => p.row >= 0 && p.row < s.grid.height && !s.grid.cells[p.row][p.col].blocked && !s.grid.cells[p.row][p.col].occupantId)!;
-    const next = applyAction(s, { type: 'attack', targetId: enemy.id, moveTo: adj });
+    const vampBefore = s.units.find(u => u.definition.name === 'Vamp')!;
+    s = placeAdjacent(s, vampBefore.id, enemy.id);
+    const next = applyAction(s, { type: 'attack', targetId: enemy.id });
     const vamp = next.units.find(u => u.definition.name === 'Vamp')!;
     // Damage 60 at 100% lifesteal fills the wounded creature (5->30) and
     // revives the second, but never past startCount = 2.

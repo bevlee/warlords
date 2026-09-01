@@ -18,11 +18,13 @@ describe('Knight roster', () => {
     });
   });
 
-  it('Cavalier and Champion have jousting', () => {
+  it('gives Cavalier and Champion distinct cavalry identities', () => {
     const cavalier = KNIGHT_UNITS.find(u => u.name === 'Cavalier')!;
     const champion = KNIGHT_UNITS.find(u => u.name === 'Champion')!;
-    expect(cavalier.abilities).toContain('jousting');
-    expect(champion.abilities).toContain('jousting');
+    expect(cavalier.abilities).toEqual(expect.arrayContaining(['gallop', 'ride_by_attack']));
+    expect(cavalier.abilities).not.toContain('grand_joust');
+    expect(champion.abilities).toEqual(expect.arrayContaining(['grand_joust', 'overrun']));
+    expect(champion.abilities).not.toContain('ride_by_attack');
   });
 });
 
@@ -35,9 +37,11 @@ describe('Wizard roster', () => {
     WIZARD_UNITS.forEach(u => expect(u.hp).toBeGreaterThan(0));
   });
 
-  it('Gorgon has death_stare', () => {
-    const gorgon = WIZARD_UNITS.find(u => u.name === 'Gorgon')!;
-    expect(gorgon.abilities).toContain('death_stare');
+  it('replaces the legacy Gorgon with the corrosive Bilehorn', () => {
+    expect(WIZARD_UNITS.some(u => u.name === 'Gorgon')).toBe(false);
+    const bilehorn = WIZARD_UNITS.find(u => u.name === 'Bilehorn')!;
+    expect(bilehorn.abilities).toEqual(expect.arrayContaining(['caustic_breath', 'corrosive_carapace']));
+    expect(bilehorn.abilities).not.toContain('death_stare');
   });
 });
 

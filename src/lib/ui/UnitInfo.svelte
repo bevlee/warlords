@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Hero, UnitStack } from '$lib/engine/types';
+  import type { BattleState, Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import { effectiveAttack, effectiveDefense } from '$lib/engine/combat';
   import { effectiveSpeed } from '$lib/engine/selectors';
@@ -15,6 +15,8 @@
   interface Props {
     unit: UnitStack | null;
     hero?: Hero | null;
+    /** Live battle context resolves artifact-upgraded effect values. */
+    battle?: BattleState | null;
     pinned?: boolean;
     onunpin?: (() => void) | null;
     /** Render inside another surface (e.g. a draft card): no own border, no pin hint. */
@@ -25,7 +27,7 @@
     size?: 'compact' | 'large' | 'rail';
   }
 
-  let { unit, hero = null, pinned = false, onunpin = null, embedded = false, size = 'compact' }: Props = $props();
+  let { unit, hero = null, battle = null, pinned = false, onunpin = null, embedded = false, size = 'compact' }: Props = $props();
 
   const isRail = $derived(size === 'rail');
 
@@ -114,7 +116,7 @@
     ];
   });
 
-  const effects = $derived(unit ? activeEffects(unit, hero) : []);
+  const effects = $derived(unit ? activeEffects(unit, hero, battle) : []);
 </script>
 
 <!-- One layout for both states: right-clicking pins the panel to whatever it is

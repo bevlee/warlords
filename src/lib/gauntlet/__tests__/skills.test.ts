@@ -4,9 +4,9 @@ import { newRun } from '../run';
 import { GOBLIN, WOLF_RIDER } from '../../engine/barbarian';
 
 describe('catalog', () => {
-  it('has the five launch skills with names and descriptions', () => {
+  it('keeps the five launch skills and adds Rank-scaled Training', () => {
     expect(new Set(SKILL_IDS)).toEqual(
-      new Set(['life_drain', 'double_strike', 'no_retaliation', 'fleet_footwork', 'bravery'])
+      new Set(['life_drain', 'double_strike', 'no_retaliation', 'fleet_footwork', 'bravery', 'weapon_training', 'armour_training'])
     );
     for (const id of SKILL_IDS) {
       expect(UNIT_SKILLS[id].name).toBeTruthy();

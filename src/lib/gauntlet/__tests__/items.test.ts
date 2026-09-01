@@ -3,13 +3,13 @@ import { ITEMS, ITEM_IDS, itemBonuses, itemDraftOptions, itemEffectText, type It
 import { newRun } from '../run';
 
 describe('item catalog', () => {
-  it('every item has a name, a rarity, and at least one effect', () => {
+  it('every item has a name, a rarity, and either a mechanic description or stat effect', () => {
     for (const id of ITEM_IDS) {
       const item = ITEMS[id];
       expect(item.id).toBe(id);
       expect(item.name.length).toBeGreaterThan(0);
       expect(['common', 'rare', 'epic']).toContain(item.rarity);
-      expect(Object.keys(item.effects).length).toBeGreaterThan(0);
+      expect(Object.keys(item.effects).length > 0 || item.description.length > 0).toBe(true);
     }
   });
 

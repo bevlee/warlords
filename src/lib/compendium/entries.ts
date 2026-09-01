@@ -278,6 +278,22 @@ const SPELL_TEXT: Record<SpellId, { effect: (level: number) => string; descripti
       'Turns a friendly stack’s skin to granite: +4 defense for the rest of the battle. ' +
       'Casting it again on the same stack adds another +4.',
   },
+  slow: {
+    effect: () => '−2 Speed and Initiative until the target’s next turn',
+    description: 'A temporary control spell.',
+  },
+  chain_lightning: {
+    effect: (level) => `${lightningDamage(level)} magic damage, then two 50% arcs`,
+    description: 'Lightning-attribute magic damage.',
+  },
+  resurrect: {
+    effect: (level) => `Heal ${30 + 10 * level} HP`,
+    description: 'Restores health and revives creatures.',
+  },
+  blizzard: {
+    effect: (level) => `${lightningDamage(level)} centre / 60% surrounding`,
+    description: 'A friendly-fire 3×3 Cold magic spell.',
+  },
 };
 
 /** Spell entries at a given hero level, so the page can show the player's real
