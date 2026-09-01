@@ -14,7 +14,7 @@
 <main class="min-h-screen bg-slate-900 px-4 py-5 text-slate-100 sm:px-6 sm:py-6">
   <div class="mx-auto max-w-4xl">
     <div class="flex items-center justify-between gap-4">
-      <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← Hub</a>
+      <a href="/legacy" class="text-lg text-slate-400 hover:text-slate-200">← Hub</a>
       <a href="/events" class="text-sm font-bold text-sky-300 hover:text-sky-200">Past events →</a>
     </div>
 

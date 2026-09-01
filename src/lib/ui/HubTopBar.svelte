@@ -1,9 +1,11 @@
 <script lang="ts">
-  let { gold = 0 }: { gold?: number } = $props();
+  // `home` is where the wordmark leads: the default hub, or the legacy one
+  // when the bar is rendered inside it.
+  let { gold = 0, home = '/' }: { gold?: number; home?: string } = $props();
 </script>
 
 <header class="flex items-center justify-between gap-3">
-  <a href="/" class="text-xl font-black tracking-tight text-slate-50">WAR<span class="text-amber-400">L</span>ORDS</a>
+  <a href={home} class="text-xl font-black tracking-tight text-slate-50">WAR<span class="text-amber-400">L</span>ORDS</a>
   <div class="flex items-center gap-3">
     <span class="inline-flex items-center gap-1.5 font-extrabold tabular-nums text-amber-300" aria-label="{gold} gold">
       <span class="h-4 w-4 rounded-full bg-gradient-to-br from-amber-200 to-amber-600 shadow-inner"></span>

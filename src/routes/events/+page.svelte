@@ -13,7 +13,7 @@
 <main class="min-h-screen bg-slate-900 px-4 py-5 text-slate-100 sm:px-6 sm:py-6">
   <div class="mx-auto max-w-3xl">
     <div class="flex items-center gap-4">
-      <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← Hub</a>
+      <a href="/legacy" class="text-lg text-slate-400 hover:text-slate-200">← Hub</a>
       <h1 class="text-2xl font-bold">Seasonal Events</h1>
     </div>
 

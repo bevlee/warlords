@@ -30,6 +30,15 @@ Run the production build locally with:
 DATABASE_PATH=data/warlords.db PORT=3000 npm run start
 ```
 
+## Navigation
+
+The default page at `/` is the gauntlet home: it shows the state of the current run — act, node,
+faction, and hero level — and leads into `/gauntlet`. No other mode is surfaced there.
+
+The previous multi-mode hub is preserved at `/legacy`, still carrying the seasonal event, campaign,
+gauntlet, and compendium cards. Screens that are only reachable from it (`/campaign`, `/events`,
+`/compendium`) link back to `/legacy`; `/gauntlet`, `/history`, and `/settings` link back to `/`.
+
 ## Persistence and multiplayer
 
 Game saves live in SQLite behind authenticated REST endpoints. A random session token is kept in
