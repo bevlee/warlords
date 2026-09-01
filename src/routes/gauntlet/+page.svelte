@@ -200,7 +200,6 @@
   {#if !inBattle}
     <div class="mb-4 flex items-center gap-4">
       <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
-      <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
     </div>
   {/if}
 
@@ -564,17 +563,19 @@
           </dd>
         </div>
         <div>
-          <dt class="font-semibold text-slate-300">Your army recovers</dt>
+          <dt class="font-semibold text-slate-300">Your whole army comes back</dt>
           <dd class="mt-1">
-            Losses stay lost, but every surviving stack returns to full health before the next fight,
-            so there is no attrition to nurse between battles.
+            Casualties last only for the battle they happen in. Every stack you own returns at full
+            strength for the next encounter, however badly the last one went — there is no attrition
+            to nurse, and a costly win costs nothing but the win.
           </dd>
         </div>
         <div>
           <dt class="font-semibold text-slate-300">Every win pays out</dt>
           <dd class="mt-1">
-            Victories offer a choice of reinforcements, and at intervals an artifact for the whole
-            army or a new skill for one of your units. Your hero levels up and spends stat points.
+            Victories offer a choice of reinforcements, and every third one adds an artifact for the
+            whole army or a new skill for one of your unit types. Your hero gains a level each win,
+            which raises its attack and defense and deepens the faction skills on its own.
           </dd>
         </div>
         <div>
