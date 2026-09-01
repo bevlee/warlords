@@ -30,6 +30,20 @@ Run the production build locally with:
 DATABASE_PATH=data/warlords.db PORT=3000 npm run start
 ```
 
+## Navigation
+
+The default page at `/` is a title screen for the gauntlet: a play button into `/gauntlet` (reading
+`Resume` with the current run's faction and node when one is live), quiet links to the compendium
+and battle history, and a cog carrying the battle-speed setting. The gauntlet's rules live at the
+foot of `/gauntlet` itself rather than on the title screen.
+
+The previous multi-mode hub is preserved at `/legacy`, still carrying the seasonal event, campaign,
+gauntlet, and compendium cards. It is not linked from `/`; `/campaign` and `/events` — reachable
+only from it — link back to `/legacy`.
+
+Battle speed is a profile setting (`src/lib/profile.ts`, localStorage), so the cog on `/`, the cog
+inside a battle, and `/settings` all read and write the same value and it holds between battles.
+
 ## Persistence and multiplayer
 
 Game saves live in SQLite behind authenticated REST endpoints. A random session token is kept in

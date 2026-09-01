@@ -201,7 +201,6 @@
   {#if !inBattle}
     <div class="mb-4 flex items-center gap-4">
       <h1 class="text-2xl font-bold">Warlords — Gauntlet</h1>
-      <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← main game</a>
     </div>
   {/if}
 
@@ -225,10 +224,8 @@
     <!-- Run setup: pick a faction -->
     <div class="mx-auto max-w-5xl">
       <h2 class="mb-2 text-3xl font-bold text-amber-200">Choose your faction</h2>
-      <p class="mb-8 text-lg text-slate-300">
-        Fight 10 escalating battles, then continue forever in Endless. Your army fully recovers
-        between battles, and each victory offers reinforcements and permanent upgrades.
-      </p>
+      <!-- Kept short: the full rules sit in the section at the foot of the page. -->
+      <p class="mb-8 text-lg text-slate-300">Your faction decides your roster for the whole run.</p>
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {#each Object.entries(FACTION_INFO) as [id, info] (id)}
           <button
@@ -554,5 +551,47 @@
         </button>
       </div>
     </div>
+  {/if}
+
+  {#if !inBattle}
+    <!-- The rules, kept off the home screen: this is where someone actually
+         wants them, and only between fights. -->
+    <section class="mx-auto mt-10 max-w-3xl border-t border-slate-800 pt-6 text-sm text-slate-400">
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500">How the Gauntlet works</h2>
+      <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <dt class="font-semibold text-slate-300">{RUN_LENGTH} battles, one life</dt>
+          <dd class="mt-1">
+            Pick a faction and fight through {RUN_LENGTH} encounters. Enemy armies grow about a
+            quarter stronger each node and pick up veteran attack and defence as the ranks climb;
+            nodes {[...BOSS_NODES].join(', ')} are bosses that field more still. A single defeat
+            ends the run.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-slate-300">Your whole army comes back</dt>
+          <dd class="mt-1">
+            Casualties last only for the battle they happen in. Every stack you own returns at full
+            strength for the next encounter, however badly the last one went — there is no attrition
+            to nurse, and a costly win costs nothing but the win.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-slate-300">Every win pays out</dt>
+          <dd class="mt-1">
+            Victories offer a choice of reinforcements, and every third one adds an artifact for the
+            whole army or a new skill for one of your unit types. Your hero gains a level each win,
+            which sharpens its own attacks and deepens the faction skills on its own.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-semibold text-slate-300">Endless</dt>
+          <dd class="mt-1">
+            Clearing node {RUN_LENGTH} does not have to end it — Endless keeps generating harder
+            armies for as long as you keep winning.
+          </dd>
+        </div>
+      </dl>
+    </section>
   {/if}
 </main>

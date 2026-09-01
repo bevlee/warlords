@@ -158,7 +158,7 @@
 
 <main class="min-h-screen bg-slate-900 p-4 text-slate-100 sm:p-6">
   <div class="mb-4 flex items-center gap-4">
-    <a href="/" class="text-lg text-slate-400 hover:text-slate-200">← Hub</a>
+    <a href="/legacy" class="text-lg text-slate-400 hover:text-slate-200">← Hub</a>
     <h1 class="text-2xl font-bold">Campaign</h1>
     <a href="/history" class="text-lg text-violet-400 hover:text-violet-300">🎬 Battle history →</a>
   </div>
