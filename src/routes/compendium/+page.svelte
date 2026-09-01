@@ -203,7 +203,7 @@
 
   <!-- Mobile-only bottom nav in the thumb zone -->
   <nav class="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-slate-700/60 bg-slate-900/90 py-2 backdrop-blur sm:hidden">
-    <a href="/legacy" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
+    <a href="/" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
       <span class="text-lg">🏰</span>Home
     </a>
     <a href="/campaign" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">

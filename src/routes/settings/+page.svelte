@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { resetHero, clearArmy, clearRun } from '$lib/storage';
-  import { loadProfile, saveProfile, clearProfile, DEFAULT_PROFILE, type Profile } from '$lib/profile';
+  import { loadProfile, saveProfile, clearProfile, DEFAULT_PROFILE, type BattleSpeed, type Profile } from '$lib/profile';
   import { resetCampaign } from '$lib/campaign/campaignStore';
   import { resetDiscovery } from '$lib/compendium/discovery';
+
+  const SPEEDS: BattleSpeed[] = ['slow', 'normal', 'fast'];
 
   let profile = $state<Profile>({ ...DEFAULT_PROFILE });
   let loaded = $state(false);
@@ -17,7 +19,12 @@
   // Persist after the load has seeded state, so the initial mount doesn't
   // write defaults over a real save.
   $effect(() => {
-    const snapshot = { name: profile.name, audio: profile.audio, reducedMotion: profile.reducedMotion };
+    const snapshot = {
+      name: profile.name,
+      audio: profile.audio,
+      reducedMotion: profile.reducedMotion,
+      battleSpeed: profile.battleSpeed,
+    };
     if (loaded) saveProfile(snapshot);
   });
 
@@ -59,6 +66,23 @@
         <span class="text-sm text-slate-300">Reduce motion</span>
         <input type="checkbox" bind:checked={profile.reducedMotion} class="h-5 w-5 accent-sky-400" />
       </label>
+      <div class="mt-3 flex items-center justify-between gap-3">
+        <span class="text-sm text-slate-300">Battle speed</span>
+        <div class="flex gap-1" role="group" aria-label="battle speed">
+          {#each SPEEDS as speed (speed)}
+            <button
+              type="button"
+              class="rounded-md px-3 py-1 text-xs font-bold capitalize {profile.battleSpeed === speed
+                ? 'bg-sky-400 text-slate-900'
+                : 'border border-slate-600 text-slate-300 hover:bg-slate-700/60'}"
+              aria-pressed={profile.battleSpeed === speed}
+              onclick={() => (profile.battleSpeed = speed)}
+            >
+              {speed}
+            </button>
+          {/each}
+        </div>
+      </div>
     </section>
 
     <section class="mt-4 rounded-2xl border border-red-500/30 bg-red-500/5 p-5">

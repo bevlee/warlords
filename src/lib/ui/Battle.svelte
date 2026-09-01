@@ -38,6 +38,7 @@
   import Sprite from './Sprite.svelte';
   import { heroSpriteName, unitSlug } from './sprites';
   import { recordSeen } from '$lib/compendium/discovery';
+  import { loadProfile, saveBattleSpeed, type BattleSpeed } from '$lib/profile';
   import SpellBook from './SpellBook.svelte';
   import GameLog from './GameLog.svelte';
   import ActionDock from './ActionDock.svelte';
@@ -101,8 +102,9 @@
   }: Props = $props();
 
   const AI_SPEEDS = { slow: 900, normal: 450, fast: 150 } as const;
-  type BattleSpeed = keyof typeof AI_SPEEDS;
-  let battleSpeed: BattleSpeed = $state('normal');
+  // Seeded from the saved profile so the choice carries between battles; the
+  // pills below write it straight back.
+  let battleSpeed: BattleSpeed = $state(loadProfile().battleSpeed);
   let autoBattle = $state(false);
   const AI_DELAY_MS = $derived(AI_SPEEDS[battleSpeed]);
 
@@ -1037,7 +1039,10 @@
                   <button
                     type="button"
                     class="settings-pill {battleSpeed === speed ? 'on' : ''}"
-                    onclick={() => (battleSpeed = speed as BattleSpeed)}
+                    onclick={() => {
+                      battleSpeed = speed as BattleSpeed;
+                      saveBattleSpeed(battleSpeed);
+                    }}
                   >
                     {speed}
                   </button>
