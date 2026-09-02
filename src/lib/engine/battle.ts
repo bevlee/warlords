@@ -1945,6 +1945,14 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
         if (abilities.includes('boulder_burst')) fraction = hasArtifact(nextState, actor, 'shaped_stones') ? (marked ? 1 : 0.75) : (marked ? 0.75 : 0.5);
         if (hasArtifact(nextState, actor, 'rain_of_iron') && !abilities.includes('boulder_burst')) { fraction = marked ? 0.75 : 0.5; friendlyFire = false; }
         for (const area of areaTargets(nextState, target.pos, { size, primaryId: target.id, secondaryMultiplier: fraction, enemyOf: actor, friendlyFire }).filter(area => !area.primary)) {
+          // The ability that owns this splash. Used for the damage seed, and
+          // logged so the battle log can name it rather than saying "splash".
+          const splashSource = abilities.includes('hellfire_shot') ? 'hellfire_shot'
+            : abilities.includes('lightning_strike') ? 'lightning_strike'
+            : abilities.includes('area_shot') ? 'area_shot'
+            : abilities.includes('boulder_burst') ? 'boulder_burst'
+            : hasArtifact(nextState, actor, 'rain_of_iron') ? 'rain_of_iron'
+            : 'splash';
           const packetRng = rngFor(nextState.seed, nextState.actionSeq ?? 0, 'damage', abilities.includes('hellfire_shot') ? 'hellfire_shot' : abilities.includes('lightning_strike') ? 'lightning_strike' : 'ranged_splash', `${area.stack.id}:${shot}`);
           const splashDamage = abilities.includes('area_shot') ? shotDamage : shotDamage * fraction;
           const hit = resolveDamagePacket(nextState, {
@@ -1968,7 +1976,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
               positive: false, innate: true, removable: true, stacks: 1, expires: { targetTurnsRemaining: 1, phase: 'start' }, data: { noRetaliation: true },
             });
           }
-          nextState = { ...nextState, units: nextState.units.map(unit => unit.id === splashTarget.id ? splashTarget : unit), log: [...nextState.log, { type: 'status', data: { effect: 'splash', sourceId: actor.id, unitId: splashTarget.id, damage: hit.outcome.finalDamage, killed: hit.outcome.killed } }] };
+          nextState = { ...nextState, units: nextState.units.map(unit => unit.id === splashTarget.id ? splashTarget : unit), log: [...nextState.log, { type: 'status', data: { effect: splashSource, sourceId: actor.id, unitId: splashTarget.id, damage: hit.outcome.finalDamage, killed: hit.outcome.killed } }] };
           if (splashTarget.count === 0) nextState = handleDeath(nextState, splashTarget, packetRng);
         }
       }

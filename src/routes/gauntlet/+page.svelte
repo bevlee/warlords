@@ -1,4 +1,6 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
+  import { stripKeywords } from '$lib/compendium/keywords';
   import { onMount } from 'svelte';
   import Battle from '$lib/ui/Battle.svelte';
   import Sprite from '$lib/ui/Sprite.svelte';
@@ -236,7 +238,7 @@
           >
             <Sprite name={heroSpriteName(id as FactionClass)} animate class="h-28 w-24" />
             <span class="text-xl font-bold text-amber-200">{info.name}</span>
-            <span class="text-sm leading-snug text-slate-400">{info.description}</span>
+            <span class="text-sm leading-snug text-slate-400"><KeywordText text={info.description} /></span>
           </button>
         {/each}
       </div>
@@ -310,7 +312,7 @@
                 <ItemIcon {id} class="h-14 w-14" />
                 <span class="text-xl font-bold {rs.text}">{item.name}</span>
                 <span class="text-xs font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
-                <span class="font-mono text-base text-amber-200">{itemEffectText(item)}</span>
+                <span class="font-mono text-base text-amber-200"><KeywordText text={itemEffectText(item)} /></span>
               </button>
               <a
                 href={entryHref('item', id)}
@@ -347,7 +349,7 @@
                 <span class="text-4xl leading-none" aria-hidden="true">{skillGlyph(id)}</span>
               {/if}
               <span class="text-lg font-bold text-violet-300">{skill.name}</span>
-              <span class="text-center text-sm leading-snug text-slate-400">{skill.description}</span>
+              <span class="text-center text-sm leading-snug text-slate-400"><KeywordText text={skill.description} /></span>
             </button>
             <a
               href={entryHref('unitSkill', id)}
@@ -492,7 +494,7 @@
           <p class="mb-2 font-mono text-xs text-slate-400">⚔{run.hero.attack} 🛡{run.hero.defense}</p>
           <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Skills</p>
 {#each run.hero.factionSkills as skill (skill.id)}
-  <div class="flex items-center gap-2 py-0.5" title={skill.description}>
+  <div class="flex items-center gap-2 py-0.5" title={stripKeywords(skill.description)}>
     <span class="text-xs text-slate-200">{skill.name}</span>
     <span class="font-mono text-[10px] text-amber-300">{skill.level}</span>
   </div>
@@ -501,10 +503,10 @@
             <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Artifacts</p>
             {#each run.items as id (id)}
               {@const item = ITEMS[id]}
-              <div class="flex items-center gap-2 py-0.5" title={itemEffectText(item)}>
+              <div class="flex items-center gap-2 py-0.5" title={stripKeywords(itemEffectText(item))}>
                 <ItemIcon {id} class="h-5 w-5 shrink-0" />
                 <span class="flex-1 text-xs {RARITY_STYLE[item.rarity].text}">{item.name}</span>
-                <span class="font-mono text-[10px] text-amber-300">{itemEffectText(item)}</span>
+                <span class="font-mono text-[10px] text-amber-300">{stripKeywords(itemEffectText(item))}</span>
               </div>
             {/each}
           {/if}
@@ -521,7 +523,7 @@
                 {#each taught as [sk, lvl] (sk)}
                   <span
                     class="rounded bg-violet-950/60 px-1 text-[10px] font-medium text-violet-300 ring-1 ring-violet-500/40"
-                    title={UNIT_SKILLS[sk].description}
+                    title={stripKeywords(UNIT_SKILLS[sk].description)}
                   >
                     {skillGlyph(sk)} {UNIT_SKILLS[sk].name}{lvl > 1 ? ` ${lvl}` : ''}
                   </span>

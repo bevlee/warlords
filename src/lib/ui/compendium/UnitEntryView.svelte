@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '../keyword/KeywordText.svelte';
   import type { EntryKind, UnitEntry } from '$lib/compendium/entries';
   import { FACTION_INFO } from '$lib/engine/factions';
   import { TIER_STYLE } from '../tierStyle';
@@ -88,7 +89,7 @@
             {/if}
             {info.label}
           </a>
-          <p class="text-sm leading-tight text-slate-400">{info.description}</p>
+          <p class="text-sm leading-tight text-slate-400"><KeywordText text={info.description} /></p>
         </div>
       {/each}
     </div>
