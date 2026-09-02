@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { initBattle } from '$lib/engine/battle';
 import { GOBLIN, ORC } from '$lib/engine/barbarian';
 import type { CombatEffect, Hero } from '$lib/engine/types';
-import { activeHeroEffect, heroActionViews } from '../heroActionDisplay';
+import { activeHeroEffect, heroActionsFor, heroActionViews } from '../heroActionDisplay';
 
 const hero: Hero = { class: 'barbarian', level: 1, xp: 0, attack: 1, defense: 1, statPoints: 0, factionSkills: [] };
 
@@ -36,6 +36,25 @@ describe('heroActionViews', () => {
 
     expect(charge?.summary).toBe('+2 Speed · +25% melee damage');
     expect(charge?.usesLabel).toBe('1 of 1 uses remaining');
+  });
+});
+
+describe('heroActionsFor', () => {
+  it('reads a hero\u2019s kit outside a battle, from owned artifacts alone', () => {
+    const plain = heroActionsFor(hero, []);
+    const horned = heroActionsFor(hero, ['bronze_war_horn']);
+
+    expect(plain.find(view => view.id === 'charge')?.summary).toBe('+2 Speed · +25% melee damage');
+    expect(horned.find(view => view.id === 'charge')?.summary).toBe('+4 Speed · +40% melee damage');
+    // No battle means no spent uses: the run screen shows a full allowance.
+    expect(plain.find(view => view.id === 'charge')?.usesLabel).toBe('1 of 1 uses remaining');
+  });
+
+  it('gives the wizard no actions, and every other class three', () => {
+    expect(heroActionsFor({ ...hero, class: 'wizard' }, [])).toEqual([]);
+    for (const heroClass of ['knight', 'ranger', 'barbarian', 'demon', 'necromancer'] as const) {
+      expect(heroActionsFor({ ...hero, class: heroClass }, [])).toHaveLength(3);
+    }
   });
 });
 

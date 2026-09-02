@@ -48,10 +48,18 @@ const action = (
   targetingLabel: targetLabel[targeting], duration, artifactNotes,
 });
 
-export function heroActionViews(state: BattleState, heroUnit: UnitStack, hero: Hero): HeroActionView[] {
-  const artifacts = artifactIdsFor(state, heroUnit);
-  const controllerState = state.heroActionState?.[controllerOfUnit(heroUnit)] ?? {};
-
+/**
+ * A hero's kit, from the hero and the artifacts its side owns.
+ *
+ * Pure so the run screen can explain a hero between battles: outside a battle
+ * there is no controller state, so every limited action reads as unspent.
+ * `heroActionViews` layers a live battle's spent uses over the result.
+ */
+export function heroActionsFor(
+  hero: Hero,
+  artifacts: string[],
+  controllerState: Record<string, unknown> = {},
+): HeroActionView[] {
   if (hero.class === 'knight') return [
     action('hold_the_line', 'Hold the Line', 'Order', 'End without moving → Braced', 'Units that finish a turn without moving become Braced and take 30% less damage until their next turn.', 'none', 'Until another Order is issued'),
     action('ready_the_counterattack', 'Counterattack', 'Order', '+50% retaliation · +10% [[atb]]', 'Each unit’s first retaliation deals 50% more damage and advances that unit by 10% [[atb]].', 'none', 'Until another Order is issued'),
@@ -104,6 +112,14 @@ export function heroActionViews(state: BattleState, heroUnit: UnitStack, hero: H
   ];
 
   return [];
+}
+
+export function heroActionViews(state: BattleState, heroUnit: UnitStack, hero: Hero): HeroActionView[] {
+  return heroActionsFor(
+    hero,
+    artifactIdsFor(state, heroUnit),
+    state.heroActionState?.[controllerOfUnit(heroUnit)] ?? {},
+  );
 }
 
 const sameController = (unit: UnitStack, controller: string) => controllerOfUnit(unit) === controller;
