@@ -147,7 +147,7 @@ export function damagePreview(
   return { min, max, killsMin: kills(min), killsMax: kills(max) };
 }
 
-/** Live forecast including controller stats, enemy Veterancy and Rank Training. */
+/** Live forecast including controller stats, enemy bonus and Rank Training. */
 export function damagePreviewInBattle(
   state: BattleState,
   attacker: UnitStack,

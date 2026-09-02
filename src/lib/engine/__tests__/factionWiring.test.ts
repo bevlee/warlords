@@ -26,12 +26,12 @@ describe('redesigned progression wiring', () => {
     expect(initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], wizard, 1).hero.mana).toBe(11);
   });
 
-  it('applies enemy Veterancy and controller-scoped Rank Training to effective stats', () => {
+  it('applies enemy bonus and controller-scoped Rank Training to effective stats', () => {
     const state = initBattle(
       [{ unit: GOBLIN, count: 5 }], [{ unit: GOBLIN, count: 5 }], hero(), 1, [], undefined,
       {
         gauntletRound: 7,
-        enemyVeterancy: 3,
+        enemyBonus: 3,
         training: { player: { Goblin: { weapon: true, armour: true } } },
       },
     );

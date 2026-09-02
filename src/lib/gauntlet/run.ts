@@ -157,7 +157,7 @@ export interface GauntletEncounter {
   budget: number;
   army: ArmySlot[];
   isBoss: boolean;
-  veterancy: number;
+  enemyBonus: number;
   rank: number;
 }
 
@@ -175,12 +175,12 @@ export function generateGauntletEnemy(run: RunState): GauntletEncounter {
     budget,
     army: buildArmy(roster, budget, rng, n),
     isBoss: BOSS_NODES.has(n),
-    veterancy: enemyVeterancy(n),
+    enemyBonus: enemyBonus(n),
     rank: n,
   };
 }
 
-export function enemyVeterancy(rank: number): number {
+export function enemyBonus(rank: number): number {
   return Math.floor((Math.max(1, rank) - 1) / 2);
 }
 

@@ -71,7 +71,7 @@
     armyBonuses?: ArmyBonuses;
     items?: ItemId[];
     gauntletRound?: number;
-    enemyVeterancy?: number;
+    enemyBonus?: number;
     savedFormation?: SavedFormation;
     onformation?: (formation: SavedFormation) => void;
     initialState?: BattleState;
@@ -108,7 +108,7 @@
     armyBonuses,
     items = [],
     gauntletRound = 1,
-    enemyVeterancy = 0,
+    enemyBonus = 0,
     savedFormation,
     onformation,
     initialState,
@@ -140,7 +140,7 @@
     initialState ?? initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, {
       modifierSources,
       gauntletRound,
-      enemyVeterancy,
+      enemyBonus,
       savedFormation,
       artifacts: { player: items },
       training: { player: training },
@@ -1054,7 +1054,7 @@
     battle = initBattle(playerArmy, enemyArmy, hero, Date.now(), [], armyBonuses, {
       modifierSources,
       gauntletRound,
-      enemyVeterancy,
+      enemyBonus,
       savedFormation,
       artifacts: { player: items },
       training: { player: training },
@@ -1180,7 +1180,7 @@
     {#if inDeploy}
       <div class="status-card deploy">
         <p class="status-text text-sm font-medium text-slate-100">
-          Rank {gauntletRound} · Enemy Veterancy +{enemyVeterancy} Attack/Defence — reposition whole stacks by clicking a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
+          Rank {gauntletRound} · Enemy bonus +{enemyBonus} Attack/Defence — reposition whole stacks by clicking a stack, then a highlighted cell{selectedDeployUnit ? ' (or another stack to swap)' : ''}.
         </p>
         {#if !online}
           <button type="button" class="status-button ml-auto" disabled={debugOpen} onclick={resetDeploy}>Reset</button>

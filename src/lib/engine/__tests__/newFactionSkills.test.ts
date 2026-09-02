@@ -30,10 +30,10 @@ describe('faction redesign foundations', () => {
     expect(effectiveDefenseInBattle(state, player) - effectiveDefenseInBattle(state, enemy)).toBe(1 + 8);
   });
 
-  it('uses Rank to increase enemy Veterancy while limiting distinct stacks', () => {
+  it('uses Rank to increase enemy bonus while limiting distinct stacks', () => {
     const run = { ...newRun('barbarian', 9), encounterIndex: 9, battlesWon: 8 };
     const encounter = generateGauntletEnemy(run);
-    expect(encounter.veterancy).toBe(4);
+    expect(encounter.enemyBonus).toBe(4);
     expect(encounter.army.length).toBeLessThanOrEqual(4);
   });
 

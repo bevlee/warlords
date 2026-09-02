@@ -25,6 +25,11 @@
     ring: string;
   }
 
+  // Only the spells this hero actually knows. The book previously listed the
+  // three original spells unconditionally, so trimming the default loadout
+  // would otherwise have left uncastable pages in it.
+  const known = $derived(new Set(hero.spells ?? ['lightning']));
+
   const entries: SpellEntry[] = $derived([
     {
       id: 'lightning' as SpellId,
@@ -59,7 +64,7 @@
         'Casting it again on the same stack adds another +4.',
       ring: 'ring-stone-400 bg-stone-200',
     },
-  ]);
+  ].filter(entry => known.has(entry.id)));
 </script>
 
 <!-- Backdrop: click anywhere outside the book to close. -->

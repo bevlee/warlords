@@ -28,7 +28,10 @@ const SPELL_RULES: Record<SpellId, { cost: number; friendly: boolean }> = {
 };
 const availableSpells = (heroClass: string, spells: SpellId[] | undefined): SpellId[] => {
   if (heroClass !== 'wizard') return [];
-  return spells ?? ['lightning', 'bloodlust', 'stoneskin'];
+  // Bloodlust and Stoneskin are out of the default book for now: the run
+  // screen teaches the hero's kit, and a two-spell buff pair added noise
+  // without decisions. Both spells still resolve if something grants them.
+  return spells ?? ['lightning'];
 };
 const sameController = (a: UnitStack, b: UnitStack): boolean =>
   (a.controllerId ?? a.side) === (b.controllerId ?? b.side);

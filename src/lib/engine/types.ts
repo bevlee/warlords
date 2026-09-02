@@ -258,7 +258,7 @@ export interface BattleState {
   artifacts?: Record<string, string[]>;
   /** Controller teams make target-owned marks work across co-op allies. */
   controllerTeams?: Record<string, string>;
-  /** Encounter-owned Attack/Defence sources such as enemy Veterancy. */
+  /** Encounter-owned Attack/Defence sources such as enemy bonus. */
   controllerStats?: Record<string, { attack: number; defense: number; label?: string }>;
   /** Learned training keyed by controller then strategic unit name. */
   training?: Record<string, Record<string, { weapon?: boolean; armour?: boolean }>>;

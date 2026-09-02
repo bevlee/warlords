@@ -76,8 +76,11 @@ describe('hero spells', () => {
     expect(totalHp(next, enemy.id)).toBe(before);
   });
 
+  // Neither spell is in the default book any more, so this covers the
+  // mechanics as they behave for a hero that has been granted them.
   it('bloodlust and stoneskin grant battle-long buffs that feed the damage formula', () => {
-    const s = toHeroTurn(newBattle());
+    const granted = toHeroTurn(newBattle());
+    const s: BattleState = { ...granted, hero: { ...granted.hero, spells: ['lightning', 'bloodlust', 'stoneskin'] } };
     const friendly = s.units.find(u => u.side === 'player' && !u.isHero)!;
 
     const buffed = applyAction(s, { type: 'cast', spell: 'bloodlust', targetId: friendly.id });

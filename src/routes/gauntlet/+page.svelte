@@ -23,7 +23,7 @@
     applySkillPick,
     generateGauntletEnemy,
     encounterBudget,
-    enemyVeterancy,
+    enemyBonus,
     migrateRunState,
     actOf,
     BOSS_NODES,
@@ -252,7 +252,7 @@
         armyBonuses={battleBonuses(run.items)}
         items={run.items}
         gauntletRound={run.battlesWon + 1}
-        enemyVeterancy={encounter?.veterancy ?? 0}
+        enemyBonus={encounter?.enemyBonus ?? 0}
         savedFormation={run.savedFormation}
         onformation={saveFormation}
         allowRestart={false}
@@ -438,7 +438,7 @@
             </p>
             <div class="flex items-center gap-3">
               <span class="flex-1 text-sm text-slate-200">
-                Rank {run.encounterIndex} · {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(run.encounterIndex)} · Veterancy +{enemyVeterancy(run.encounterIndex)} Attack/Defence
+                Rank {run.encounterIndex} · {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(run.encounterIndex)} · Enemy bonus +{enemyBonus(run.encounterIndex)} Attack/Defence
               </span>
               <button
                 type="button"
@@ -467,7 +467,7 @@
               {#if current}
                 {@const enc = generateGauntletEnemy(run)}
                 <span class="flex-1 text-sm text-slate-200">
-                  Rank {n} · {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(n)} · Veterancy +{enemyVeterancy(n)} Attack/Defence
+                  Rank {n} · {FACTION_INFO[enc.faction].name} warband — strength ~{encounterBudget(n)} · Enemy bonus +{enemyBonus(n)} Attack/Defence
                   {#if enc.isBoss}<span class="ml-1 font-semibold text-red-400">BOSS</span>{/if}
                 </span>
                 <button

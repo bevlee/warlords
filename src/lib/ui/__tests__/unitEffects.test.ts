@@ -40,17 +40,17 @@ describe('signedModifier', () => {
 });
 
 describe('activeEffects', () => {
-  it('shows controller-wide enemy Veterancy with the values combat uses', () => {
+  it('shows controller-wide enemy bonus with the values combat uses', () => {
     const unit = makeStack({ controllerId: 'enemy' });
     const battle = {
       controllerStats: {
-        enemy: { attack: 5, defense: 5, label: 'Enemy Veterancy' },
+        enemy: { attack: 5, defense: 5, label: 'Enemy bonus' },
       },
     } as unknown as BattleState;
 
     expect(activeEffects(unit, null, battle)).toContainEqual({
       id: 'controller-stats:enemy',
-      label: 'Enemy Veterancy',
+      label: 'Enemy bonus',
       value: 'ATK +5 · DEF +5',
       detail: 'Encounter-wide bonus included in this stack’s effective Attack and Defence.',
       tone: 'buff',

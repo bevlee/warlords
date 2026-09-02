@@ -613,7 +613,7 @@ export interface BattleInitOptions {
   gauntletRound?: number;
   artifacts?: Record<string, string[]>;
   controllerTeams?: Record<string, string>;
-  enemyVeterancy?: number;
+  enemyBonus?: number;
   training?: Record<string, Record<string, { weapon?: boolean; armour?: boolean }>>;
   savedFormation?: SavedFormation;
 }
@@ -643,7 +643,8 @@ export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
   blizzard: { cost: 5, friendly: false },
 };
 
-const DEFAULT_WIZARD_SPELLS: SpellId[] = ['lightning', 'bloodlust', 'stoneskin'];
+/** Default book. Bloodlust and Stoneskin are withheld for now; see actions.ts. */
+const DEFAULT_WIZARD_SPELLS: SpellId[] = ['lightning'];
 function prepareBattleHero(hero: Hero, artifactIds: string[]): Hero {
   if (hero.class !== 'wizard') return { ...hero, mana: 0, spells: [] };
   const granted: Array<[string, SpellId]> = [
@@ -972,8 +973,8 @@ export function initBattle(
     gauntletRound: Math.max(1, Math.floor(options.gauntletRound ?? 1)),
     artifacts: options.artifacts ?? {},
     controllerTeams: options.controllerTeams,
-    controllerStats: options.enemyVeterancy
-      ? { [options.controllers?.enemy ?? 'enemy']: { attack: options.enemyVeterancy, defense: options.enemyVeterancy, label: 'Enemy Veterancy' } }
+    controllerStats: options.enemyBonus
+      ? { [options.controllers?.enemy ?? 'enemy']: { attack: options.enemyBonus, defense: options.enemyBonus, label: 'Enemy bonus' } }
       : undefined,
     training: options.training,
     nextId,
