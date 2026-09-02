@@ -23,6 +23,11 @@ describe('redesigned progression wiring', () => {
     expect(maxMana(hero({ class: 'barbarian', level: 20 }))).toBe(0);
     const wizard = hero({ class: 'wizard', level: 2 });
     expect(maxMana(wizard)).toBe(11);
+    // In a gauntlet the depth drives it, so mana grows as the run does.
+    expect(maxMana(wizard, 1)).toBe(8);
+    expect(maxMana(wizard, 10)).toBe(35);
+    // Campaign and coop pass no depth and keep levelling by XP.
+    expect(maxMana({ ...wizard, level: 7 })).toBe(26);
     expect(initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], wizard, 1).hero.mana).toBe(11);
   });
 

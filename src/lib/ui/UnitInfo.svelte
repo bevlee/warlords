@@ -90,7 +90,7 @@
     if (unit.isHero && hero) {
       return [
         { key: 'level', value: `${hero.level}` },
-        { key: 'mana', value: `${hero.mana ?? 0}/${maxMana(hero)}` },
+        { key: 'mana', value: `${hero.mana ?? 0}/${maxMana(hero, battle?.gauntletRound)}` },
         { key: 'attack', value: `${hero.attack}` },
         { key: 'defense', value: `${hero.defense}` },
         { key: 'damage', value: `${d.minDamage}–${d.maxDamage}` },

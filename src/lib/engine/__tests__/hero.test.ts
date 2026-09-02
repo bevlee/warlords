@@ -31,7 +31,9 @@ describe('spellPreview', () => {
     expect(p).toEqual({ min: 28, max: 28, killsMin: 5, killsMax: 5 });
   });
 
-  it('scales Lightning with the Sorcery skill', () => {
+  // Faction skills no longer exist — Sorcery used to multiply this. A hero
+  // carrying one from an old save must not resurrect the bonus.
+  it('ignores faction skills left on a migrated hero', () => {
     const sorcerer: Hero = {
       ...hero,
       class: 'wizard',
@@ -41,7 +43,7 @@ describe('spellPreview', () => {
     const goblins = state.units.find(u => !u.isHero && u.side === 'player')!;
 
     const p = spellPreview(sorcerer, 'lightning', goblins);
-    expect(p!.min).toBe(31); // round(28 × 1.10)
+    expect(p!.min).toBe(28);
   });
 
   it('is null for friendly buff spells', () => {

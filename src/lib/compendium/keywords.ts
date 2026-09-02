@@ -21,7 +21,7 @@ export type Segment =
  * lead because that is what a rules sentence nearly always means; write
  * `[[unitSkill:focus]]` for the draft card.
  */
-const RESOLUTION_ORDER: EntryKind[] = ['ability', 'item', 'unit', 'spell', 'factionSkill', 'faction', 'unitSkill'];
+const RESOLUTION_ORDER: EntryKind[] = ['ability', 'item', 'concept', 'unit', 'spell', 'faction', 'unitSkill'];
 
 /** The one-line definition a popup shows. Not the same as a grid card's
  *  subtitle: a card answers "which one is this in a list", a popup answers
@@ -36,8 +36,8 @@ export function keywordBlurb(entry: CompendiumEntry): string {
       return `${entry.manaCost} mana · ${entry.effect}`;
     case 'faction':
     case 'ability':
-    case 'factionSkill':
     case 'unitSkill':
+    case 'concept':
       return entry.description;
   }
 }

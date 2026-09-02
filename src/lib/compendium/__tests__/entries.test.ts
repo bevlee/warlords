@@ -5,7 +5,6 @@ import {
   entriesOfKind,
   entryHref,
   entryHrefFrom,
-  factionSkillId,
   findEntry,
   kindOfTab,
   matchesFilters,
@@ -20,7 +19,6 @@ import {
 } from '../entries';
 import { CATALOG } from '../../engine/catalog';
 import { FACTION_UNITS, FACTION_INFO } from '../../engine/factions';
-import { FACTION_SKILL_DEFS } from '../../engine/factionSkills';
 import { ABILITY_INFO } from '../../ui/abilities';
 import { ITEMS, ITEM_IDS } from '../../gauntlet/items';
 import { SKILL_IDS } from '../../gauntlet/skills';
@@ -41,10 +39,6 @@ describe('entry coverage', () => {
     expect(entriesOfKind('item').map(e => e.id).sort()).toEqual([...ITEM_IDS].sort());
     expect(entriesOfKind('unitSkill').map(e => e.id).sort()).toEqual([...SKILL_IDS].sort());
 
-    const expected = Object.entries(FACTION_SKILL_DEFS).flatMap(([faction, defs]) =>
-      defs.map(d => factionSkillId(faction as FactionClass, d.id)),
-    );
-    expect(entriesOfKind('factionSkill').map(e => e.id).sort()).toEqual(expected.sort());
   });
 
   it('documents every ability any unit actually has', () => {
@@ -71,14 +65,6 @@ describe('entry ids', () => {
       const ids = entriesOfKind(kind).map(e => e.id);
       expect(new Set(ids).size, `${kind} has duplicate ids`).toBe(ids.length);
     }
-  });
-
-  it('keeps faction skills apart when factions define the same skill differently', () => {
-    const skills = entriesOfKind('factionSkill');
-    const barbarian = skills.find(e => e.id === factionSkillId('barbarian', 'armorer'));
-    const knight = skills.find(e => e.id === factionSkillId('knight', 'armorer'));
-    expect(barbarian?.kind === 'factionSkill' && barbarian.description).toContain('3/6/9');
-    expect(knight?.kind === 'factionSkill' && knight.description).toContain('5/10/15');
   });
 
   it('round-trips through the tab slug used in URLs', () => {

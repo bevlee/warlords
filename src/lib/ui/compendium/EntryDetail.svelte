@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { CompendiumEntry } from '$lib/compendium/entries';
   import {
-    factionSkillId,
     unitEntries,
     factionLabel,
     ITEM_GROUP_LABEL,
@@ -10,7 +9,6 @@
   } from '$lib/compendium/entries';
   import type { DiscoveryState } from '$lib/compendium/discovery';
   import { factionProgress } from '$lib/compendium/discovery';
-  import { FACTION_SKILL_DEFS } from '$lib/engine/factionSkills';
   import { FACTION_INFO } from '$lib/engine/factions';
   import { TIER_STYLE } from '../tierStyle';
   import { UNIT_SKILLS } from '$lib/gauntlet/skills';
@@ -74,17 +72,6 @@
     </div>
   </div>
 
-  <div class="mt-4 border-t border-slate-700 pt-3">
-    <h3 class="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-slate-500">Faction skills</h3>
-    <div class="flex flex-col gap-2">
-      {#each FACTION_SKILL_DEFS[entry.faction] as skill (skill.id)}
-        <a href={hrefFor('factionSkill', factionSkillId(entry.faction, skill.id))} class="block hover:underline">
-          <p class="text-sm font-semibold text-amber-300">{skill.name}</p>
-          <p class="text-sm leading-tight text-slate-400"><KeywordText text={skill.description} /></p>
-        </a>
-      {/each}
-    </div>
-  </div>
 {:else if entry.kind === 'ability'}
   <h2 class="text-2xl font-black text-amber-300">{entry.name}</h2>
   <p class="mt-2 text-sm leading-snug text-slate-300"><KeywordText text={entry.description} /></p>
@@ -132,17 +119,6 @@
     </div>
   </div>
   <p class="mt-4 border-t border-slate-700 pt-3 text-sm leading-snug text-slate-300"><KeywordText text={entry.description} /></p>
-{:else if entry.kind === 'factionSkill'}
-  <h2 class="text-2xl font-black text-slate-100">{entry.name}</h2>
-  <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-    <a href={hrefFor('faction', entry.faction)} class="hover:text-amber-300">{FACTION_INFO[entry.faction].name}</a>
-    · unlocks at hero level {entry.unlockLevel}
-  </p>
-  <p class="mt-3 border-t border-slate-700 pt-3 text-sm leading-snug text-slate-300"><KeywordText text={entry.description} /></p>
-  <p class="mt-2 text-sm text-slate-500">
-    Faction skills level up as the hero does — one rank at the unlock level, then a rank every three
-    levels to a maximum of three.
-  </p>
 {:else if entry.kind === 'item'}
   {@const requires = entry.requiresUnit
     .map((name) => unitEntries().find((u) => u.name === name))
@@ -197,6 +173,14 @@
     {:else}
       It stays with the army for the rest of the run.
     {/if}
+  </p>
+{:else if entry.kind === 'concept'}
+  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Glossary</p>
+  <h2 class="mt-0.5 text-2xl font-black text-sky-300">{entry.name}</h2>
+  <p class="mt-2 text-sm leading-snug text-slate-300"><KeywordText text={entry.description} /></p>
+  <p class="mt-4 border-t border-slate-700 pt-3 text-sm text-slate-400">
+    A rules word rather than a thing in the world. It is here because ability and artifact text uses
+    it, and a term the rules lean on should be somewhere you can look it up.
   </p>
 {:else if entry.kind === 'unitSkill'}
   <h2 class="text-2xl font-black text-violet-300">{entry.name}</h2>

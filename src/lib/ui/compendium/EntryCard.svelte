@@ -30,19 +30,19 @@
       case 'unit':
         return `Tier ${entry.tier} · ${entry.unit.base.hp} HP · ${entry.unit.base.minDamage}–${entry.unit.base.maxDamage} dmg`;
       case 'faction':
-        return `${entry.roster.length} units · ${entry.skills.length} skills`;
+        return `${entry.roster.length} units`;
       case 'ability':
         return entry.units.length > 0
           ? `${entry.units.length} unit${entry.units.length === 1 ? '' : 's'}`
           : 'Taught in gauntlet runs';
       case 'spell':
         return `${entry.manaCost} mana · ${entry.target}`;
-      case 'factionSkill':
-        return `Unlocks at level ${entry.unlockLevel}`;
       case 'item':
         return stripKeywords(entry.effect);
       case 'unitSkill':
         return 'Gauntlet draft';
+      case 'concept':
+        return stripKeywords(entry.description);
     }
   });
 </script>
@@ -56,8 +56,9 @@
     {selected ? 'border-amber-500 bg-slate-700 ring-1 ring-amber-500/40' : 'border-slate-700'}
     {tier?.glow ?? ''}"
 >
-  <!-- Abilities and artifacts use their titles as their visual identity. -->
-  {#if entry.kind !== 'ability' && entry.kind !== 'item'}
+  <!-- Abilities and artifacts use their titles as their visual identity;
+       glossary terms are words, so they have nothing to show either. -->
+  {#if entry.kind !== 'ability' && entry.kind !== 'item' && entry.kind !== 'concept'}
     <span class="grid h-12 w-11 shrink-0 place-items-center">
       {#if entry.kind === 'unit'}
         <Sprite name={entry.name} class="h-12 w-11" />
