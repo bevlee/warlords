@@ -34,6 +34,11 @@
 
     <div class="min-w-0 flex-1">
       {#if actions.length > 0}
+        <!-- Named outright: the cards below are what the hero itself can do in
+             a battle, not the army's or a unit's. -->
+        <h3 class="mb-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+          Abilities <span class="font-normal normal-case tracking-normal text-slate-600">— your hero's own actions in battle</span>
+        </h3>
         <ul class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {#each actions as action (action.id)}
             <li class="rounded border border-slate-700 bg-slate-900/50 p-2.5">
@@ -57,7 +62,10 @@
 
       {#if mana > 0}
         <!-- The wizard has no hero actions; spells are its whole kit. -->
-        <div class="{actions.length > 0 ? 'mt-2 ' : ''}rounded border border-sky-900 bg-sky-950/40 p-2.5">
+        <h3 class="{actions.length > 0 ? 'mt-3 ' : ''}mb-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+          Spells <span class="font-normal normal-case tracking-normal text-slate-600">— cast with mana during a battle</span>
+        </h3>
+        <div class="rounded border border-sky-900 bg-sky-950/40 p-2.5">
           <div class="flex items-baseline justify-between gap-2">
             <span class="text-sm font-semibold text-sky-200">Lightning</span>
             <span class="shrink-0 rounded bg-sky-900 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-200">
