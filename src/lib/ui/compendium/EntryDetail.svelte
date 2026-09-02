@@ -13,7 +13,6 @@
   import { TIER_STYLE } from '../tierStyle';
   import { UNIT_SKILLS } from '$lib/gauntlet/skills';
   import Sprite from '../Sprite.svelte';
-  import ItemIcon from '../ItemIcon.svelte';
   import UnitEntryView from './UnitEntryView.svelte';
   import KeywordText from '../keyword/KeywordText.svelte';
   import { spellIconFor } from '../spellIcons';
@@ -124,11 +123,9 @@
   {@const requires = entry.requiresUnit
     .map((name) => unitEntries().find((u) => u.name === name))
     .filter((u) => u !== undefined)}
-  <div class="flex items-center gap-4">
-    <ItemIcon id={entry.id} class="h-20 w-20 shrink-0" />
-    <div>
-      <h2 class="text-2xl font-black {RARITY[entry.rarity].text}">{entry.name}</h2>
-      <p class="mt-1 flex flex-wrap items-center gap-1.5">
+  <div>
+    <h2 class="text-2xl font-black {RARITY[entry.rarity].text}">{entry.name}</h2>
+    <p class="mt-1 flex flex-wrap items-center gap-1.5">
         <span class="inline-block rounded border {RARITY[entry.rarity].border} px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider {RARITY[entry.rarity].text}">
           {RARITY[entry.rarity].label}
         </span>
@@ -148,9 +145,8 @@
             {factionLabel(entry.faction)}
           </a>
         {/if}
-      </p>
-      <p class="mt-1 font-mono text-sm text-amber-300"><KeywordText text={entry.effect} /></p>
-    </div>
+    </p>
+    <p class="mt-1 font-mono text-sm text-amber-300"><KeywordText text={entry.effect} /></p>
   </div>
 
   {#if requires.length > 0}

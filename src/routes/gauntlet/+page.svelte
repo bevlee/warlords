@@ -35,7 +35,6 @@
   import { loadRun, saveRun, clearRun } from '$lib/storage';
   import { TIER_STYLE } from '$lib/ui/tierStyle';
   import UnitInfo from '$lib/ui/UnitInfo.svelte';
-  import ItemIcon from '$lib/ui/ItemIcon.svelte';
   import type { ArmyBonuses, FactionClass, UnitDef, UnitStack } from '$lib/engine/types';
 
   const ACT_NAMES: Record<1 | 2 | 3, string> = {
@@ -309,7 +308,6 @@
                   hover:bg-slate-700 hover:brightness-110 {rs.border}"
                 onclick={() => pickItem(id)}
               >
-                <ItemIcon {id} class="h-14 w-14" />
                 <span class="text-xl font-bold {rs.text}">{item.name}</span>
                 <span class="text-xs font-semibold uppercase tracking-wider {rs.text}">{rs.label}</span>
                 <span class="font-mono text-base text-amber-200"><KeywordText text={itemEffectText(item)} /></span>
@@ -504,7 +502,6 @@
             {#each run.items as id (id)}
               {@const item = ITEMS[id]}
               <div class="flex items-center gap-2 py-0.5" title={stripKeywords(itemEffectText(item))}>
-                <ItemIcon {id} class="h-5 w-5 shrink-0" />
                 <span class="flex-1 text-xs {RARITY_STYLE[item.rarity].text}">{item.name}</span>
                 <span class="font-mono text-[10px] text-amber-300">{stripKeywords(itemEffectText(item))}</span>
               </div>

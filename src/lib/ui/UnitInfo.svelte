@@ -19,7 +19,6 @@
   import { activeEffects } from './unitEffects';
   import { artifactInteractionsFor } from './artifactDisplay';
   import type { ItemId } from '$lib/gauntlet/items';
-  import ItemIcon from './ItemIcon.svelte';
 
   interface Props {
     unit: UnitStack | null;
@@ -271,7 +270,6 @@
           <h3>Artifact interactions</h3>
           {#each artifactInteractions as interaction (interaction.id)}
             <div class="artifact-interaction">
-              <ItemIcon id={interaction.id} class="artifact-interaction-icon" />
               <div><strong>{interaction.name}</strong><p><KeywordText text={interaction.description} /></p></div>
             </div>
           {/each}
@@ -483,21 +481,12 @@
     margin-top: 0.35rem;
   }
 
-  .artifact-interaction :global(.artifact-interaction-icon) {
-    width: 1.35rem;
-    height: 1.35rem;
-    flex: none;
-    object-fit: contain;
-    image-rendering: pixelated;
-  }
-
   .artifact-interaction strong { display: block; font-size: 0.72rem; color: #fde68a; }
   .artifact-interaction p { margin: 0.1rem 0 0; font-size: 0.66rem; line-height: 1.25; color: #94a3b8; }
   .artifact-scope { margin: 0.4rem 0 0; font-size: 0.6rem; font-style: italic; color: #64748b; }
 
   .rail .artifact-interactions h3 { font-size: calc(9 * var(--fx)); }
   .rail .artifact-interaction { gap: calc(5 * var(--fx)); margin-top: calc(4 * var(--fx)); }
-  .rail .artifact-interaction :global(.artifact-interaction-icon) { width: calc(18 * var(--fx)); height: calc(18 * var(--fx)); }
   .rail .artifact-interaction strong { font-size: calc(10.5 * var(--fx)); }
   .rail .artifact-interaction p { font-size: calc(9.5 * var(--fx)); }
   .rail .artifact-scope { font-size: calc(8.5 * var(--fx)); }
