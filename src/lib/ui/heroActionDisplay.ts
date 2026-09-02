@@ -7,7 +7,6 @@ export type HeroActionTargeting = 'none' | 'enemy' | 'friendly' | 'burning' | 'a
 export interface HeroActionView {
   id: string;
   label: string;
-  icon: string;
   kind: HeroActionKind;
   summary: string;
   description: string;
@@ -20,7 +19,6 @@ export interface HeroActionView {
 
 export interface ActiveHeroEffectView {
   id: string;
-  icon: string;
   label: string;
   summary: string;
   affectedLabel: string;
@@ -39,7 +37,6 @@ const targetLabel: Record<HeroActionTargeting, string> = {
 const action = (
   id: string,
   label: string,
-  icon: string,
   kind: HeroActionKind,
   summary: string,
   description: string,
@@ -47,7 +44,7 @@ const action = (
   duration: string,
   artifactNotes: string[] = [],
 ): HeroActionView => ({
-  id, label, icon, kind, summary, description, targeting,
+  id, label, kind, summary, description, targeting,
   targetingLabel: targetLabel[targeting], duration, artifactNotes,
 });
 
@@ -56,15 +53,15 @@ export function heroActionViews(state: BattleState, heroUnit: UnitStack, hero: H
   const controllerState = state.heroActionState?.[controllerOfUnit(heroUnit)] ?? {};
 
   if (hero.class === 'knight') return [
-    action('hold_the_line', 'Hold the Line', '🛡️', 'Order', 'End without moving → Braced', 'Units that finish a turn without moving become Braced and take 30% less damage until their next turn.', 'none', 'Until another Order is issued'),
-    action('ready_the_counterattack', 'Counterattack', '⚔️', 'Order', '+50% retaliation · +10% ATB', 'Each unit’s first retaliation deals 50% more damage and advances that unit by 10% ATB.', 'none', 'Until another Order is issued'),
-    action('advance_by_ranks', 'Advance by Ranks', '🚩', 'Order', 'Long move beside ally → 50% ATB', 'A move-only action of at least two cells that ends beside an ally returns that unit at 50% ATB.', 'none', 'Until another Order is issued'),
+    action('hold_the_line', 'Hold the Line', 'Order', 'End without moving → Braced', 'Units that finish a turn without moving become Braced and take 30% less damage until their next turn.', 'none', 'Until another Order is issued'),
+    action('ready_the_counterattack', 'Counterattack', 'Order', '+50% retaliation · +10% ATB', 'Each unit’s first retaliation deals 50% more damage and advances that unit by 10% ATB.', 'none', 'Until another Order is issued'),
+    action('advance_by_ranks', 'Advance by Ranks', 'Order', 'Long move beside ally → 50% ATB', 'A move-only action of at least two cells that ends beside an ally returns that unit at 50% ATB.', 'none', 'Until another Order is issued'),
   ];
 
   if (hero.class === 'ranger') return [
-    action('name_the_quarry', 'Name the Quarry', '🎯', 'Plan', 'First hit per ally → +10% ATB', 'Choose an enemy. Each allied unit’s first damaging attack against it advances that attacker by 10% ATB.', 'enemy', 'Until the Ranger hero’s next turn'),
-    action('set_the_ambush', 'Set the Ambush', '🌲', 'Plan', 'Stronger, safer opening attacks', 'Choose a 3×3 area. Allied units attacking from it gain a stronger opening attack and a safe return.', 'area', 'Until the Ranger hero’s next turn'),
-    action('open_an_escape_route', 'Escape Route', '🗺️', 'Plan', 'Move-only actions return at 75% ATB', 'Choose a 3×3 area. Allied move-only actions ending inside it return at 75% ATB.', 'area', 'Until the Ranger hero’s next turn'),
+    action('name_the_quarry', 'Name the Quarry', 'Plan', 'First hit per ally → +10% ATB', 'Choose an enemy. Each allied unit’s first damaging attack against it advances that attacker by 10% ATB.', 'enemy', 'Until the Ranger hero’s next turn'),
+    action('set_the_ambush', 'Set the Ambush', 'Plan', 'Stronger, safer opening attacks', 'Choose a 3×3 area. Allied units attacking from it gain a stronger opening attack and a safe return.', 'area', 'Until the Ranger hero’s next turn'),
+    action('open_an_escape_route', 'Escape Route', 'Plan', 'Move-only actions return at 75% ATB', 'Choose a 3×3 area. Allied move-only actions ending inside it return at 75% ATB.', 'area', 'Until the Ranger hero’s next turn'),
   ];
 
   if (hero.class === 'barbarian') {
@@ -79,31 +76,31 @@ export function heroActionViews(state: BattleState, heroUnit: UnitStack, hero: H
     const bloodDamage = has(artifacts, 'skull_trumpet') ? 75 : 50;
     const voiceNote = has(artifacts, 'voice_of_the_warchief') ? ['Voice of the Warchief: 2 uses; the hero returns at 50% ATB.'] : [];
     return [
-      withUses(action('charge', 'Charge!', '📯', 'Battle Cry', `+${chargeSpeed} Speed · +${chargeDamage}% melee damage`, `Every friendly melee unit gains +${chargeSpeed} Speed and deals ${chargeDamage}% more damage during its next turn.`, 'none', 'Each affected unit’s next turn', [
+      withUses(action('charge', 'Charge!', 'Battle Cry', `+${chargeSpeed} Speed · +${chargeDamage}% melee damage`, `Every friendly melee unit gains +${chargeSpeed} Speed and deals ${chargeDamage}% more damage during its next turn.`, 'none', 'Each affected unit’s next turn', [
         ...(has(artifacts, 'bronze_war_horn') ? ['Bronze War Horn supplies the displayed upgraded values.'] : []), ...voiceNote,
       ])),
-      withUses(action('loose', 'Loose!', '🏹', 'Battle Cry', `+${looseDamage}% ranged damage · free shot`, `Each friendly shooter’s next attack deals ${looseDamage}% more damage and costs no ammunition.${has(artifacts, 'horn_of_the_hunt') ? ' It also Marks before dealing damage.' : ''}`, 'none', 'Each affected unit’s next ranged attack', [
+      withUses(action('loose', 'Loose!', 'Battle Cry', `+${looseDamage}% ranged damage · free shot`, `Each friendly shooter’s next attack deals ${looseDamage}% more damage and costs no ammunition.${has(artifacts, 'horn_of_the_hunt') ? ' It also Marks before dealing damage.' : ''}`, 'none', 'Each affected unit’s next ranged attack', [
         ...(has(artifacts, 'horn_of_the_hunt') ? ['Horn of the Hunt upgrades damage and applies Mark before damage.'] : []), ...voiceNote,
       ])),
-      withUses(action('blood_for_blood', 'Blood for Blood!', '🩸', 'Battle Cry', `+${bloodDamage}% dealt · +50% taken`, `Every friendly unit deals ${bloodDamage}% more damage and takes 50% more damage.`, 'none', 'Until the Barbarian hero’s next turn', [
+      withUses(action('blood_for_blood', 'Blood for Blood!', 'Battle Cry', `+${bloodDamage}% dealt · +50% taken`, `Every friendly unit deals ${bloodDamage}% more damage and takes 50% more damage.`, 'none', 'Until the Barbarian hero’s next turn', [
         ...(has(artifacts, 'skull_trumpet') ? ['Skull Trumpet upgrades outgoing damage to 75%.'] : []), ...voiceNote,
       ])),
     ];
   }
 
   if (hero.class === 'demon') return [
-    action('blood_offering', 'Blood Offering', '🔥', 'Ritual', 'Sacrifice 10% · army +10% ATB', 'Sacrifice 10% of a friendly stack. Every other friendly unit advances by 10% ATB; summoned sacrifices grant 5%.', 'friendly', 'Immediate'),
-    action('feed_the_fire', 'Feed the Fire', '♨️', 'Ritual', 'Consume one Burn tick · spread Burn', 'Consume one Burn tick immediately, then spread Burn to adjacent units.', 'burning', 'Immediate', [
+    action('blood_offering', 'Blood Offering', 'Ritual', 'Sacrifice 10% · army +10% ATB', 'Sacrifice 10% of a friendly stack. Every other friendly unit advances by 10% ATB; summoned sacrifices grant 5%.', 'friendly', 'Immediate'),
+    action('feed_the_fire', 'Feed the Fire', 'Ritual', 'Consume one Burn tick · spread Burn', 'Consume one Burn tick immediately, then spread Burn to adjacent units.', 'burning', 'Immediate', [
       ...(has(artifacts, 'blackened_wick') ? ['Blackened Wick doubles the consumed Burn tick when its source carries the artifact.'] : []),
       ...(has(artifacts, 'crown_of_wildfire') ? ['Crown of Wildfire makes spread applications stack and refresh.'] : []),
     ]),
-    action('demonic_bargain', 'Demonic Bargain', '😈', 'Ritual', 'Sacrifice 20% HP · next attack ×2', 'Sacrifice 20% of a friendly stack’s starting HP. Its next attack deals double damage and cannot be retaliated against.', 'friendly', 'The target’s next attack'),
+    action('demonic_bargain', 'Demonic Bargain', 'Ritual', 'Sacrifice 20% HP · next attack ×2', 'Sacrifice 20% of a friendly stack’s starting HP. Its next attack deals double damage and cannot be retaliated against.', 'friendly', 'The target’s next attack'),
   ];
 
   if (hero.class === 'necromancer') return [
-    action('reknit_the_dead', 'Reknit the Dead', '🪡', 'Necromancy', 'Consume up to 5 Skeletons · heal', 'Consume up to five Skeletons to heal a wounded non-Skeleton undead stack.', 'friendly', 'Immediate'),
-    action('grasping_dead', 'Grasping Dead', '🖐️', 'Necromancy', 'Consume 5 Skeletons · pin enemy', 'Consume five Skeletons to prevent an enemy from moving or retaliating until its next turn.', 'enemy', 'Until the target’s next turn'),
-    action('death_march', 'Death March', '☠️', 'Necromancy', 'Consume 10 Skeletons · army +20% ATB', 'Consume ten Skeletons to advance every other friendly undead stack by 20% ATB.', 'none', 'Immediate'),
+    action('reknit_the_dead', 'Reknit the Dead', 'Necromancy', 'Consume up to 5 Skeletons · heal', 'Consume up to five Skeletons to heal a wounded non-Skeleton undead stack.', 'friendly', 'Immediate'),
+    action('grasping_dead', 'Grasping Dead', 'Necromancy', 'Consume 5 Skeletons · pin enemy', 'Consume five Skeletons to prevent an enemy from moving or retaliating until its next turn.', 'enemy', 'Until the target’s next turn'),
+    action('death_march', 'Death March', 'Necromancy', 'Consume 10 Skeletons · army +20% ATB', 'Consume ten Skeletons to advance every other friendly undead stack by 20% ATB.', 'none', 'Immediate'),
   ];
 
   return [];
@@ -143,7 +140,6 @@ export function activeHeroEffect(state: BattleState, heroUnit: UnitStack, hero: 
   if (!view) return null;
   return {
     id: view.id,
-    icon: view.icon,
     label: view.label,
     summary: view.summary,
     affectedLabel: affected === 1 ? '1 unit affected' : `${affected} units affected`,

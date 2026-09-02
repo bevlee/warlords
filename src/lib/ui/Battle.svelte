@@ -1198,11 +1198,11 @@
 
   <!-- ══ Band 3: flank · battlefield · creature info ══ -->
   <div class="battle-middle">
-    <!-- Left flank: battle controls at the top, hero standee centred on the
-         battlefield beside it. -->
+    <!-- Left flank: controls, hero, then the army's artifacts. Keeping all
+         three in normal flow prevents a long artifact list covering the hero. -->
     <div class="flank">
-      {#if !replay}
-        <div class="flank-top">
+      <div class="flank-top">
+        {#if !replay}
           <div class="flank-buttons">
             <button
               type="button"
@@ -1239,7 +1239,35 @@
               >⏩</button>
             {/if}
           </div>
+        {/if}
 
+        {#if heroUnit && heroUnit.count > 0}
+          <!-- The hero owns a fixed slot above the scrollable artifact list. -->
+          <button
+            type="button"
+            class="hero-standee {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
+            aria-label="Hero — level {deployHero.level}"
+            onclick={() => {
+              selectedArtifactId = null;
+              selectedHeroActionId = null;
+              inspect(heroUnit);
+            }}
+            onmouseenter={() => (hovered = heroUnit)}
+            onmouseleave={() => (hovered = null)}
+            oncontextmenu={e => {
+              e.preventDefault();
+              inspect(heroUnit);
+            }}
+          >
+            <span class="hero-shadow" aria-hidden="true"></span>
+            {#if heroUnit.id === battle.currentUnitId}
+              <span class="hero-arc" aria-hidden="true"></span>
+            {/if}
+            <Sprite name={heroSpriteName(deployHero.class)} class="hero-sprite" />
+          </button>
+        {/if}
+
+        {#if !replay}
           {#if settingsOpen}
             <div class="settings-popover">
               <p class="settings-heading">Combat speed</p>
@@ -1301,35 +1329,8 @@
               }}
             />
           {/if}
-        </div>
-      {/if}
-
-      {#if heroUnit && heroUnit.count > 0}
-        <!-- Hero on the flank: a bare sprite like any other unit; its
-             attributes appear in the creature-info rail on hover. -->
-        <button
-          type="button"
-          class="hero-standee {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
-          aria-label="Hero — level {deployHero.level}"
-          onclick={() => {
-            selectedArtifactId = null;
-            selectedHeroActionId = null;
-            inspect(heroUnit);
-          }}
-          onmouseenter={() => (hovered = heroUnit)}
-          onmouseleave={() => (hovered = null)}
-          oncontextmenu={e => {
-            e.preventDefault();
-            inspect(heroUnit);
-          }}
-        >
-          <span class="hero-shadow" aria-hidden="true"></span>
-          {#if heroUnit.id === battle.currentUnitId}
-            <span class="hero-arc" aria-hidden="true"></span>
-          {/if}
-          <Sprite name={heroSpriteName(deployHero.class)} class="hero-sprite" />
-        </button>
-      {/if}
+        {/if}
+      </div>
     </div>
 
     <!-- Battlefield stage: the board plus every overlay that covers it. -->
@@ -1615,10 +1616,13 @@
   .flank-top {
     position: relative;
     display: flex;
+    height: 100%;
+    min-height: 0;
     width: 100%;
     flex-direction: column;
     align-items: center;
     gap: calc(7 * var(--fx));
+    overflow: hidden;
   }
 
   .flank-buttons {
@@ -1791,16 +1795,12 @@
     text-decoration: underline;
   }
 
-  /* Centred on the flank, which shares its box with the battlefield now that
-     the status strip is its own band — so this lands on the board's own
-     centreline. Absolute so a long artifact strip can't push the hero down. */
+  /* Fixed top-left flank slot; artifacts flow below instead of behind it. */
   .hero-standee {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    transform: translateY(-50%);
+    position: relative;
     display: flex;
+    width: 100%;
+    flex: none;
     flex-direction: column;
     align-items: center;
     /* Room for the shadow and the active-turn arc, which hang below the feet. */
@@ -1810,7 +1810,7 @@
 
   .hero-standee :global(.hero-sprite) {
     position: relative;
-    width: calc(76 * var(--fx));
+    width: calc(64 * var(--fx));
     height: auto;
   }
 

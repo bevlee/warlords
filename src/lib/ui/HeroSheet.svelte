@@ -34,7 +34,6 @@
   <div class="action-list">
     {#each actions as action (action.id)}
       <button type="button" onclick={() => onselect(action.id)}>
-        <span class="icon" aria-hidden="true">{action.icon}</span>
         <span><strong>{action.label}</strong><small>{action.summary}</small>{#if action.usesLabel}<em>{action.usesLabel}</em>{/if}</span>
       </button>
     {:else}<p class="empty">This hero has no faction actions.</p>{/each}
@@ -61,7 +60,6 @@
   .action-list { display: grid; gap: calc(5 * var(--fx)); margin-top: calc(6 * var(--fx)); }
   .action-list button { display: flex; gap: calc(7 * var(--fx)); border-radius: .35rem; border: 1px solid #334155; background: rgb(30 41 59 / .72); padding: calc(7 * var(--fx)); text-align: left; }
   .action-list button:hover { border-color: #f59e0b; background: #334155; }
-  .icon { font-size: calc(20 * var(--fx)); }
   .action-list strong, .action-list small, .action-list em { display: block; }
   .action-list strong { font-size: calc(11 * var(--fx)); color: #fde68a; }
   .action-list small { margin-top: calc(2 * var(--fx)); font-size: calc(9.5 * var(--fx)); color: #cbd5e1; }

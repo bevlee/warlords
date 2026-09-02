@@ -1,6 +1,5 @@
 <script lang="ts">
   import { ITEMS, itemEffectText, type ItemId } from '$lib/gauntlet/items';
-  import ItemIcon from './ItemIcon.svelte';
   import KeywordText from './keyword/KeywordText.svelte';
   interface Props { id: ItemId; onclose?: () => void; }
   let { id, onclose }: Props = $props();
@@ -8,7 +7,7 @@
 </script>
 
 <section class="artifact-detail" aria-label="Artifact details">
-  <header><ItemIcon {id} class="artifact-icon" /><div><p>Army artifact · {item.rarity}</p><h2>{item.name}</h2></div>{#if onclose}<button type="button" aria-label="Close artifact details" onclick={onclose}>×</button>{/if}</header>
+  <header><div><p>Army artifact · {item.rarity}</p><h2>{item.name}</h2></div>{#if onclose}<button type="button" aria-label="Close artifact details" onclick={onclose}>×</button>{/if}</header>
   <p class="effect"><KeywordText text={itemEffectText(item)} /></p>
   <div class="ownership"><strong>Ownership</strong><p>This artifact belongs to the army. It is not equipped by an individual unit.</p></div>
   {#if item.requiresUnit?.length}
@@ -21,7 +20,6 @@
 <style>
   .artifact-detail { height: 100%; overflow-y: auto; border-radius: calc(8 * var(--fx)); border: 1px solid rgb(100 116 139 / .55); background: rgb(15 23 42 / .94); padding: calc(11 * var(--fx)); color: #e2e8f0; }
   header { display: flex; align-items: center; gap: calc(8 * var(--fx)); border-bottom: 1px solid #334155; padding-bottom: calc(9 * var(--fx)); }
-  header :global(.artifact-icon) { width: calc(42 * var(--fx)); height: calc(42 * var(--fx)); object-fit: contain; image-rendering: pixelated; }
   header div { min-width: 0; flex: 1; }
   header p, h2, .effect, div p { margin: 0; }
   header p { font: 700 calc(8.5 * var(--fx))/1 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: #94a3b8; }

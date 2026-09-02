@@ -15,7 +15,6 @@
 
 <section class="detail-panel" aria-label="Hero ability details">
   <header class="detail-header">
-    <span class="detail-icon" aria-hidden="true">{action.icon}</span>
     <div class="min-w-0 flex-1">
       <p class="detail-kind">{action.kind}</p>
       <h2>{action.label}</h2>
@@ -57,7 +56,6 @@
 <style>
   .detail-panel { height: 100%; overflow-y: auto; border-radius: calc(8 * var(--fx, 1px)); border: 1px solid rgb(100 116 139 / .55); background: rgb(15 23 42 / .94); padding: calc(12 * var(--fx, 1px)); color: #e2e8f0; }
   .detail-header { display: flex; align-items: center; gap: calc(8 * var(--fx, 1px)); border-bottom: 1px solid rgb(100 116 139 / .45); padding-bottom: calc(9 * var(--fx, 1px)); }
-  .detail-icon { font-size: calc(28 * var(--fx, 1px)); }
   .detail-kind, h2, h3, p { margin: 0; }
   .detail-kind { font: 700 calc(9 * var(--fx, 1px))/1 ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; color: #94a3b8; }
   h2 { margin-top: calc(3 * var(--fx, 1px)); font-size: calc(18 * var(--fx, 1px)); color: #fde68a; }

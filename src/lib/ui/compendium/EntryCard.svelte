@@ -4,7 +4,6 @@
   import { abilityInfo } from '../abilities';
   import { skillIconFor, skillGlyph } from '../skillIcons';
   import Sprite from '../Sprite.svelte';
-  import ItemIcon from '../ItemIcon.svelte';
   import { stripKeywords } from '$lib/compendium/keywords';
   import { spellIconFor } from '../spellIcons';
 
@@ -57,15 +56,13 @@
     {selected ? 'border-amber-500 bg-slate-700 ring-1 ring-amber-500/40' : 'border-slate-700'}
     {tier?.glow ?? ''}"
 >
-  <!-- Abilities are deliberately text-only until the whole set has art. -->
-  {#if entry.kind !== 'ability'}
+  <!-- Abilities and artifacts use their titles as their visual identity. -->
+  {#if entry.kind !== 'ability' && entry.kind !== 'item'}
     <span class="grid h-12 w-11 shrink-0 place-items-center">
       {#if entry.kind === 'unit'}
         <Sprite name={entry.name} class="h-12 w-11" />
       {:else if entry.kind === 'faction'}
         <Sprite name="Hero {entry.faction}" class="h-12 w-11" />
-      {:else if entry.kind === 'item'}
-        <ItemIcon id={entry.id} class="h-10 w-10" />
       {:else if entry.kind === 'spell'}
         {#if spellIconFor(entry.id)}
           <img
