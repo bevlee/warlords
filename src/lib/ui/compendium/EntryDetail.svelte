@@ -202,6 +202,14 @@
       It stays with the army for the rest of the run.
     {/if}
   </p>
+{:else if entry.kind === 'concept'}
+  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Glossary</p>
+  <h2 class="mt-0.5 text-2xl font-black text-sky-300">{entry.name}</h2>
+  <p class="mt-2 text-sm leading-snug text-slate-300"><KeywordText text={entry.description} /></p>
+  <p class="mt-4 border-t border-slate-700 pt-3 text-sm text-slate-400">
+    A rules word rather than a thing in the world. It is here because ability and artifact text uses
+    it, and a term the rules lean on should be somewhere you can look it up.
+  </p>
 {:else if entry.kind === 'unitSkill'}
   <h2 class="text-2xl font-black text-violet-300">{entry.name}</h2>
   <p class="mt-2 text-sm leading-snug text-slate-300"><KeywordText text={UNIT_SKILLS[entry.id as keyof typeof UNIT_SKILLS].description} /></p>

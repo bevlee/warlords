@@ -44,6 +44,8 @@
         return stripKeywords(entry.effect);
       case 'unitSkill':
         return 'Gauntlet draft';
+      case 'concept':
+        return stripKeywords(entry.description);
     }
   });
 </script>
@@ -58,7 +60,7 @@
     {tier?.glow ?? ''}"
 >
   <!-- Abilities are deliberately text-only until the whole set has art. -->
-  {#if entry.kind !== 'ability'}
+  {#if entry.kind !== 'ability' && entry.kind !== 'concept'}
     <span class="grid h-12 w-11 shrink-0 place-items-center">
       {#if entry.kind === 'unit'}
         <Sprite name={entry.name} class="h-12 w-11" />

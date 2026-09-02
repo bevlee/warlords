@@ -25,7 +25,7 @@
     {/if}
   </header>
 
-  <p class="summary">{action.summary}</p>
+  <p class="summary"><KeywordText text={action.summary} /></p>
   <p class="description"><KeywordText text={action.description} /></p>
 
   <dl>

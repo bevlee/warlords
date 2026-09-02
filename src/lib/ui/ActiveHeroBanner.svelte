@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { stripKeywords } from '$lib/compendium/keywords';
   import type { ActiveHeroEffectView } from './heroActionDisplay';
   interface Props { effect: ActiveHeroEffectView; oninspect?: () => void; }
   let { effect, oninspect }: Props = $props();
@@ -6,7 +7,7 @@
 
 <button type="button" class="banner" onclick={() => oninspect?.()} aria-label="Inspect active hero effect">
   <span class="icon" aria-hidden="true">{effect.icon}</span>
-  <span class="copy"><strong>{effect.label} — {effect.affectedLabel}</strong><small>{effect.summary} · {effect.duration}</small></span>
+  <span class="copy"><strong>{effect.label} — {effect.affectedLabel}</strong><small>{stripKeywords(effect.summary)} · {effect.duration}</small></span>
 </button>
 
 <style>

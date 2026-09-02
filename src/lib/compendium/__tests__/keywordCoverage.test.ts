@@ -31,9 +31,10 @@ function svelteFiles(dir: string): string[] {
  * An attribute — `desc={season.description}` — is passing text to a component
  * that renders it, so it is not a leak; the component it hands off to is
  * checked on its own. Only a bare interpolation puts text on screen, so the
- * pattern rejects a match preceded by `=`.
+ * pattern rejects a match preceded by `=`, and `{#if …}` and friends, which
+ * are control flow rather than output.
  */
-const RAW_TEXT = /(^|[^=])\{[^{}]*\b(description|effect|itemEffectText\([^)]*\))\s*\}/g;
+const RAW_TEXT = /(^|[^=])\{(?![#/:@])[^{}]*\b(description|effect|summary|blurb|itemEffectText\([^)]*\))\s*\}/g;
 
 /** The same expression, but handed to something that copes with markup. */
 const SAFE = /(KeywordText|stripKeywords)/;

@@ -7,34 +7,34 @@ export const FACTION_SKILL_DEFS: Record<
   Array<{ id: string; name: string; description: string; unlockLevel: number }>
 > = {
   barbarian: [
-    { id: 'offense', name: 'Offense', description: '+3/6/9% damage', unlockLevel: 1 },
-    { id: 'armorer', name: 'Armorer', description: '+3/6/9% defense', unlockLevel: 3 },
-    { id: 'leadership', name: 'Leadership', description: '+1/2/3 morale to all', unlockLevel: 5 },
+    { id: 'offense', name: 'Offense', description: '+3/6/9% damage dealt, by rank', unlockLevel: 1 },
+    { id: 'armorer', name: 'Armorer', description: '+3/6/9% less damage taken, by rank', unlockLevel: 3 },
+    { id: 'leadership', name: 'Leadership', description: '+1/2/3 [[morale]] to every stack, by rank', unlockLevel: 5 },
   ],
   knight: [
-    { id: 'tactics', name: 'Tactics', description: 'Start 1/2/3 rows forward', unlockLevel: 1 },
-    { id: 'armorer', name: 'Armorer', description: '+5/10/15% defense', unlockLevel: 2 },
-    { id: 'leadership', name: 'Leadership', description: '+1/2/3 morale to all', unlockLevel: 4 },
+    { id: 'tactics', name: 'Tactics', description: 'Deploy 1/2/3 rows further forward, by rank', unlockLevel: 1 },
+    { id: 'armorer', name: 'Armorer', description: '+5/10/15% less damage taken, by rank', unlockLevel: 2 },
+    { id: 'leadership', name: 'Leadership', description: '+1/2/3 [[morale]] to every stack, by rank', unlockLevel: 4 },
   ],
   wizard: [
-    { id: 'sorcery', name: 'Sorcery', description: '+5/10/15% spell damage', unlockLevel: 1 },
-    { id: 'intelligence', name: 'Intelligence', description: '+2/4/6 mana', unlockLevel: 2 },
-    { id: 'mysticism', name: 'Mysticism', description: 'Regen 1/2/3 mana/round', unlockLevel: 4 },
+    { id: 'sorcery', name: 'Sorcery', description: '+5/10/15% spell damage, by rank', unlockLevel: 1 },
+    { id: 'intelligence', name: 'Intelligence', description: '+2/4/6 maximum mana, by rank', unlockLevel: 2 },
+    { id: 'mysticism', name: 'Mysticism', description: 'Regain 1/2/3 mana each round, by rank', unlockLevel: 4 },
   ],
   necromancer: [
-    { id: 'necromancy', name: 'Necromancy', description: 'Raise 5/10/15% of killed enemies as Skeletons for your next battle', unlockLevel: 1 },
+    { id: 'necromancy', name: 'Necromancy', description: 'Raise 5/10/15% of enemies you kill as Skeletons for the next battle, by rank', unlockLevel: 1 },
     { id: 'death_magic', name: 'Death Magic', description: "+5/10/15% to the Lich's shot damage", unlockLevel: 3 },
-    { id: 'sorcery', name: 'Sorcery', description: '+5/10/15% spell damage', unlockLevel: 5 },
+    { id: 'sorcery', name: 'Sorcery', description: '+5/10/15% spell damage, by rank', unlockLevel: 5 },
   ],
   ranger: [
-    { id: 'archery', name: 'Archery', description: '+5/10/15% ranged damage', unlockLevel: 1 },
-    { id: 'logistics', name: 'Logistics', description: '+1/2/3 movement speed to all units', unlockLevel: 3 },
-    { id: 'natures_luck', name: "Nature's Luck", description: '+1/2/3 luck to all units', unlockLevel: 5 },
+    { id: 'archery', name: 'Archery', description: '+5/10/15% ranged damage, by rank', unlockLevel: 1 },
+    { id: 'logistics', name: 'Logistics', description: '+1/2/3 Speed to every stack, by rank', unlockLevel: 3 },
+    { id: 'natures_luck', name: "Nature's Luck", description: '+1/2/3 [[luck]] to every stack, by rank', unlockLevel: 5 },
   ],
   demon: [
-    { id: 'offense', name: 'Offense', description: '+3/6/9% damage', unlockLevel: 1 },
-    { id: 'fire_magic', name: 'Fire Magic', description: '+10/20/30% damage from burn and the Efreet', unlockLevel: 3 },
-    { id: 'gating', name: 'Gating', description: '20/40/60% chance a fallen Demon-faction unit respawns for free', unlockLevel: 5 },
+    { id: 'offense', name: 'Offense', description: '+3/6/9% damage dealt, by rank', unlockLevel: 1 },
+    { id: 'fire_magic', name: 'Fire Magic', description: '+10/20/30% damage from [[burn]] and from Efreet’s attacks, by rank', unlockLevel: 3 },
+    { id: 'gating', name: 'Gating', description: '20/40/60% chance a fallen Demon-faction stack returns for free, by rank', unlockLevel: 5 },
   ],
 };
 

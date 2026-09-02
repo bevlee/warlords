@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { stripKeywords } from '$lib/compendium/keywords';
   import type { Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import type { ActiveHeroEffectView, HeroActionView } from './heroActionDisplay';
@@ -28,14 +29,14 @@
     <span><b>{unit.morale}</b> Morale</span><span><b>{unit.luck}</b> Luck</span>
   </div>
   {#if activeEffect}
-    <div class="active"><p>Active {activeEffect.label}</p><strong>{activeEffect.summary}</strong><small>{activeEffect.affectedLabel} · {activeEffect.duration}</small></div>
+    <div class="active"><p>Active {activeEffect.label}</p><strong>{stripKeywords(activeEffect.summary)}</strong><small>{activeEffect.affectedLabel} · {activeEffect.duration}</small></div>
   {/if}
   <h3>Hero actions</h3>
   <div class="action-list">
     {#each actions as action (action.id)}
       <button type="button" onclick={() => onselect(action.id)}>
         <span class="icon" aria-hidden="true">{action.icon}</span>
-        <span><strong>{action.label}</strong><small>{action.summary}</small>{#if action.usesLabel}<em>{action.usesLabel}</em>{/if}</span>
+        <span><strong>{action.label}</strong><small>{stripKeywords(action.summary)}</small>{#if action.usesLabel}<em>{action.usesLabel}</em>{/if}</span>
       </button>
     {:else}<p class="empty">This hero has no faction actions.</p>{/each}
   </div>

@@ -596,7 +596,7 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
         ...nextState,
         units: [...nextState.units.map(unit => unit.id === dead.id ? { ...unit, abilityState: { ...(unit.abilityState ?? {}), corpseRaised: true } } : unit), raised],
         grid: setOccupant(nextState.grid, pos, id), nextId: nextState.nextId + 1,
-        log: [...nextState.log, { type: 'status', data: { effect: 'corpse_raise', unitId: id, sourceId: dead.id, count } }],
+        log: [...nextState.log, { type: 'status', data: { effect: 'corpse_raise', unitId: id, sourceId: dead.id, count, artifact: ids.includes('dragon_ossuary') ? 'dragon_ossuary' : 'gravewrights_grimoire' } }],
       };
     }
   }

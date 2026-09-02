@@ -27,13 +27,13 @@ export interface UnitSkillDef {
  *  engine ability catalog) stack additively per pick; unique ones are
  *  once-only. Melee/ranged-penalty style abilities are excluded by design. */
 export const UNIT_SKILLS: Record<SkillId, UnitSkillDef> = {
-  weapon_training: { id: 'weapon_training', name: 'Weapon Training', description: '+Gauntlet Rank Attack.' },
-  armour_training: { id: 'armour_training', name: 'Armour Training', description: '+Gauntlet Rank Defence.' },
-  life_drain: { id: 'life_drain', name: 'Lifesteal', description: 'Heals the stack for 10% of damage dealt per level.' },
-  double_strike: { id: 'double_strike', name: 'Double Strike', description: 'Melee attacks land a second blow after the retaliation.' },
-  no_retaliation: { id: 'no_retaliation', name: 'No Retaliation', description: 'Targets this unit hits cannot retaliate.' },
-  fleet_footwork: { id: 'fleet_footwork', name: 'Fleet Footwork', description: '+1 speed per level.' },
-  bravery: { id: 'bravery', name: 'Bravery', description: '+1 morale per level.' },
+  weapon_training: { id: 'weapon_training', name: 'Weapon Training', description: 'Adds the gauntlet node number to this stack’s Attack — +1 at the first node, +10 at the last.' },
+  armour_training: { id: 'armour_training', name: 'Armour Training', description: 'Adds the gauntlet node number to this stack’s Defense — +1 at the first node, +10 at the last.' },
+  life_drain: { id: 'life_drain', name: 'Lifesteal', description: 'Heals the [[stack]] for 10% of the damage it deals, per level.' },
+  double_strike: { id: 'double_strike', name: 'Double Strike', description: 'Melee attacks land a second blow after the [[retaliation]].' },
+  no_retaliation: { id: 'no_retaliation', name: 'No Retaliation', description: 'Targets this unit hits cannot [[retaliation|retaliate]].' },
+  fleet_footwork: { id: 'fleet_footwork', name: 'Fleet Footwork', description: '+1 Speed per level — one more cell of movement.' },
+  bravery: { id: 'bravery', name: 'Bravery', description: '+1 [[morale]] per level.' },
 };
 
 export const SKILL_IDS = Object.keys(UNIT_SKILLS) as SkillId[];

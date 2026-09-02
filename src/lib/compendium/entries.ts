@@ -15,6 +15,7 @@ import { ABILITY_INFO, abilityInfo } from '../ui/abilities';
 import { SPELL_META } from '../ui/logLines';
 import { ITEMS, ITEM_IDS, itemEffectText, type ItemRarity } from '../gauntlet/items';
 import { UNIT_SKILLS, SKILL_IDS, type SkillId } from '../gauntlet/skills';
+import { CONCEPTS } from './concepts';
 
 export const ENTRY_KINDS = [
   'unit',
@@ -24,6 +25,7 @@ export const ENTRY_KINDS = [
   'factionSkill',
   'item',
   'unitSkill',
+  'concept',
 ] as const;
 
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -37,6 +39,7 @@ export const TAB_OF: Record<EntryKind, string> = {
   factionSkill: 'faction-skills',
   item: 'items',
   unitSkill: 'gauntlet-skills',
+  concept: 'glossary',
 };
 
 /** Tab heading per kind, in ENTRY_KINDS order. */
@@ -50,6 +53,7 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   // tab said "Items". The URL slug stays `items` so old links keep working.
   item: 'Artifacts',
   unitSkill: 'Gauntlet skills',
+  concept: 'Glossary',
 };
 
 /** Singular name for one entry of a kind, for places that talk about a single
@@ -62,6 +66,7 @@ export const KIND_TERM: Record<EntryKind, string> = {
   factionSkill: 'Faction skill',
   item: 'Artifact',
   unitSkill: 'Gauntlet skill',
+  concept: 'Term',
 };
 
 const KIND_OF_TAB = new Map(
@@ -289,6 +294,14 @@ export interface ItemEntry extends BaseEntry {
   upgrades: string | null;
 }
 
+/** A rules word the text leans on — "primary", "retaliation", "ATB". These
+ *  have no data behind them in the engine; they exist so the vocabulary has
+ *  somewhere to point. */
+export interface ConceptEntry extends BaseEntry {
+  kind: 'concept';
+  description: string;
+}
+
 export interface UnitSkillEntry extends BaseEntry {
   kind: 'unitSkill';
   description: string;
@@ -303,7 +316,8 @@ export type CompendiumEntry =
   | SpellEntry
   | FactionSkillEntry
   | ItemEntry
-  | UnitSkillEntry;
+  | UnitSkillEntry
+  | ConceptEntry;
 
 /** Faction-scoped id: Armorer is +3%/level for Barbarian but +5%/level for
  *  Knight, so the two are genuinely different entries and cannot share a key. */
@@ -466,6 +480,13 @@ const UNIT_SKILL_ENTRIES: UnitSkillEntry[] = SKILL_IDS.map((id) => ({
   ability: id,
 }));
 
+const CONCEPT_ENTRIES: ConceptEntry[] = CONCEPTS.map((concept) => ({
+  kind: 'concept',
+  id: concept.id,
+  name: concept.name,
+  description: concept.description,
+}));
+
 /** Every entry except spells, which depend on hero level and are built on demand. */
 export const STATIC_ENTRIES: CompendiumEntry[] = [
   ...UNIT_ENTRIES,
@@ -474,6 +495,7 @@ export const STATIC_ENTRIES: CompendiumEntry[] = [
   ...FACTION_SKILL_ENTRIES,
   ...ITEM_ENTRIES,
   ...UNIT_SKILL_ENTRIES,
+  ...CONCEPT_ENTRIES,
 ];
 
 export function entriesOfKind(kind: EntryKind, heroLevel = SAMPLE_HERO_LEVEL): CompendiumEntry[] {
@@ -495,3 +517,4 @@ export const abilityEntries = (): AbilityEntry[] => ABILITY_ENTRIES;
 export const itemEntries = (): ItemEntry[] => ITEM_ENTRIES;
 export const unitSkillEntries = (): UnitSkillEntry[] => UNIT_SKILL_ENTRIES;
 export const factionSkillEntries = (): FactionSkillEntry[] => FACTION_SKILL_ENTRIES;
+export const conceptEntries = (): ConceptEntry[] => CONCEPT_ENTRIES;

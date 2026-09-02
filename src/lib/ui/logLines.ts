@@ -57,6 +57,8 @@ const EFFECT_ENTRY: Record<string, { entryKind: EntryKind; id: string }> = {
   three_headed_strike: { entryKind: 'ability', id: 'three_headed_strike' },
   thunder_dive: { entryKind: 'ability', id: 'thunder_dive' },
   animus_engine: { entryKind: 'item', id: 'animus_engine' },
+  gravewrights_grimoire: { entryKind: 'item', id: 'gravewrights_grimoire' },
+  dragon_ossuary: { entryKind: 'item', id: 'dragon_ossuary' },
   blighted_soil: { entryKind: 'item', id: 'blighted_soil' },
   blood_tithe_ready: { entryKind: 'item', id: 'blood_tithe' },
   funeral_drum: { entryKind: 'item', id: 'funeral_drum' },
@@ -263,8 +265,14 @@ export function describeEvent(
           return line(u, t(' claw their way back — '), num(d.count), t(d.count === 1 ? ' returns.' : ' return.'));
 
         // --- Necromancy ---
-        case 'corpse_raise':
-          return line(t('The remains of '), unit(d.sourceId), t(' rise as '), num(d.count), t(d.count === 1 ? ' new servant.' : ' new servants.'));
+        case 'corpse_raise': {
+          // Name the artifact doing the raising. Without it the line reads as
+          // though corpses simply get up on their own, and a player has no way
+          // to connect it to the Grimoire they drafted.
+          const raiser = String(d.artifact ?? 'gravewrights_grimoire');
+          const label = raiser === 'dragon_ossuary' ? 'Dragon Ossuary' : "Gravewright's Grimoire";
+          return line(term(raiser, label), t(' raises '), num(d.count), t(' from the remains of '), unit(d.sourceId), t('.'));
+        }
         case 'blighted_soil':
           return line(term('blighted_soil', 'Blighted Soil'), t(' spreads the rot from '), unit(d.sourceId), t(' to everything around it.'));
         case 'blood_tithe_ready':
