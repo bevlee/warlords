@@ -8,7 +8,6 @@ import type {
   UnitStack,
 } from './types';
 import { abilityLevel } from './abilityCatalog';
-import { getLogisticsBonus, getMoraleBonus, getNatureLuckBonus } from './factionSkills';
 
 /** Abilities with a real engine read-path today. Definition-only placeholders
  * such as gate, teleport and fire_immunity are deliberately omitted. */
@@ -66,9 +65,9 @@ export function createDebugStackTemplate(
 ): DebugStackTemplate {
   const def = cloneDefinition(definition);
   const player = side === 'player';
-  const morale = abilityLevel(def, 'bravery') + (player ? getMoraleBonus(hero) : 0) + (player ? armyBonuses?.morale ?? 0 : 0);
-  const luck = player ? getNatureLuckBonus(hero) + (armyBonuses?.luck ?? 0) : 0;
-  const logistics = player ? getLogisticsBonus(hero) : 0;
+  const morale = abilityLevel(def, 'bravery') + (player ? armyBonuses?.morale ?? 0 : 0);
+  const luck = player ? (armyBonuses?.luck ?? 0) : 0;
+  const logistics = 0;
   const speedBonus = logistics + (player ? armyBonuses?.speed ?? 0 : 0);
   return {
     definition: def,

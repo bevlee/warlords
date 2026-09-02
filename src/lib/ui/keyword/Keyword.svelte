@@ -76,8 +76,12 @@
 <style>
   .keyword {
     /* Inherits the surrounding text so a dense panel does not turn into
-       confetti — the underline is the whole affordance. */
+       confetti. Semibold rather than bold: enough to read as a distinct word
+       at rest, without the dotted underline and the weight together shouting
+       over the sentence they sit in. `font: inherit` resets weight, so the
+       override has to follow it. */
     font: inherit;
+    font-weight: 600;
     color: inherit;
     background: none;
     border: 0;

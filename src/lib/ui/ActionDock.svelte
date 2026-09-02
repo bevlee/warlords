@@ -144,7 +144,6 @@
             aria-disabled={!ability.enabled}
             onclick={() => onability?.(ability.id)}
           >
-            <span class="hero-card-icon" aria-hidden="true">{ability.view?.icon ?? '✦'}</span>
             <span class="hero-card-copy">
               <strong>{ability.info.label}</strong>
               <small><KeywordText text={ability.view?.summary ?? ability.info.description} /></small>
@@ -295,7 +294,6 @@
   }
 
   .hero-card.unavailable { opacity: .58; }
-  .hero-card-icon { flex: none; font-size: calc(20 * var(--fx)); line-height: 1; }
   .hero-card-copy { min-width: 0; }
   .hero-card-copy strong, .hero-card-copy small, .hero-card-copy em { display: block; }
   .hero-card-copy strong { font-size: calc(11 * var(--fx)); line-height: 1.15; color: #fde68a; }

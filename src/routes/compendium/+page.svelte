@@ -111,7 +111,7 @@
       ? 'border-amber-500 bg-amber-500/15 text-amber-300'
       : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700/60';
 
-  const showFactionFilter = $derived(kind === 'unit' || kind === 'factionSkill' || kind === 'item');
+  const showFactionFilter = $derived(kind === 'unit' || kind === 'item');
 </script>
 
 <svelte:head><title>Compendium — Warlords</title></svelte:head>
