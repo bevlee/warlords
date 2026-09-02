@@ -14,11 +14,17 @@ import type { Hero } from './types.ts';
  * Neither does anything else.
  */
 
-/** Hero's max and starting mana. Wizard-only; the Intelligence skill that used
- *  to add to it no longer exists. */
-export function maxMana(hero: Hero): number {
+/**
+ * Hero's max and starting mana. Wizard-only.
+ *
+ * Scales with how deep a gauntlet run has gone. Hero level is the fallback for
+ * the modes that have no run depth — campaign and coop, where the hero levels
+ * by XP instead. In a gauntlet the two are the same number anyway, since
+ * `recordBattle` raises the level and the depth together.
+ */
+export function maxMana(hero: Hero, runDepth?: number): number {
   if (hero.class !== 'wizard') return 0;
-  return 5 + 3 * hero.level;
+  return 5 + 3 * Math.max(1, runDepth ?? hero.level);
 }
 
 /** Kept on the hero load path so old saves still open. Faction skills are no

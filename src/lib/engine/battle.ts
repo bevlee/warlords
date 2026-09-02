@@ -610,7 +610,7 @@ export const SPELLS: Record<SpellId, { cost: number; friendly: boolean }> = {
 };
 
 const DEFAULT_WIZARD_SPELLS: SpellId[] = ['lightning', 'bloodlust', 'stoneskin'];
-function prepareBattleHero(hero: Hero, artifactIds: string[]): Hero {
+function prepareBattleHero(hero: Hero, artifactIds: string[], runDepth?: number): Hero {
   if (hero.class !== 'wizard') return { ...hero, mana: 0, spells: [] };
   const granted: Array<[string, SpellId]> = [
     ['scroll_of_slowing', 'slow'],
@@ -619,7 +619,7 @@ function prepareBattleHero(hero: Hero, artifactIds: string[]): Hero {
     ['tome_of_the_blizzard', 'blizzard'],
   ];
   const spells = [...new Set([...(hero.spells ?? DEFAULT_WIZARD_SPELLS), ...granted.filter(([id]) => artifactIds.includes(id)).map(([, spell]) => spell)])];
-  const maximum = maxMana(hero);
+  const maximum = maxMana(hero, runDepth);
   return { ...hero, mana: Math.min(hero.mana ?? maximum, maximum), spells };
 }
 
@@ -912,9 +912,9 @@ export function initBattle(
 
   const playerController = options.controllers?.player ?? 'player';
   const allyController = options.controllers?.ally ?? 'ally';
-  const playerHero = prepareBattleHero(hero, options.artifacts?.[playerController] ?? []);
+  const playerHero = prepareBattleHero(hero, options.artifacts?.[playerController] ?? [], options.gauntletRound);
   const allyPreparedHero = options.allyHero
-    ? prepareBattleHero(options.allyHero, options.artifacts?.[allyController] ?? [])
+    ? prepareBattleHero(options.allyHero, options.artifacts?.[allyController] ?? [], options.gauntletRound)
     : undefined;
   const state: BattleState = {
     grid,
