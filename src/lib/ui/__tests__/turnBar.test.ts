@@ -64,12 +64,12 @@ describe('turnBarEntries', () => {
     expect(entries.map(e => e.startsRound)).toEqual([false, false, true]);
   });
 
-  it('re-shapes the strip around the action being hovered', () => {
+  it('keeps the live strip for an action that does not alter ATB', () => {
     const entries = turnBarEntries(standoff(), 'defend').slice(0, 3);
 
-    // Ending its turn outright drops 'a' behind 'b', which the live strip
-    // above cannot show because 'a' has not acted yet.
-    expect(entries.map(e => e.unit.id)).toEqual(['b', 'a', 'b']);
+    expect(entries.map(e => e.unit.id)).toEqual(['a', 'b', 'a']);
+    expect(entries.map(e => e.isCurrent)).toEqual([true, false, false]);
+    expect(entries.every(e => !e.isProjected)).toBe(true);
   });
 
   it('marks only the landing slot, not every later turn of the same stack', () => {
@@ -87,12 +87,12 @@ describe('turnBarEntries', () => {
     expect(entries.map(e => e.isProjected)).toEqual([true, false, false]);
   });
 
-  it('marks where the acting stack lands rather than where it stands', () => {
-    const entries = turnBarEntries(standoff(), 'defend').slice(0, 3);
+  it('marks where a waiting stack lands rather than where it stands', () => {
+    const entries = turnBarEntries(standoff(), 'wait').slice(0, 3);
 
     // Nothing is "acting now" in a projection — the amber ring would otherwise
     // promote whichever stack happens to lead the hypothetical order.
     expect(entries.every(e => !e.isCurrent)).toBe(true);
-    expect(entries.map(e => e.isProjected)).toEqual([false, true, false]);
+    expect(entries.map(e => e.isProjected)).toEqual([true, false, false]);
   });
 });

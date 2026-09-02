@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import type { BattleState, Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import {
@@ -259,7 +260,7 @@
                   <a href={entryHref('ability', ability)} target="_blank" rel="noopener" class="hover:underline">{info.label}</a>
                 </p>
               {/if}
-              <p class="ability-desc leading-tight text-slate-400 {sz.ability}">{info.description}</p>
+              <p class="ability-desc leading-tight text-slate-400 {sz.ability}"><KeywordText text={info.description} /></p>
             </div>
           {/each}
         </div>
@@ -271,7 +272,7 @@
           {#each artifactInteractions as interaction (interaction.id)}
             <div class="artifact-interaction">
               <ItemIcon id={interaction.id} class="artifact-interaction-icon" />
-              <div><strong>{interaction.name}</strong><p>{interaction.description}</p></div>
+              <div><strong>{interaction.name}</strong><p><KeywordText text={interaction.description} /></p></div>
             </div>
           {/each}
           <p class="artifact-scope">Army-owned synergy; not equipped by this unit.</p>

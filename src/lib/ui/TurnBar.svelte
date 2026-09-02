@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { BattleAction, BattleState, UnitStack } from '$lib/engine/types';
-  import { turnBarEntries } from './turnBar';
+  import { affectsAtbPreview, turnBarEntries } from './turnBar';
   import Sprite from './Sprite.svelte';
 
   interface Props {
@@ -18,7 +18,8 @@
   // Each entry carries the round it falls in, so the strip can break itself
   // into rounds inline — `startsRound` is set on the first turn of each new
   // one, which is where the marker goes. See ./turnBar.ts for the projection.
-  const entries = $derived(turnBarEntries(battleState, previewAction));
+  const effectivePreview = $derived(affectsAtbPreview(previewAction) ? previewAction : null);
+  const entries = $derived(turnBarEntries(battleState, effectivePreview));
 
   // Paged, not scrolled. Scrolling cost a permanent scrollbar across the
   // ribbon's full width — space the portraits can use instead — and a hovered
@@ -70,7 +71,7 @@
   // which is where both the acting stack and the projected landing spot are.
   $effect(() => {
     void battleState.currentUnitId;
-    void previewAction;
+    void effectivePreview;
     page = 0;
   });
 </script>
@@ -79,7 +80,7 @@
      round medallion and paging arrows built into its frame. Full width on
      purpose — a content-sized ribbon visibly narrows as stacks die. Every
      dimension is a multiple of --fx; see "Fitting the screen" in Battle.svelte. -->
-<div class="atb-ribbon" class:projecting={!!previewAction}>
+<div class="atb-ribbon" class:projecting={!!effectivePreview}>
   <button
     type="button"
     class="atb-arrow"

@@ -9,15 +9,20 @@ import {
   findEntry,
   kindOfTab,
   matchesFilters,
+  filters,
+  filtersFrom,
+  ALL,
   spellEntries,
   tabHrefFrom,
+  itemSectionOf,
   type EntryKind,
+  type ItemEntry,
 } from '../entries';
 import { CATALOG } from '../../engine/catalog';
 import { FACTION_UNITS, FACTION_INFO } from '../../engine/factions';
 import { FACTION_SKILL_DEFS } from '../../engine/factionSkills';
 import { ABILITY_INFO } from '../../ui/abilities';
-import { ITEM_IDS } from '../../gauntlet/items';
+import { ITEMS, ITEM_IDS } from '../../gauntlet/items';
 import { SKILL_IDS } from '../../gauntlet/skills';
 import { lightningDamage } from '../../engine/battle';
 import type { FactionClass } from '../../engine/types';
@@ -146,29 +151,130 @@ describe('entries read from their sources rather than restating them', () => {
   });
 });
 
+const items = (): ItemEntry[] => entriesOfKind('item') as ItemEntry[];
+
 describe('filters', () => {
   const unit = (slug: string) => entriesOfKind('unit').find(e => e.id === slug)!;
 
   it('applies a tier filter only to units, so other tabs are not emptied', () => {
-    expect(matchesFilters(unit('champion'), { tier: 7 })).toBe(true);
-    expect(matchesFilters(unit('champion'), { tier: 3 })).toBe(false);
+    expect(matchesFilters(unit('champion'), filters({ tier: 7 }))).toBe(true);
+    expect(matchesFilters(unit('champion'), filters({ tier: 3 }))).toBe(false);
     // An item has no tier; a stale tier filter must not hide it.
-    expect(matchesFilters(entriesOfKind('item')[0], { tier: 3 })).toBe(true);
-    expect(entriesOfKind('item').filter(e => matchesFilters(e, { tier: 3 }))).toHaveLength(
+    expect(matchesFilters(entriesOfKind('item')[0], filters({ tier: 3 }))).toBe(true);
+    expect(entriesOfKind('item').filter(e => matchesFilters(e, filters({ tier: 3 })))).toHaveLength(
       entriesOfKind('item').length,
     );
   });
 
   it('applies a faction filter only to entries that have a faction', () => {
-    expect(matchesFilters(unit('champion'), { faction: 'knight' })).toBe(true);
-    expect(matchesFilters(unit('champion'), { faction: 'demon' })).toBe(false);
-    expect(matchesFilters(entriesOfKind('spell')[0], { faction: 'demon' })).toBe(true);
+    expect(matchesFilters(unit('champion'), filters({ faction: 'knight' }))).toBe(true);
+    expect(matchesFilters(unit('champion'), filters({ faction: 'demon' }))).toBe(false);
+    expect(matchesFilters(entriesOfKind('spell')[0], filters({ faction: 'demon' }))).toBe(true);
+  });
+
+  it('filters artifacts by the faction that can draft them', () => {
+    const pennant = items().find(e => e.id === 'butchers_pennant')!;
+    expect(matchesFilters(pennant, filters({ faction: 'barbarian' }))).toBe(true);
+    expect(matchesFilters(pennant, filters({ faction: 'knight' }))).toBe(false);
+    // The legacy stat items belong to no faction: they are Neutral, which is a
+    // value you can filter *to*, not an absence.
+    const legacy = items().find(e => e.id === 'blade_of_the_vanguard')!;
+    expect(legacy.faction).toBe('neutral');
+    expect(matchesFilters(legacy, filters({ faction: 'knight' }))).toBe(false);
+    expect(matchesFilters(legacy, filters({ faction: 'neutral' }))).toBe(true);
+    expect(matchesFilters(legacy, filters())).toBe(true);
+    // ...and it is the only group that is Neutral.
+    expect(items().filter(e => e.faction === 'neutral').every(e => e.group === 'legacy')).toBe(true);
+  });
+
+  it('applies a rarity filter only to artifacts, so other tabs are not emptied', () => {
+    const pennant = items().find(e => e.id === 'butchers_pennant')!;
+    expect(matchesFilters(pennant, filters({ rarity: 'rare' }))).toBe(true);
+    expect(matchesFilters(pennant, filters({ rarity: 'epic' }))).toBe(false);
+    expect(matchesFilters(unit('champion'), filters({ rarity: 'epic' }))).toBe(true);
   });
 
   it('matches names case-insensitively and ignores blank search', () => {
-    expect(matchesFilters(unit('champion'), { search: 'CHAMP' })).toBe(true);
-    expect(matchesFilters(unit('champion'), { search: '  ' })).toBe(true);
-    expect(matchesFilters(unit('champion'), { search: 'goblin' })).toBe(false);
+    expect(matchesFilters(unit('champion'), filters({ search: 'CHAMP' }))).toBe(true);
+    expect(matchesFilters(unit('champion'), filters({ search: '  ' }))).toBe(true);
+    expect(matchesFilters(unit('champion'), filters({ search: 'goblin' }))).toBe(false);
+  });
+});
+
+describe('the artifact tab sorts itself', () => {
+  it('reads each artifact\u2019s faction, source and requirement off the item table', () => {
+    for (const entry of items()) {
+      const def = ITEMS[entry.id];
+      expect(entry.faction).toBe(def.faction ?? def.starterForFaction ?? 'neutral');
+      expect(entry.requiresUnit).toEqual(def.requiresUnit ?? []);
+      expect(entry.group).toBe(def.legacy ? 'legacy' : def.starterForFaction ? 'starter' : 'faction');
+    }
+  });
+
+  it('groups starters first, then faction pools, then the legacy pool', () => {
+    const groups = items().map(e => e.group);
+    expect([...new Set(groups)]).toEqual(['starter', 'faction', 'legacy']);
+    // Each group is one contiguous run, so the page never repeats a heading.
+    expect(groups.filter((g, i) => g !== groups[i - 1])).toEqual(['starter', 'faction', 'legacy']);
+  });
+
+  it('keeps each faction\u2019s artifacts together and ordered common to epic', () => {
+    const rank = { common: 0, rare: 1, epic: 2 };
+    const faction = items().filter(e => e.group === 'faction');
+    const sections = faction.map(itemSectionOf);
+    expect(new Set(sections).size).toBe(sections.filter((s, i) => s !== sections[i - 1]).length);
+    for (const [index, entry] of faction.entries()) {
+      const previous = faction[index - 1];
+      if (!previous || itemSectionOf(previous) !== itemSectionOf(entry)) continue;
+      expect(rank[previous.rarity], `${previous.name} sorts after ${entry.name}`)
+        .toBeLessThanOrEqual(rank[entry.rarity]);
+    }
+  });
+
+  it('names a section after the faction whose runs draft it', () => {
+    const pennant = items().find(e => e.id === 'butchers_pennant')!;
+    expect(itemSectionOf(pennant)).toBe('Barbarian artifacts');
+    expect(itemSectionOf(items().find(e => e.id === 'banner_of_the_first_raid')!))
+      .toBe('Starting artifacts');
+    expect(itemSectionOf(items().find(e => e.id === 'blade_of_the_vanguard')!))
+      .toBe('Legacy artifacts');
+  });
+});
+
+describe('filters are total: every field always holds a real value', () => {
+  it('reads a filterless query string as ALL rather than as nothing', () => {
+    expect(filtersFrom(new URLSearchParams())).toEqual({
+      faction: ALL, tier: ALL, rarity: ALL, search: '',
+    });
+  });
+
+  it('reads each filter back off the query string', () => {
+    const active = filtersFrom(new URLSearchParams('faction=knight&tier=7&rarity=epic'));
+    expect(active).toEqual({ faction: 'knight', tier: 7, rarity: 'epic', search: '' });
+  });
+
+  it('falls back to ALL for values that are not real filters', () => {
+    // A hand-edited or stale URL must show everything, never silently nothing.
+    const active = filtersFrom(new URLSearchParams('faction=goblin&tier=99&rarity=mythic'));
+    expect(active).toEqual({ faction: ALL, tier: ALL, rarity: ALL, search: '' });
+    expect(entriesOfKind('unit').filter(e => matchesFilters(e, active))).toHaveLength(
+      entriesOfKind('unit').length,
+    );
+  });
+
+  it('drops junk filters from the links it builds rather than carrying them', () => {
+    const url = new URL(
+      entryHrefFrom(new URLSearchParams('faction=goblin&tier=99'), 'unit', 'champion'),
+      'https://example.test',
+    );
+    expect(url.searchParams.get('faction')).toBeNull();
+    expect(url.searchParams.get('tier')).toBeNull();
+  });
+
+  it('matches everything when nothing is filtered', () => {
+    for (const kind of ENTRY_KINDS) {
+      for (const entry of entriesOfKind(kind)) expect(matchesFilters(entry, filters())).toBe(true);
+    }
   });
 });
 
@@ -214,11 +320,10 @@ describe('links keep the browsing context', () => {
           entryHrefFrom(params('faction=knight&tier=7'), kind, entry.id),
           'https://example.test',
         );
-        const applied = {
-          faction: url.searchParams.get('faction'),
-          tier: Number(url.searchParams.get('tier')) || null,
-        };
-        expect(matchesFilters(entry, applied), `${kind}/${entry.id} would be hidden`).toBe(true);
+        expect(
+          matchesFilters(entry, filtersFrom(url.searchParams)),
+          `${kind}/${entry.id} would be hidden`,
+        ).toBe(true);
       }
     }
   });

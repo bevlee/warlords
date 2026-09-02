@@ -11,13 +11,20 @@
     entryHrefFrom,
     kindOfTab,
     matchesFilters,
+    filtersFrom,
+    factionLabel,
     tabHrefFrom,
+    itemSectionOf,
+    ALL,
+    FACTION_FILTERS,
+    TIER_FILTERS,
+    RARITY_FILTERS,
+    ITEM_GROUP_NOTE,
     type CompendiumEntry,
     type EntryKind,
   } from '$lib/compendium/entries';
   import { loadDiscovery, newDiscovery, type DiscoveryState } from '$lib/compendium/discovery';
-  import { FACTION_INFO } from '$lib/engine/factions';
-  import type { FactionClass, Hero } from '$lib/engine/types';
+  import type { Hero } from '$lib/engine/types';
   import { loadHero } from '$lib/storage';
 
   let hero = $state<Hero | null>(null);
@@ -36,14 +43,32 @@
   // any view can be linked to from elsewhere in the game.
   const kind = $derived(kindOfTab(page.url.searchParams.get('tab')));
   const selectedId = $derived(page.url.searchParams.get('entry'));
-  const factionFilter = $derived(page.url.searchParams.get('faction') as FactionClass | null);
-  const tierFilter = $derived(Number(page.url.searchParams.get('tier')) || null);
+
+  /** The URL's filters plus the search box, as one complete set. Every field is
+   *  a real value — ALL is how a filter says it isn't narrowing anything. */
+  const active = $derived({ ...filtersFrom(page.url.searchParams), search });
 
   const all = $derived(entriesOfKind(kind, hero?.level ?? 1));
+  const shown = $derived(all.filter((e) => matchesFilters(e, active)));
 
-  const shown = $derived(
-    all.filter((e) => matchesFilters(e, { faction: factionFilter, tier: tierFilter, search })),
-  );
+  /** Section heading to print above a row, or null when it continues the run
+   *  above it. Artifacts only: every other tab is a flat list. */
+  const headingFor = $derived((entry: CompendiumEntry, index: number) => {
+    if (entry.kind !== 'item') return null;
+    const previous = shown[index - 1];
+    const section = itemSectionOf(entry);
+    return previous?.kind === 'item' && itemSectionOf(previous) === section ? null : section;
+  });
+
+  /** The one-line explanation under an artifact heading, printed once per
+   *  group — the Knight/Ranger/… headings all share the faction note. */
+  const noteFor = $derived((entry: CompendiumEntry, index: number) => {
+    if (entry.kind !== 'item') return null;
+    const previous = shown[index - 1];
+    return previous?.kind === 'item' && previous.group === entry.group
+      ? null
+      : ITEM_GROUP_NOTE[entry.group];
+  });
 
   /** Entry links keep the active filters, so picking a Knight while filtered to
    *  Knight leaves the list filtered. Passed down so the detail panel's
@@ -71,18 +96,22 @@
    *  since it belongs to the tab being left. */
   const tabHref = $derived((k: EntryKind) => tabHrefFrom(page.url.searchParams, k));
 
-  function filterHref(params: Record<string, string | null>): string {
+  /** ALL clears the parameter rather than writing it, so a URL only ever
+   *  carries the filters actually narrowing the list. */
+  function filterHref(key: 'faction' | 'tier' | 'rarity', value: string): string {
     const url = new URL(page.url);
-    for (const [key, value] of Object.entries(params)) {
-      if (value === null) url.searchParams.delete(key);
-      else url.searchParams.set(key, value);
-    }
+    if (value === ALL) url.searchParams.delete(key);
+    else url.searchParams.set(key, value);
     url.searchParams.delete('entry');
     return url.pathname + url.search;
   }
 
-  const showFactionFilter = $derived(kind === 'unit' || kind === 'factionSkill');
-  const TIERS = [1, 2, 3, 4, 5, 6, 7];
+  const chip = (selected: boolean) =>
+    selected
+      ? 'border-amber-500 bg-amber-500/15 text-amber-300'
+      : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700/60';
+
+  const showFactionFilter = $derived(kind === 'unit' || kind === 'factionSkill' || kind === 'item');
 </script>
 
 <svelte:head><title>Compendium — Warlords</title></svelte:head>
@@ -124,36 +153,36 @@
       />
       {#if showFactionFilter}
         <div class="flex flex-wrap gap-1">
-          <a
-            href={filterHref({ faction: null })}
-            class="rounded border px-2 py-1 text-[11px] font-bold {factionFilter
-              ? 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700/60'
-              : 'border-amber-500 bg-amber-500/15 text-amber-300'}">All</a
-          >
-          {#each Object.entries(FACTION_INFO) as [cls, info] (cls)}
+          <a href={filterHref('faction', ALL)} class="rounded border px-2 py-1 text-[11px] font-bold {chip(active.faction === ALL)}">All</a>
+          {#each FACTION_FILTERS as faction (faction)}
+            <!-- Neutral is only ever populated on the Artifacts tab; on the
+                 others it correctly finds nothing. -->
             <a
-              href={filterHref({ faction: cls })}
-              class="rounded border px-2 py-1 text-[11px] font-bold {factionFilter === cls
-                ? 'border-amber-500 bg-amber-500/15 text-amber-300'
-                : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700/60'}">{info.name}</a
+              href={filterHref('faction', faction)}
+              class="rounded border px-2 py-1 text-[11px] font-bold {chip(active.faction === faction)}"
+              >{factionLabel(faction)}</a
             >
           {/each}
         </div>
       {/if}
       {#if kind === 'unit'}
         <div class="flex flex-wrap gap-1">
-          <a
-            href={filterHref({ tier: null })}
-            class="rounded border px-2 py-1 text-[11px] font-bold {tierFilter
-              ? 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700/60'
-              : 'border-amber-500 bg-amber-500/15 text-amber-300'}">All tiers</a
-          >
-          {#each TIERS as t (t)}
+          <a href={filterHref('tier', ALL)} class="rounded border px-2 py-1 text-[11px] font-bold {chip(active.tier === ALL)}">All tiers</a>
+          {#each TIER_FILTERS as tier (tier)}
             <a
-              href={filterHref({ tier: String(t) })}
-              class="rounded border px-2 py-1 text-[11px] font-bold {tierFilter === t
-                ? 'border-amber-500 bg-amber-500/15 text-amber-300'
-                : 'border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700/60'}">T{t}</a
+              href={filterHref('tier', String(tier))}
+              class="rounded border px-2 py-1 text-[11px] font-bold {chip(active.tier === tier)}">T{tier}</a
+            >
+          {/each}
+        </div>
+      {/if}
+      {#if kind === 'item'}
+        <div class="flex flex-wrap gap-1">
+          <a href={filterHref('rarity', ALL)} class="rounded border px-2 py-1 text-[11px] font-bold {chip(active.rarity === ALL)}">All rarities</a>
+          {#each RARITY_FILTERS as rarity (rarity)}
+            <a
+              href={filterHref('rarity', rarity)}
+              class="rounded border px-2 py-1 text-[11px] font-bold capitalize {chip(active.rarity === rarity)}">{rarity}</a
             >
           {/each}
         </div>
@@ -169,7 +198,19 @@
           </p>
         {:else}
           <div class="flex flex-col gap-1.5">
-            {#each shown as entry (entry.id)}
+            {#each shown as entry, index (entry.id)}
+              {@const heading = headingFor(entry, index)}
+              {#if heading}
+                {@const note = noteFor(entry, index)}
+                <div class="{index === 0 ? '' : 'mt-3'} px-0.5">
+                  <h2 class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
+                    {heading}
+                  </h2>
+                  {#if note}
+                    <p class="mt-0.5 text-[11px] leading-tight text-slate-600">{note}</p>
+                  {/if}
+                </div>
+              {/if}
               <EntryCard
                 {entry}
                 href={hrefFor(entry.kind, entry.id)}

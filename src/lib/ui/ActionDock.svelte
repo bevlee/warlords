@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { stripKeywords } from '$lib/compendium/keywords';
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import type { UnitStack } from '$lib/engine/types';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { abilityInfo } from './abilities';
@@ -27,7 +29,7 @@
     ondefend: () => void;
     /** Hovering an action projects its effect onto the turns bar. Null on
      *  leave. Read-only — the projection never commits anything. */
-    onpreview?: (action: 'wait' | 'defend' | null) => void;
+    onpreview?: (action: 'wait' | null) => void;
     onspellbook: () => void;
     onability?: (abilityId: string) => void;
   }
@@ -120,10 +122,6 @@
         title="Defend — +30% defense until your next turn"
         {disabled}
         onclick={ondefend}
-        onmouseenter={() => !disabled && onpreview?.('defend')}
-        onmouseleave={() => onpreview?.(null)}
-        onfocus={() => !disabled && onpreview?.('defend')}
-        onblur={() => onpreview?.(null)}
       >
         <img src={statusIconFor('defending')} alt="" class="action-icon" />
         <span class="action-label">Defend</span>
@@ -149,7 +147,7 @@
             <span class="hero-card-icon" aria-hidden="true">{ability.view?.icon ?? '✦'}</span>
             <span class="hero-card-copy">
               <strong>{ability.info.label}</strong>
-              <small>{ability.view?.summary ?? ability.info.description}</small>
+              <small><KeywordText text={ability.view?.summary ?? ability.info.description} /></small>
               {#if ability.view?.usesLabel}<em>{ability.view.usesLabel}</em>{/if}
             </span>
           </button>
@@ -178,7 +176,7 @@
               type="button"
               class="slot ability-slot"
               aria-label={slot.ability.info.label}
-              title="{slot.ability.info.label} — {slot.ability.info.description}"
+              title="{slot.ability.info.label} — {stripKeywords(slot.ability.info.description)}"
               disabled={!slot.ability.enabled}
               onclick={() => onability?.(slot.ability.id)}
             >
@@ -217,7 +215,7 @@
             <a href={entryHref('ability', ability.id)} target="_blank" rel="noopener">{ability.label}</a>
             {#if ability.taught}<span class="taught-tag">taught</span>{/if}
           </p>
-          <p class="passive-desc">{ability.description}</p>
+          <p class="passive-desc"><KeywordText text={ability.description} /></p>
         </div>
       {:else}
         <p class="passive-desc none">This stack has no passive abilities.</p>

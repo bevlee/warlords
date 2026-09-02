@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import { ITEMS, itemEffectText, type ItemId, type ItemRarity } from '$lib/gauntlet/items';
   import ItemIcon from './ItemIcon.svelte';
 
@@ -47,7 +48,7 @@
         >
           <p class="font-bold {NAME[item.rarity]}">{item.name}</p>
           <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{item.rarity}</p>
-          <p class="mt-1 font-mono text-amber-200">{itemEffectText(item)}</p>
+          <p class="mt-1 font-mono text-amber-200"><KeywordText text={itemEffectText(item)} /></p>
         </div>
       </div>
     {/each}

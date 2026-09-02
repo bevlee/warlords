@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { LogLine, DamageTier } from './logLines';
   import { CONTROLLER_STYLE } from './controllers';
+  import Keyword from './keyword/Keyword.svelte';
 
   // Permanent, scrollable battle history, grouped under sticky round headers.
   interface Props {
@@ -94,7 +95,12 @@
         {#each group.lines as line, i (i)}
           <p class="text-slate-400">
             {#each line.segments as seg, j (j)}
-              {#if seg.controller}<span class="font-semibold {CONTROLLER_STYLE[seg.controller].log}">{seg.text}</span
+              {#if seg.keyword}<Keyword
+                  entryKind={seg.keyword.entryKind}
+                  id={seg.keyword.id}
+                  label={seg.text}
+                /><!--
+              -->{:else if seg.controller}<span class="font-semibold {CONTROLLER_STYLE[seg.controller].log}">{seg.text}</span
               >{:else if seg.damage !== undefined}<span class="font-bold text-red-400 {DAMAGE_CLS[seg.damage]}">{seg.text}</span
               >{:else if seg.kills}<span class="font-bold text-slate-200">{seg.text}</span
               >{:else if seg.emph}<span class="font-bold text-slate-200">{seg.text}</span

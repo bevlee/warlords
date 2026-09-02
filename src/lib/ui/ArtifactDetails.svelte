@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ITEMS, itemEffectText, type ItemId } from '$lib/gauntlet/items';
   import ItemIcon from './ItemIcon.svelte';
+  import KeywordText from './keyword/KeywordText.svelte';
   interface Props { id: ItemId; onclose?: () => void; }
   let { id, onclose }: Props = $props();
   const item = $derived(ITEMS[id]);
@@ -8,7 +9,7 @@
 
 <section class="artifact-detail" aria-label="Artifact details">
   <header><ItemIcon {id} class="artifact-icon" /><div><p>Army artifact · {item.rarity}</p><h2>{item.name}</h2></div>{#if onclose}<button type="button" aria-label="Close artifact details" onclick={onclose}>×</button>{/if}</header>
-  <p class="effect">{itemEffectText(item)}</p>
+  <p class="effect"><KeywordText text={itemEffectText(item)} /></p>
   <div class="ownership"><strong>Ownership</strong><p>This artifact belongs to the army. It is not equipped by an individual unit.</p></div>
   {#if item.requiresUnit?.length}
     <div class="connections"><strong>Relevant units and abilities</strong><p>{item.requiresUnit.join(' or ')} enables this artifact’s draft or supplies the ability it modifies.</p></div>

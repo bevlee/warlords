@@ -13,7 +13,7 @@ import { SPELLS, lightningDamage } from '../engine/battle';
 import { abilityLevel } from '../engine/abilityCatalog';
 import { ABILITY_INFO, abilityInfo } from '../ui/abilities';
 import { SPELL_META } from '../ui/logLines';
-import { ITEMS, ITEM_IDS, itemEffectText, type ItemId, type ItemRarity } from '../gauntlet/items';
+import { ITEMS, ITEM_IDS, itemEffectText, type ItemRarity } from '../gauntlet/items';
 import { UNIT_SKILLS, SKILL_IDS, type SkillId } from '../gauntlet/skills';
 
 export const ENTRY_KINDS = [
@@ -46,8 +46,22 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   ability: 'Abilities',
   spell: 'Spells',
   factionSkill: 'Faction skills',
-  item: 'Items',
+  // The engine, the battle HUD, and the players all say "artifact"; only this
+  // tab said "Items". The URL slug stays `items` so old links keep working.
+  item: 'Artifacts',
   unitSkill: 'Gauntlet skills',
+};
+
+/** Singular name for one entry of a kind, for places that talk about a single
+ *  term rather than heading a list of them. */
+export const KIND_TERM: Record<EntryKind, string> = {
+  unit: 'Unit',
+  faction: 'Faction',
+  ability: 'Ability',
+  spell: 'Spell',
+  factionSkill: 'Faction skill',
+  item: 'Artifact',
+  unitSkill: 'Gauntlet skill',
 };
 
 const KIND_OF_TAB = new Map(
@@ -66,38 +80,92 @@ export function entryHref(kind: EntryKind, id: string): string {
   return `/compendium?tab=${TAB_OF[kind]}&entry=${encodeURIComponent(id)}`;
 }
 
-/** Grid filters, all optional. Absent or empty means "don't filter on this". */
+/** Every faction an entry can belong to, plus Neutral for the ones that belong
+ *  to none — today, the legacy stat artifacts. */
+export type EntryFaction = FactionClass | 'neutral';
+export type EntryTier = UnitDef['tier'];
+
+/** A filter that is deliberately not filtering. An absent filter and a filter
+ *  set to "everything" were always the same state; naming it means no filter
+ *  value is ever null, and every call site is total. */
+export const ALL = 'all';
+type All = typeof ALL;
+
+/** Grid filters. Every field is present and non-null — `ALL` is the value that
+ *  means "don't narrow on this", and an empty search means "don't search". */
 export interface EntryFilters {
-  faction?: string | null;
-  tier?: number | null;
-  search?: string | null;
+  faction: EntryFaction | All;
+  tier: EntryTier | All;
+  rarity: ItemRarity | All;
+  search: string;
 }
+
+export const NO_FILTERS: EntryFilters = { faction: ALL, tier: ALL, rarity: ALL, search: '' };
+
+/** Terse construction for the cases that care about one field. */
+export const filters = (some: Partial<EntryFilters> = {}): EntryFilters => ({ ...NO_FILTERS, ...some });
+
+export const FACTION_FILTERS: EntryFaction[] = [
+  ...(Object.keys(FACTION_INFO) as FactionClass[]),
+  'neutral',
+];
+export const TIER_FILTERS: EntryTier[] = [1, 2, 3, 4, 5, 6, 7];
+export const RARITY_FILTERS: ItemRarity[] = ['common', 'rare', 'epic'];
+
+/** Display name for a faction value, including the one that is not a faction. */
+export const factionLabel = (faction: EntryFaction): string =>
+  faction === 'neutral' ? 'Neutral' : FACTION_INFO[faction].name;
 
 /**
  * The single filter predicate, shared by the grid and by link building — so a
  * link can never send you to an entry the grid would then hide.
  *
  * A filter only applies to kinds it means something for: tier is a unit
- * concept, faction belongs to units, factions, and faction skills. Applying
- * them blindly would empty the Items tab the moment a tier was selected.
+ * concept, rarity an item one, and faction belongs to units, factions, faction
+ * skills, and items. Applying them blindly would empty the Artifacts tab the
+ * moment a tier was selected. A kind that has no faction at all — spells,
+ * gauntlet skills — carries no `faction` field, which is what exempts it; that
+ * is different from an entry whose faction is Neutral.
  */
-export function matchesFilters(entry: CompendiumEntry, filters: EntryFilters): boolean {
-  const search = filters.search?.trim().toLowerCase();
+export function matchesFilters(entry: CompendiumEntry, active: EntryFilters): boolean {
+  const search = active.search.trim().toLowerCase();
   if (search && !entry.name.toLowerCase().includes(search)) return false;
-  if (filters.faction && 'faction' in entry && entry.faction !== filters.faction) return false;
-  if (filters.tier && entry.kind === 'unit' && entry.tier !== filters.tier) return false;
+  if (active.faction !== ALL && 'faction' in entry && entry.faction !== active.faction) return false;
+  if (active.tier !== ALL && entry.kind === 'unit' && entry.tier !== active.tier) return false;
+  if (active.rarity !== ALL && entry.kind === 'item' && entry.rarity !== active.rarity) return false;
   return true;
 }
 
 /** Filters that survive navigation from one entry to the next. Search is not
  *  one of them: it is transient typing, not a browsing mode. */
-const STICKY_FILTERS = ['faction', 'tier'] as const;
+const STICKY_FILTERS = ['faction', 'tier', 'rarity'] as const;
+type StickyFilter = (typeof STICKY_FILTERS)[number];
 
-function filtersFrom(params: URLSearchParams): EntryFilters {
+const oneOf = <T extends string>(value: string | null, allowed: readonly T[]): T | All =>
+  allowed.includes(value as T) ? (value as T) : ALL;
+
+/**
+ * The query string, read into a complete set of filters. Anything unrecognised
+ * — a hand-edited `?tier=99`, a faction that no longer exists — reads back as
+ * ALL rather than as a filter that quietly matches nothing. Search is not in
+ * the URL; the page holds it and spreads it over the result.
+ */
+export function filtersFrom(params: URLSearchParams): EntryFilters {
+  const tier = Number(params.get('tier'));
   return {
-    faction: params.get('faction'),
-    tier: Number(params.get('tier')) || null,
+    faction: oneOf(params.get('faction'), FACTION_FILTERS),
+    tier: TIER_FILTERS.includes(tier as EntryTier) ? (tier as EntryTier) : ALL,
+    rarity: oneOf(params.get('rarity'), RARITY_FILTERS),
+    search: '',
   };
+}
+
+/** The active set narrowed to a single field, to ask whether that one filter
+ *  alone would hide an entry. */
+function onlyFilter(key: StickyFilter, active: EntryFilters): EntryFilters {
+  if (key === 'faction') return filters({ faction: active.faction });
+  if (key === 'tier') return filters({ tier: active.tier });
+  return filters({ rarity: active.rarity });
 }
 
 /**
@@ -116,12 +184,11 @@ export function entryHrefFrom(
 ): string {
   const next = new URLSearchParams({ tab: TAB_OF[kind], entry: id });
   const target = findEntry(kind, id, heroLevel);
+  const active = filtersFrom(params);
   for (const key of STICKY_FILTERS) {
-    const value = params.get(key);
-    if (!value) continue;
-    const only: EntryFilters = key === 'tier' ? { tier: Number(value) || null } : { faction: value };
-    if (target && !matchesFilters(target, only)) continue;
-    next.set(key, value);
+    if (active[key] === ALL) continue;
+    if (target && !matchesFilters(target, onlyFilter(key, active))) continue;
+    next.set(key, String(active[key]));
   }
   return `/compendium?${next}`;
 }
@@ -131,9 +198,9 @@ export function entryHrefFrom(
  *  the list. Any selected entry is dropped — it belongs to the old tab. */
 export function tabHrefFrom(params: URLSearchParams, kind: EntryKind): string {
   const next = new URLSearchParams({ tab: TAB_OF[kind] });
+  const active = filtersFrom(params);
   for (const key of STICKY_FILTERS) {
-    const value = params.get(key);
-    if (value) next.set(key, value);
+    if (active[key] !== ALL) next.set(key, String(active[key]));
   }
   return `/compendium?${next}`;
 }
@@ -191,10 +258,35 @@ export interface FactionSkillEntry extends BaseEntry {
   unlockLevel: number;
 }
 
+/** How an artifact is obtained — the Items tab's top-level grouping, because
+ *  it is the first thing a player needs to know about one. */
+export type ItemGroup = 'starter' | 'faction' | 'legacy';
+
+export const ITEM_GROUP_LABEL: Record<ItemGroup, string> = {
+  starter: 'Starting artifacts',
+  faction: 'Faction artifacts',
+  legacy: 'Legacy artifacts',
+};
+
+export const ITEM_GROUP_NOTE: Record<ItemGroup, string> = {
+  starter: 'Held from the first battle of a run with that faction. Never drafted.',
+  faction: 'Offered as a draft choice after a won battle, to that faction only.',
+  legacy: 'Flat army-wide stat bonuses from an older draft pool. No longer offered.',
+};
+
 export interface ItemEntry extends BaseEntry {
   kind: 'item';
   rarity: ItemRarity;
   effect: string;
+  /** The faction whose runs can draft it; Neutral for the legacy stat items,
+   *  which belong to no faction. */
+  faction: EntryFaction;
+  group: ItemGroup;
+  /** Unit names that unlock it in a draft; any one of them is enough. Empty
+   *  means the whole faction pool can roll it. */
+  requiresUnit: string[];
+  /** Item id this replaces when drafted, if any. */
+  upgrades: string | null;
 }
 
 export interface UnitSkillEntry extends BaseEntry {
@@ -329,13 +421,42 @@ const FACTION_SKILL_ENTRIES: FactionSkillEntry[] = (
   })),
 );
 
-const ITEM_ENTRIES: ItemEntry[] = ITEM_IDS.map((id) => ({
+const ITEM_GROUP_ORDER: Record<ItemGroup, number> = { starter: 0, faction: 1, legacy: 2 };
+const RARITY_ORDER: Record<ItemRarity, number> = { common: 0, rare: 1, epic: 2 };
+/** Faction order follows the roster tabs rather than the alphabet, and
+ *  FACTION_FILTERS already ends with Neutral, so the legacy items sort last. */
+const factionRank = (faction: EntryFaction): number => FACTION_FILTERS.indexOf(faction);
+
+const itemGroup = (id: string): ItemGroup =>
+  ITEMS[id].legacy ? 'legacy' : ITEMS[id].starterForFaction ? 'starter' : 'faction';
+
+/** Sorted so the list reads as a table of contents: how you get it, then whose
+ *  it is, then how rare, then by name. The page keeps this order and only
+ *  inserts headings, so filtering never reshuffles the rows. */
+const ITEM_ENTRIES: ItemEntry[] = ITEM_IDS.map((id): ItemEntry => ({
   kind: 'item',
   id,
   name: ITEMS[id].name,
   rarity: ITEMS[id].rarity,
   effect: itemEffectText(ITEMS[id]),
-}));
+  faction: ITEMS[id].faction ?? ITEMS[id].starterForFaction ?? 'neutral',
+  group: itemGroup(id),
+  requiresUnit: ITEMS[id].requiresUnit ?? [],
+  upgrades: ITEMS[id].upgrades ?? null,
+})).sort((a, b) =>
+  ITEM_GROUP_ORDER[a.group] - ITEM_GROUP_ORDER[b.group] ||
+  factionRank(a.faction) - factionRank(b.faction) ||
+  RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity] ||
+  a.name.localeCompare(b.name),
+);
+
+/** Heading an item sits under in the Items tab. Faction artifacts get one
+ *  heading per faction; the other two groups are a single run each. */
+export function itemSectionOf(entry: ItemEntry): string {
+  return entry.group === 'faction' && entry.faction !== 'neutral'
+    ? `${FACTION_INFO[entry.faction].name} artifacts`
+    : ITEM_GROUP_LABEL[entry.group];
+}
 
 const UNIT_SKILL_ENTRIES: UnitSkillEntry[] = SKILL_IDS.map((id) => ({
   kind: 'unitSkill',

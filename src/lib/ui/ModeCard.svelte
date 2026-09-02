@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import type { Snippet } from 'svelte';
 
   interface Props {
@@ -60,7 +61,7 @@
   </div>
 
   <h2 class="mt-2 text-xl font-extrabold tracking-tight text-slate-50 {tall ? 'sm:text-2xl' : ''}">{title}</h2>
-  <p class="mt-1 text-sm text-slate-400">{desc}</p>
+  <p class="mt-1 text-sm text-slate-400"><KeywordText text={desc} /></p>
 
   {#if extra}
     <div class="mt-4">{@render extra()}</div>

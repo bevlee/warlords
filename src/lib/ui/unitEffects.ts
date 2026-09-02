@@ -161,7 +161,7 @@ const COMBAT_EFFECT_COPY: Record<string, EffectCopy> = {
 const MARK_COPY: Record<TargetMark['kind'], { label: string; detail: string }> = {
   quarry: {
     label: 'Name the Quarry',
-    detail: 'Each allied unit’s first damaging attack against this target advances that attacker 10% ATB.',
+    detail: 'Each allied unit’s first damaging attack against this target brings that attacker’s next turn 10% sooner.',
   },
   ranged_mark: {
     label: 'Ranged Mark',

@@ -1,5 +1,5 @@
 import type { BattleAction, BattleState, UnitStack } from '$lib/engine/types';
-import { predictTurnSchedule, previewTurnSchedule } from '$lib/engine/turnOrder';
+import { predictTurnSchedule, previewTurnSchedule, reentryAtb } from '$lib/engine/turnOrder';
 
 /** How many turns the ribbon predicts ahead. */
 export const TURN_BAR_ENTRIES = 16;
@@ -19,6 +19,11 @@ export interface TurnBarEntry {
   isProjected: boolean;
 }
 
+/** Only actions that alter re-entry ATB warrant replacing the live ribbon. */
+export function affectsAtbPreview(action: BattleAction['type'] | null): boolean {
+  return action !== null && reentryAtb(action) !== reentryAtb('defend');
+}
+
 /**
  * The strip of portraits to draw, live or projected.
  *
@@ -32,11 +37,12 @@ export function turnBarEntries(
   state: BattleState,
   previewAction: BattleAction['type'] | null = null,
 ): TurnBarEntry[] {
-  const slots = previewAction
-    ? previewTurnSchedule(state, previewAction, TURN_BAR_ENTRIES)
+  const effectivePreview = affectsAtbPreview(previewAction) ? previewAction : null;
+  const slots = effectivePreview
+    ? previewTurnSchedule(state, effectivePreview, TURN_BAR_ENTRIES)
     : predictTurnSchedule(state.units, TURN_BAR_ENTRIES, state.battleTime);
 
-  const landing = previewAction
+  const landing = effectivePreview
     ? slots.findIndex(slot => slot.unitId === state.currentUnitId)
     : -1;
 
@@ -45,7 +51,7 @@ export function turnBarEntries(
       unit: state.units.find(u => u.id === slot.unitId),
       round: slot.round,
       startsRound: i > 0 && slot.round !== slots[i - 1].round,
-      isCurrent: !previewAction && i === 0,
+      isCurrent: !effectivePreview && i === 0,
       isProjected: i === landing,
     }))
     .filter((e): e is TurnBarEntry => !!e.unit);

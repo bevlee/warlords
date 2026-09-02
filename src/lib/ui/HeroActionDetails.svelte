@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HeroActionView } from './heroActionDisplay';
+  import KeywordText from './keyword/KeywordText.svelte';
 
   interface Props {
     action: HeroActionView;
@@ -25,7 +26,7 @@
   </header>
 
   <p class="summary">{action.summary}</p>
-  <p class="description">{action.description}</p>
+  <p class="description"><KeywordText text={action.description} /></p>
 
   <dl>
     <div><dt>Target</dt><dd>{action.targetingLabel}</dd></div>
@@ -36,7 +37,7 @@
   {#if action.artifactNotes.length > 0}
     <section class="artifact-notes" aria-label="Artifact modifications">
       <h3>Artifact modifications</h3>
-      {#each action.artifactNotes as note (note)}<p>{note}</p>{/each}
+      {#each action.artifactNotes as note (note)}<p><KeywordText text={note} /></p>{/each}
     </section>
   {/if}
 

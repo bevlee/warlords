@@ -8,7 +8,7 @@ export const STAT_META = {
   mana: { icon: attributeIconFor('mana'), title: 'Mana — spent casting spells', label: 'Mana' },
   xp: { icon: attributeIconFor('xp'), title: 'Experience points', label: 'Experience' },
   count: {
-    icon: attributeIconFor('count'),
+    icon: attributeIconFor('units'),
     title: 'Units — alive now / battle-start maximum (revive limit)',
     label: 'Units',
   },

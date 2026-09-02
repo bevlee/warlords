@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeKeywordPopup } from '$lib/ui/keyword/popupState.svelte';
   import { onMount } from 'svelte';
   import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, beginCombat, heroFor } from '$lib/engine/battle';
   import { getTacticsShift } from '$lib/engine/factionSkills';
@@ -404,6 +405,8 @@
 
   function takeAction(action: BattleAction, controller: SoloController) {
     if (replay) return;
+    // A keyword card must never sit over the board while a stack is acting.
+    closeKeywordPopup();
     if (online) {
       // The authoritative animation starts when the server echoes the action,
       // but clear local hover immediately so it cannot follow a moved stack.
@@ -602,7 +605,7 @@
   // Cleared whenever the turn moves on: the mouse can still be sitting on the
   // button after the click that ended the turn, and the projection it asked
   // for is about a stack that is no longer acting.
-  let previewAction: 'wait' | 'defend' | null = $state(null);
+  let previewAction: 'wait' | null = $state(null);
   $effect(() => {
     void battle.currentUnitId;
     previewAction = null;

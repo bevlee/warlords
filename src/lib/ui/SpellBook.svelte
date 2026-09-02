@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import type { Hero, SpellId } from '$lib/engine/types';
   import { SPELLS, lightningDamage } from '$lib/engine/battle';
   import { maxMana } from '$lib/engine/factionSkills';
@@ -96,7 +97,7 @@
           </button>
           <p class="mt-2 text-sm font-bold text-stone-800">{s.label}</p>
           <p class="font-mono text-[11px] leading-tight text-stone-600">Mana: {SPELLS[s.id].cost}</p>
-          <p class="font-mono text-[11px] leading-tight text-stone-600">{s.effect}</p>
+          <p class="font-mono text-[11px] leading-tight text-stone-600"><KeywordText text={s.effect} /></p>
           <p class="text-[10px] italic leading-tight text-stone-500">{s.target}</p>
 
           <!-- Tooltip -->
