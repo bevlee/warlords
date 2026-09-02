@@ -26,7 +26,9 @@
     Army — <span class="text-slate-300">{army.length} {army.length === 1 ? 'stack' : 'stacks'}</span>
   </h2>
 
-  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <!-- Two up: narrower columns squeeze UnitInfo's stat labels into ellipses,
+       and a four-stack army pairs evenly rather than wrapping three-and-one. -->
+  <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
     {#each stacks as slot (slot.unit.name)}
       {@const ts = TIER_STYLE[slot.unit.tier]}
       <div class="overflow-hidden rounded-lg border-2 bg-slate-800 {ts.border} {ts.glow}">
