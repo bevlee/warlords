@@ -4,7 +4,6 @@ import { entriesOfKind, ENTRY_KINDS } from '../entries';
 import { ITEMS, ITEM_IDS } from '../../gauntlet/items';
 import { UNIT_SKILLS, SKILL_IDS } from '../../gauntlet/skills';
 import { ABILITY_INFO } from '../../ui/abilities';
-import { FACTION_SKILL_DEFS } from '../../engine/factionSkills';
 import { FACTION_INFO } from '../../engine/factions';
 
 const text = (segments: ReturnType<typeof parseKeywords>) =>
@@ -107,7 +106,6 @@ describe('flattening for plain-text contexts', () => {
       ...ITEM_IDS.map(id => ITEMS[id].description),
       ...Object.values(ABILITY_INFO).map(info => info.description),
       ...SKILL_IDS.map(id => UNIT_SKILLS[id].description),
-      ...Object.values(FACTION_SKILL_DEFS).flatMap(defs => defs.map(def => def.description)),
       ...Object.values(FACTION_INFO).map(info => info.description),
     ];
     for (const description of every) {
@@ -123,9 +121,6 @@ describe('every marker the game ships resolves', () => {
     ...ITEM_IDS.map(id => ({ where: `item ${id}`, text: ITEMS[id].description })),
     ...Object.entries(ABILITY_INFO).map(([id, info]) => ({ where: `ability ${id}`, text: info.description })),
     ...SKILL_IDS.map(id => ({ where: `gauntlet skill ${id}`, text: UNIT_SKILLS[id].description })),
-    ...Object.entries(FACTION_SKILL_DEFS).flatMap(([faction, defs]) =>
-      defs.map(def => ({ where: `${faction} skill ${def.id}`, text: def.description })),
-    ),
     ...Object.entries(FACTION_INFO).map(([id, info]) => ({ where: `faction ${id}`, text: info.description })),
   ];
 

@@ -60,4 +60,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **Faction skills.** Each faction once had three skills that levelled with the hero and quietly
+  scaled damage, morale, mana and deployment. They were superseded by hero actions and artifacts —
+  things a player picks and can see — and nothing had granted one since, so every hero ran with a
+  skill level of 0 and every bonus helper was an identity function. The compendium tab advertising
+  twenty of them is gone, along with the dead engine code. `Hero.factionSkills` stays on the type so
+  heroes saved before the change still load; it is never populated.
+
+
 - The `← main game` link beside the gauntlet page title.

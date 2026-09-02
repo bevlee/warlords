@@ -21,18 +21,6 @@ import { mulberry32, rngFor, type Rng } from './rng.ts';
 import { abilityLevel, lifestealFraction, CURSE_SHOT_PENALTY, INFECT_PENALTY } from './abilityCatalog.ts';
 import { canActivate, UNIT_ABILITIES } from './unitAbilities.ts';
 import {
-  applyOffenseBonus,
-  applyArmorerBonus,
-  applyArcheryBonus,
-  applyDeathMagicBonus,
-  applyFireMagicBonus,
-  getGatingChance,
-  getMoraleBonus,
-  getLogisticsBonus,
-  getNatureLuckBonus,
-  getSorceryMultiplier,
-  getMysticismRegen,
-  getTacticsShift,
   maxMana,
 } from './factionSkills.ts';
 import { DEMON_UNITS } from './demon.ts';
@@ -157,28 +145,6 @@ function applyFuneralDrumProgress(before: BattleState, after: BattleState): Batt
   return next;
 }
 
-/** Barbarian Offense boosts damage a player stack deals; Knight/Barbarian Armorer
- *  reduces damage a player stack takes. Ranger Archery/Necromancer Death Magic/Demon
- *  Fire Magic scale specific attack shapes. All are hero-wide, so they're applied
- *  here rather than inside calculateDamage (which only knows per-unit abilities). */
-function withHeroBonus(
-  attackerHero: Hero,
-  defenderHero: Hero,
-  attacker: UnitStack,
-  defender: UnitStack,
-  damage: number,
-  ranged = false
-): number {
-  let d = damage;
-  if (attacker.side === 'player') {
-    d = applyOffenseBonus(d, attackerHero);
-    if (ranged) d = applyArcheryBonus(d, attackerHero);
-    if (attacker.definition.abilities.includes('curse_shot')) d = applyDeathMagicBonus(d, attackerHero);
-    if (attacker.definition.abilities.includes('burn')) d = applyFireMagicBonus(d, attackerHero);
-  }
-  if (defender.side === 'player') d = applyArmorerBonus(d, defenderHero);
-  return d;
-}
 
 function attackMultiplier(state: BattleState, attacker: UnitStack, defender: UnitStack, ranged: boolean, retaliation: boolean): number {
   let multiplier = 1;
@@ -282,7 +248,7 @@ function rollHit(
   const raw = calculateDamageInBattle(state, guaranteedGoodLuck ? { ...attacker, luck: 0 } : attacker, defender, rng, sink) * (guaranteedGoodLuck ? 2 : 1);
   if (guaranteedGoodLuck) sink.luck = 'good';
   return {
-    damage: Math.max(1, Math.round(withHeroBonus(attackerHero, defenderHero, attacker, defender, raw, ranged) * attackMultiplier(state, attacker, defender, ranged, retaliation) * incomingAttackMultiplier(state, attacker, defender, ranged))),
+    damage: Math.max(1, Math.round(raw * attackMultiplier(state, attacker, defender, ranged, retaliation) * incomingAttackMultiplier(state, attacker, defender, ranged))),
     luckEvents: sink.luck
       ? [{ type: 'luck', data: { unitId: attacker.id, kind: sink.luck } }]
       : [],
@@ -665,7 +631,7 @@ export function lightningDamage(level: number): number {
 /** Forecast for the spell-aiming tooltip: Lightning's exact true damage; null for buffs. */
 export function spellPreview(hero: Hero, spell: SpellId, target: UnitStack): DamagePreview | null {
   if (SPELLS[spell].friendly) return null;
-  const damage = Math.round(lightningDamage(hero.level) * getSorceryMultiplier(hero));
+  const damage = lightningDamage(hero.level);
   const { killed } = applyDamage(target, damage);
   return { min: damage, max: damage, killsMin: killed, killsMax: killed };
 }
@@ -727,10 +693,10 @@ export function initBattle(
   let nextId = 1;
   const allocateId = () => `u${nextId++}`;
 
-  const moraleBonus = getMoraleBonus(hero);
-  const tacticsShift = getTacticsShift(hero);
-  const logisticsBonus = getLogisticsBonus(hero);
-  const luckBonus = getNatureLuckBonus(hero);
+  const moraleBonus = 0;
+  const tacticsShift = 0;
+  const logisticsBonus = 0;
+  const luckBonus = 0;
   let playerUnits: UnitStack[] = playerArmy.map((slot, i) => {
     let stack = slotToStack(slot, 'player', i, playerArmy.length, allocateId(), tacticsShift, options.controllers?.player);
     if (moraleBonus > 0) {
@@ -835,9 +801,9 @@ export function initBattle(
       isAlly: true,
     };
     if (options.allyHero) {
-      const allyMorale = getMoraleBonus(options.allyHero);
-      const allyLogistics = getLogisticsBonus(options.allyHero);
-      const allyLuck = getNatureLuckBonus(options.allyHero);
+      const allyMorale = 0;
+      const allyLogistics = 0;
+      const allyLuck = 0;
       if (allyMorale > 0) {
         stack = addModifierSource(
           { ...stack, morale: stack.morale + allyMorale },
@@ -1020,7 +986,7 @@ function isDeployable(u: UnitStack | undefined, controllerId?: string): u is Uni
 export function deployMove(state: BattleState, unitId: string, to: Pos, controllerId?: string): BattleState {
   const unit = state.units.find(u => u.id === unitId);
   if (!isDeployable(unit, controllerId)) return state;
-  if (!isInDeployZone(to, getTacticsShift(heroFor(state, unit)))) return state;
+  if (!isInDeployZone(to, 0)) return state;
   const cell = state.grid.cells[to.row]?.[to.col];
   if (!cell) return state;
   if (cell.blocked) return state;
@@ -1067,14 +1033,11 @@ function advance(state: BattleState): BattleState {
   if (next.round > state.round) {
     if (next.heroes) {
       const heroes = Object.fromEntries(Object.entries(next.heroes).map(([id, hero]) => {
-        const regen = getMysticismRegen(hero);
-        return [id, regen > 0 ? { ...hero, mana: Math.min(maxMana(hero), (hero.mana ?? 0) + regen) } : hero];
+        return [id, hero];
       }));
       const hostId = next.units.find(unit => unit.isHero && !unit.isAlly)?.controllerId;
       return { ...next, heroes, hero: hostId ? heroes[hostId] : next.hero };
     }
-    const regen = getMysticismRegen(next.hero);
-    if (regen > 0) return { ...next, hero: { ...next.hero, mana: Math.min(maxMana(next.hero), (next.hero.mana ?? 0) + regen) } };
   }
   return next;
 }
@@ -1434,7 +1397,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       const prism = hasArtifact(nextState, actor, 'prism_of_the_fallen')
         ? 1 + 0.2 * Number(heroSystemState(nextState, actor).prismDeadSnapshot ?? 0)
         : 1;
-      const baseDamage = Math.round(lightningDamage(actorHero.level) * getSorceryMultiplier(actorHero) * (conduit ? 1.1 : 1) * prism);
+      const baseDamage = Math.round(lightningDamage(actorHero.level) * (conduit ? 1.1 : 1) * prism);
       let victims: Array<{ unit: UnitStack; multiplier: number }> = [{ unit: target, multiplier: 1 }];
       if (action.spell === 'chain_lightning') {
         victims.push(...nextState.units.filter(unit => unit.side !== actor.side && unit.count > 0 && !unit.isHero && unit.id !== target.id)

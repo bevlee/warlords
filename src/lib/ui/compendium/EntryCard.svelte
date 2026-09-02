@@ -31,15 +31,13 @@
       case 'unit':
         return `Tier ${entry.tier} · ${entry.unit.base.hp} HP · ${entry.unit.base.minDamage}–${entry.unit.base.maxDamage} dmg`;
       case 'faction':
-        return `${entry.roster.length} units · ${entry.skills.length} skills`;
+        return `${entry.roster.length} units`;
       case 'ability':
         return entry.units.length > 0
           ? `${entry.units.length} unit${entry.units.length === 1 ? '' : 's'}`
           : 'Taught in gauntlet runs';
       case 'spell':
         return `${entry.manaCost} mana · ${entry.target}`;
-      case 'factionSkill':
-        return `Unlocks at level ${entry.unlockLevel}`;
       case 'item':
         return stripKeywords(entry.effect);
       case 'unitSkill':

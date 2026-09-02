@@ -2,7 +2,6 @@
   import { closeKeywordPopup } from '$lib/ui/keyword/popupState.svelte';
   import { onMount } from 'svelte';
   import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, beginCombat, heroFor } from '$lib/engine/battle';
-  import { getTacticsShift } from '$lib/engine/factionSkills';
   import { aiTakeTurn } from '$lib/engine/ai';
   import {
     getReachableCells,
@@ -172,7 +171,7 @@
   const deployHero = $derived(
     (online && localControllerId ? battle.heroes?.[localControllerId] : undefined) ?? battle.hero
   );
-  const tacticsShift = $derived(getTacticsShift(deployHero));
+  const tacticsShift = 0;
   let selectedDeployId = $state<string | null>(null);
   const selectedDeployUnit = $derived(
     selectedDeployId ? (battle.units.find(u => u.id === selectedDeployId) ?? null) : null

@@ -8,7 +8,6 @@ import type { FactionClass, SpellId, UnitDef } from '../engine/types';
 import { CATALOG, type CatalogUnit } from '../engine/catalog';
 import { FACTION_INFO } from '../engine/factions';
 import { UNIT_COSTS } from '../engine/recruit';
-import { FACTION_SKILL_DEFS } from '../engine/factionSkills';
 import { SPELLS, lightningDamage } from '../engine/battle';
 import { abilityLevel } from '../engine/abilityCatalog';
 import { ABILITY_INFO, abilityInfo } from '../ui/abilities';
@@ -22,7 +21,6 @@ export const ENTRY_KINDS = [
   'faction',
   'ability',
   'spell',
-  'factionSkill',
   'item',
   'unitSkill',
   'concept',
@@ -36,7 +34,6 @@ export const TAB_OF: Record<EntryKind, string> = {
   faction: 'factions',
   ability: 'abilities',
   spell: 'spells',
-  factionSkill: 'faction-skills',
   item: 'items',
   unitSkill: 'gauntlet-skills',
   concept: 'glossary',
@@ -48,7 +45,6 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   faction: 'Factions',
   ability: 'Abilities',
   spell: 'Spells',
-  factionSkill: 'Faction skills',
   // The engine, the battle HUD, and the players all say "artifact"; only this
   // tab said "Items". The URL slug stays `items` so old links keep working.
   item: 'Artifacts',
@@ -63,7 +59,6 @@ export const KIND_TERM: Record<EntryKind, string> = {
   faction: 'Faction',
   ability: 'Ability',
   spell: 'Spell',
-  factionSkill: 'Faction skill',
   item: 'Artifact',
   unitSkill: 'Gauntlet skill',
   concept: 'Term',
@@ -234,8 +229,6 @@ export interface FactionEntry extends BaseEntry {
   description: string;
   /** Unit-entry ids, tier ascending. */
   roster: string[];
-  /** factionSkill-entry ids. */
-  skills: string[];
 }
 
 export interface AbilityEntry extends BaseEntry {
@@ -254,13 +247,6 @@ export interface SpellEntry extends BaseEntry {
   target: 'Friendly stack' | 'Enemy stack';
   effect: string;
   description: string;
-}
-
-export interface FactionSkillEntry extends BaseEntry {
-  kind: 'factionSkill';
-  faction: FactionClass;
-  description: string;
-  unlockLevel: number;
 }
 
 /** How an artifact is obtained — the Items tab's top-level grouping, because
@@ -314,15 +300,9 @@ export type CompendiumEntry =
   | FactionEntry
   | AbilityEntry
   | SpellEntry
-  | FactionSkillEntry
   | ItemEntry
   | UnitSkillEntry
   | ConceptEntry;
-
-/** Faction-scoped id: Armorer is +3%/level for Barbarian but +5%/level for
- *  Knight, so the two are genuinely different entries and cannot share a key. */
-export const factionSkillId = (faction: FactionClass, skillId: string): string =>
-  `${faction}:${skillId}`;
 
 const UNIT_ENTRIES: UnitEntry[] = CATALOG.map((unit) => ({
   kind: 'unit',
@@ -346,7 +326,6 @@ const FACTION_ENTRIES: FactionEntry[] = (
   roster: UNIT_ENTRIES.filter((e) => e.faction === faction)
     .sort((a, b) => a.tier - b.tier)
     .map((e) => e.id),
-  skills: FACTION_SKILL_DEFS[faction].map((s) => factionSkillId(faction, s.id)),
 }));
 
 const TEACHABLE = new Set<string>(SKILL_IDS);
@@ -419,22 +398,6 @@ export function spellEntries(heroLevel = SAMPLE_HERO_LEVEL): SpellEntry[] {
   );
 }
 
-const FACTION_SKILL_ENTRIES: FactionSkillEntry[] = (
-  Object.entries(FACTION_SKILL_DEFS) as [
-    FactionClass,
-    Array<{ id: string; name: string; description: string; unlockLevel: number }>,
-  ][]
-).flatMap(([faction, defs]) =>
-  defs.map((def) => ({
-    kind: 'factionSkill' as const,
-    id: factionSkillId(faction, def.id),
-    name: def.name,
-    faction,
-    description: def.description,
-    unlockLevel: def.unlockLevel,
-  })),
-);
-
 const ITEM_GROUP_ORDER: Record<ItemGroup, number> = { starter: 0, faction: 1, legacy: 2 };
 const RARITY_ORDER: Record<ItemRarity, number> = { common: 0, rare: 1, epic: 2 };
 /** Faction order follows the roster tabs rather than the alphabet, and
@@ -492,7 +455,6 @@ export const STATIC_ENTRIES: CompendiumEntry[] = [
   ...UNIT_ENTRIES,
   ...FACTION_ENTRIES,
   ...ABILITY_ENTRIES,
-  ...FACTION_SKILL_ENTRIES,
   ...ITEM_ENTRIES,
   ...UNIT_SKILL_ENTRIES,
   ...CONCEPT_ENTRIES,
@@ -516,5 +478,4 @@ export const factionEntries = (): FactionEntry[] => FACTION_ENTRIES;
 export const abilityEntries = (): AbilityEntry[] => ABILITY_ENTRIES;
 export const itemEntries = (): ItemEntry[] => ITEM_ENTRIES;
 export const unitSkillEntries = (): UnitSkillEntry[] => UNIT_SKILL_ENTRIES;
-export const factionSkillEntries = (): FactionSkillEntry[] => FACTION_SKILL_ENTRIES;
 export const conceptEntries = (): ConceptEntry[] => CONCEPT_ENTRIES;

@@ -5,7 +5,7 @@
   import FactionSelect from '$lib/ui/FactionSelect.svelte';
   import CampaignMap from '$lib/ui/CampaignMap.svelte';
   import { recruitBudget, applyVictory } from '$lib/engine/progression';
-  import { updateFactionSkills, necromancyBonusSkeletons } from '$lib/engine/factionSkills';
+  import { updateFactionSkills } from '$lib/engine/factionSkills';
   import { SKELETON } from '$lib/engine/necromancer';
   import { loadHero, saveHero, resetHero, loadArmy, saveArmy, clearArmy, type SavedArmy } from '$lib/storage';
   import {
@@ -96,7 +96,7 @@
     if (result === 'player_wins' && activeEncounter) {
       const gained = activeEncounter.xpReward;
       const { hero: next, levels } = applyVictory(hero, gained, activeEncounter.goldReward);
-      const bonusSkeletons = (hero.bonusSkeletons ?? 0) + necromancyBonusSkeletons(hero, enemyArmy);
+      const bonusSkeletons = hero.bonusSkeletons ?? 0;
       hero = updateFactionSkills({ ...next, bonusSkeletons });
       lastBattle = { xp: gained, levels };
       lastReward = { xp: gained, gold: activeEncounter.goldReward };
