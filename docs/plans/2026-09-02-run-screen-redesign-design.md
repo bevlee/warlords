@@ -32,6 +32,13 @@ artifacts and the army, each at a size you can read.
    what the hero can *do*.
 5. Units, artifacts, abilities and keywords link through the compendium
    popover, the same interaction combat uses.
+6. **Power stays backstage.** `encounterBudget` and `armyCost` keep generating
+   encounters and sizing drafts, but no screen prints a power number. Nothing
+   in the game interacts with it, and it counts none of the things that
+   actually decide a fight — artifacts, unit skills, hero actions, the enemy
+   bonus — so a player comparing 420 against ~275 is reading a figure that can
+   be wrong in either direction. The enemy's stacks are shown instead; that is
+   the same judgement, made on real information.
 
 ### Already landed
 
@@ -56,7 +63,7 @@ The current node is a card, not a pip:
 
 ```
 ● BATTLE 5 · RANK 5
-Demon army — ~275 power · 4 stacks · enemy bonus +2 ⚔/🛡
+Demon army — 4 stacks · enemy bonus +2 ⚔/🛡
 [Imp ×24] [Hell Hound ×9] [Succubus ×6] [Efreet ×2]      [ FIGHT ⚔ ]
 ```
 
@@ -104,7 +111,7 @@ state, which is invisible today.
 
 ### Army
 
-Header: `ARMY — 4 stacks · 420 power`.
+Header: `ARMY — 4 stacks`.
 
 Each stack is a `UnitInfo size="large"` card — the same panel combat shows when
 you click a stack — passed `items={run.items}`. That brings compendium links,
@@ -132,7 +139,8 @@ same card as the artifacts band.
 ## Cut from the page
 
 Hero level, the `⚔2 🛡1` line, faction-skill list, the reversed node list, the
-`Your army:` text strip, the 📖 external-tab compendium links (the popover
+`Your army:` text strip, both `strength ~N` readouts and the army's power
+total, the 📖 external-tab compendium links (the popover
 replaces them), and the four-paragraph "How the Gauntlet works" footer, which
 moves behind a `?` in the header.
 
