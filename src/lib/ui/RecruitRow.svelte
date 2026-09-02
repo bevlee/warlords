@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { stripKeywords } from '$lib/compendium/keywords';
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import { UNIT_COSTS, MAX_STACKS, type RecruitLimit } from '$lib/engine/recruit';
   import { abilityInfo } from './abilities';
   import Sprite from './Sprite.svelte';
@@ -52,9 +54,9 @@
       <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
         {#each unit.abilities as ability (ability)}
           {@const info = abilityInfo(ability)}
-          <span class="text-[11px] leading-tight" title={info.description}>
+          <span class="text-[11px] leading-tight" title={stripKeywords(info.description)}>
             <span class="font-semibold text-amber-300">{info.label}</span>
-            <span class="text-slate-400"> — {info.description}</span>
+            <span class="text-slate-400"> — <KeywordText text={info.description} /></span>
           </span>
         {/each}
       </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeKeywordPopup } from '$lib/ui/keyword/popupState.svelte';
   import { onMount } from 'svelte';
   import { initBattle, applyAction, spellPreview, SPELLS, isInDeployZone, deployMove, beginCombat, heroFor } from '$lib/engine/battle';
   import { getTacticsShift } from '$lib/engine/factionSkills';
@@ -403,6 +404,8 @@
 
   function takeAction(action: BattleAction, controller: SoloController) {
     if (replay) return;
+    // A keyword card must never sit over the board while a stack is acting.
+    closeKeywordPopup();
     if (online) {
       // The authoritative animation starts when the server echoes the action,
       // but clear local hover immediately so it cannot follow a moved stack.
@@ -481,13 +484,13 @@
   const HERO_ACTIONS: Record<Hero['class'], Array<{ id: string; label: string; description: string }>> = {
     knight: [
       { id: 'hold_the_line', label: 'Hold the Line', description: 'Units that finish a turn without moving become Braced.' },
-      { id: 'ready_the_counterattack', label: 'Counterattack', description: 'Each unit’s first retaliation deals 50% more damage and advances it 10% ATB.' },
-      { id: 'advance_by_ranks', label: 'Advance by Ranks', description: 'Long move-only actions beside an ally return at 50% ATB.' },
+      { id: 'ready_the_counterattack', label: 'Counterattack', description: 'Each unit’s first retaliation deals 50% more damage and brings its next turn 10% sooner.' },
+      { id: 'advance_by_ranks', label: 'Advance by Ranks', description: 'A long move-only action beside an ally brings that stack’s next turn twice as soon.' },
     ],
     ranger: [
-      { id: 'name_the_quarry', label: 'Name the Quarry', description: 'Choose an enemy; each ally’s first primary hit advances it 10% ATB.' },
+      { id: 'name_the_quarry', label: 'Name the Quarry', description: 'Choose an enemy; each ally’s first primary hit on it brings that ally’s next turn 10% sooner.' },
       { id: 'set_the_ambush', label: 'Set the Ambush', description: 'Choose a 3×3 area for stronger, safer opening attacks.' },
-      { id: 'open_an_escape_route', label: 'Escape Route', description: 'Choose a 3×3 area where move-only actions return at 75% ATB.' },
+      { id: 'open_an_escape_route', label: 'Escape Route', description: 'Choose a 3×3 area where a move-only action brings the stack’s next turn 75% sooner.' },
     ],
     barbarian: [
       { id: 'charge', label: 'Charge!', description: 'Empower every friendly melee unit for its next turn.' },

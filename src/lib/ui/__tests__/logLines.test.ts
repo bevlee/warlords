@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeEvent, damageTier, type LogLine } from '../logLines';
+import { describeEvent, damageTier, readableEffect, type LogLine } from '../logLines';
 import type { BattleEvent, Hero, UnitStack } from '$lib/engine/types';
 
 const HERO: Hero = { class: 'barbarian', level: 3, xp: 0, attack: 2, defense: 1, statPoints: 0, factionSkills: [] };
@@ -91,5 +91,86 @@ describe('describeEvent', () => {
   it('capitalizes the first letter of a line', () => {
     const line = describeEvent({ type: 'death', data: { unitId: 'e1' } }, units, HERO);
     expect(textOf(line)).toBe('Wild Wolfs are wiped out!');
+  });
+});
+
+// A status event with no case of its own used to print its internal id
+// verbatim — "Wild Stone Golems are affected by follow_through." Nothing the
+// engine logs may reach a player as a snake_case identifier.
+describe('status effects never show a raw engine id', () => {
+  const units = [
+    stack('g1', 'Goblin', 'player'),
+    stack('e1', 'Stone Golem', 'enemy'),
+  ];
+  const describe_ = (data: Record<string, unknown>) =>
+    textOf(describeEvent({ type: 'status', data } as BattleEvent, units, HERO));
+
+  it('names the ability that dealt the damage, target first', () => {
+    expect(describe_({ effect: 'thunder_dive', unitId: 'e1', damage: 55, killed: 2 }))
+      .toBe('Wild Stone Golems take 55 damage from Thunder Dive. -2 💀');
+  });
+
+  it('covers every effect that deals damage in passing', () => {
+    for (const effect of ['overrun', 'shockwave', 'splash', 'collision', 'cinderburst', 'three_headed_strike']) {
+      const text = describe_({ effect, unitId: 'e1', damage: 5 });
+      expect(text, effect).toMatch(/^Wild Stone Golems take 5 damage from .+\.$/);
+      expect(text, effect).not.toContain('_');
+    }
+  });
+
+  it('makes the named ability hoverable, so the log explains itself', () => {
+    const l = describeEvent(
+      { type: 'status', data: { effect: 'thunder_dive', unitId: 'e1', damage: 55 } } as BattleEvent,
+      units, HERO,
+    );
+    const keyword = l.kind === 'event' ? l.segments.find(seg => seg.keyword) : undefined;
+    expect(keyword?.text).toBe('Thunder Dive');
+    expect(keyword?.keyword).toEqual({ entryKind: 'ability', id: 'thunder_dive' });
+  });
+
+  it('links an artifact proc to the artifact, not to an ability', () => {
+    const l = describeEvent(
+      { type: 'status', data: { effect: 'funeral_drum', lost: 5 } } as BattleEvent, units, HERO,
+    );
+    const keyword = l.kind === 'event' ? l.segments.find(seg => seg.keyword) : undefined;
+    expect(keyword?.keyword).toEqual({ entryKind: 'item', id: 'funeral_drum' });
+  });
+
+  it('names hero orders instead of their ids', () => {
+    expect(describe_({ effect: 'hero_action', actionId: 'blood_for_blood', casterId: 'g1' }))
+      .toBe('Goblins order Blood for Blood!.');
+  });
+
+  it('writes a sentence for artifact and ability procs', () => {
+    expect(describe_({ effect: 'rebirth', unitId: 'e1', count: 3 }))
+      .toBe('Wild Stone Golems claw their way back — 3 return.');
+    expect(describe_({ effect: 'blood_tithe_ready', unitId: 'g1', count: 1 }))
+      .toBe('Blood Tithe pays out — 1 Skeleton rises.');
+  });
+
+  it('falls back to a readable name for an effect nobody has worded yet', () => {
+    expect(readableEffect('some_new_proc')).toBe('Some New Proc');
+    expect(describe_({ effect: 'some_new_proc', unitId: 'e1' }))
+      .toBe('Wild Stone Golems are affected by Some New Proc.');
+  });
+
+  it('leaves no underscore in any status line the engine can emit', () => {
+    const emitted = [
+      'animus_engine', 'blighted_soil', 'blood_offering', 'blood_tithe_ready', 'caustic_breath',
+      'cinderburst', 'claim_blessing', 'cleanse', 'corpse_raise', 'feed_the_fire', 'focus',
+      'funeral_drum', 'gate', 'haste_ritual', 'hero_action', 'overfeed', 'rebirth', 'repair',
+      'ride_by_attack', 'shroud_of_preservation', 'splash', 'follow_through', 'overrun',
+      'shockwave', 'collision', 'three_headed_strike', 'life_drain', 'slow', 'infect', 'curse',
+      'blood_frenzy', 'absorbed', 'absorb', 'drain_morale', 'blind', 'burn_apply', 'burn',
+      'bind', 'bind_block',
+    ];
+    for (const effect of emitted) {
+      const text = describe_({
+        effect, unitId: 'e1', sourceId: 'g1', casterId: 'g1', targetId: 'g1',
+        actionId: 'charge', damage: 4, count: 2, heal: 3, penalty: 5, bonus: 2,
+        lost: 5, sacrificed: 1, overheal: 6,
+      });
+      expect(text, `${effect} leaked an id: ${text}`).not.toMatch(/[a-z]_[a-z]/);
+    }
   });
 });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import type { BattleState, Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
   import { effectiveAttack, effectiveDefense } from '$lib/engine/combat';
@@ -241,7 +242,7 @@
                   <a href={entryHref('ability', ability)} target="_blank" rel="noopener" class="hover:underline">{info.label}</a>
                 </p>
               {/if}
-              <p class="ability-desc leading-tight text-slate-400 {sz.ability}">{info.description}</p>
+              <p class="ability-desc leading-tight text-slate-400 {sz.ability}"><KeywordText text={info.description} /></p>
             </div>
           {/each}
         </div>

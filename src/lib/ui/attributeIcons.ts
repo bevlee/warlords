@@ -1,3 +1,7 @@
+// Icon files are named for the stat they show, with one rule: never give an
+// asset a name a content blocker recognises. This was `count.png`, which
+// EasyPrivacy-style lists match as a tracking pixel — privacy browsers blocked
+// it and the whole eager glob failed to load, taking the route with it.
 const icons = import.meta.glob('../assets/attributes/*.png', {
   eager: true,
   query: '?url',
@@ -14,7 +18,7 @@ const byId = new Map(
 export type AttributeIconId =
   | 'attack'
   | 'cost'
-  | 'count'
+  | 'units'
   | 'damage'
   | 'defense'
   | 'hp'

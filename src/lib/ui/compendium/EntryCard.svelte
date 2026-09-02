@@ -5,6 +5,7 @@
   import { skillIconFor, skillGlyph } from '../skillIcons';
   import Sprite from '../Sprite.svelte';
   import ItemIcon from '../ItemIcon.svelte';
+  import { stripKeywords } from '$lib/compendium/keywords';
   import { spellIconFor } from '../spellIcons';
 
   interface Props {
@@ -40,7 +41,7 @@
       case 'factionSkill':
         return `Unlocks at level ${entry.unlockLevel}`;
       case 'item':
-        return entry.effect;
+        return stripKeywords(entry.effect);
       case 'unitSkill':
         return 'Gauntlet draft';
     }
@@ -108,6 +109,14 @@
     {#if entry.kind === 'unit' && entry.abilities.length > 0}
       <span class="mt-0.5 block truncate text-[10px] leading-tight text-amber-400/80">
         {entry.abilities.map((a) => abilityInfo(a.id, a.level).label).join(' · ')}
+      </span>
+    {/if}
+    <!-- An artifact you cannot draft without the right unit is worth seeing
+         before you open it — it is the difference between a live pick and a
+         line of flavour text. -->
+    {#if entry.kind === 'item' && entry.requiresUnit.length > 0}
+      <span class="mt-0.5 block truncate text-[10px] leading-tight text-amber-400/80">
+        Needs {entry.requiresUnit.join(' or ')}
       </span>
     {/if}
   </span>

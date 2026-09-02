@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import { FACTION_UNITS, FACTION_INFO } from '$lib/engine/factions';
   import { UNIT_COSTS, MAX_STACKS, armyCost, recruitLimit } from '$lib/engine/recruit';
   import { xpToReach, maxRecruitTier } from '$lib/engine/progression';
@@ -87,7 +88,7 @@
       <div>
         <p class="text-[11px] font-bold uppercase tracking-widest text-slate-500">Chapter {encounter.chapter}</p>
         <h2 class="text-lg font-bold text-amber-200">{encounter.name}</h2>
-        <p class="mt-0.5 max-w-lg text-sm text-slate-400">{encounter.description}</p>
+        <p class="mt-0.5 max-w-lg text-sm text-slate-400"><KeywordText text={encounter.description} /></p>
         {#if encounter.special}
           <p class="mt-1 text-xs italic text-amber-400">{encounter.special}</p>
         {/if}

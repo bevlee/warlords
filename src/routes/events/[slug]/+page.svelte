@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import { page } from '$app/state';
   import Countdown from '$lib/ui/Countdown.svelte';
   import PartyRoster from '$lib/ui/PartyRoster.svelte';
@@ -31,7 +32,7 @@
             Live · Co-op PvE
           </div>
           <h1 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-50">{ev.name}</h1>
-          <p class="mt-1 text-sm text-slate-300/90">{ev.description}</p>
+          <p class="mt-1 text-sm text-slate-300/90"><KeywordText text={ev.description} /></p>
 
           <div class="mt-4"><Countdown endsAt={ev.endsAt} /></div>
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { stripKeywords } from '$lib/compendium/keywords';
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import type { UnitStack } from '$lib/engine/types';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
   import { abilityInfo } from './abilities';
@@ -155,7 +157,7 @@
               type="button"
               class="slot ability-slot"
               aria-label={slot.ability.info.label}
-              title="{slot.ability.info.label} — {slot.ability.info.description}"
+              title="{slot.ability.info.label} — {stripKeywords(slot.ability.info.description)}"
               disabled={!slot.ability.enabled}
               onclick={() => onability?.(slot.ability.id)}
             >
@@ -193,7 +195,7 @@
             <a href={entryHref('ability', ability.id)} target="_blank" rel="noopener">{ability.label}</a>
             {#if ability.taught}<span class="taught-tag">taught</span>{/if}
           </p>
-          <p class="passive-desc">{ability.description}</p>
+          <p class="passive-desc"><KeywordText text={ability.description} /></p>
         </div>
       {:else}
         <p class="passive-desc none">This stack has no passive abilities.</p>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import { getCurrentSeason, getPastEvents } from '$lib/events/season';
 
   const season = getCurrentSeason();
@@ -29,7 +30,7 @@
           Co-op PvE
         </div>
         <h2 class="mt-2 text-xl font-extrabold text-slate-50">{season.name}</h2>
-        <p class="mt-1 text-sm text-slate-400">{season.description}</p>
+        <p class="mt-1 text-sm text-slate-400"><KeywordText text={season.description} /></p>
         <span class="mt-4 inline-block rounded-xl bg-gradient-to-r from-sky-300 to-indigo-400 px-4 py-2 text-sm font-extrabold text-slate-900">
           Enter event →
         </span>

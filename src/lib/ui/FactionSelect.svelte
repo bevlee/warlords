@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KeywordText from '$lib/ui/keyword/KeywordText.svelte';
   import { FACTION_UNITS, FACTION_INFO } from '$lib/engine/factions';
   import Sprite from './Sprite.svelte';
   import { heroSpriteName } from './sprites';
@@ -48,7 +49,7 @@
             <Sprite name={heroSpriteName(cls)} class="h-12 w-10 shrink-0" />
             <p class="text-sm font-semibold text-slate-100">{info.name}</p>
           </div>
-          <p class="mt-1.5 flex-1 text-[11px] leading-tight text-slate-400">{info.description}</p>
+          <p class="mt-1.5 flex-1 text-[11px] leading-tight text-slate-400"><KeywordText text={info.description} /></p>
           <div class="mt-2 flex items-end gap-1 border-t border-slate-700/60 pt-2">
             {#each taster(cls) as unit (unit.name)}
               <Sprite name={unit.name} class="h-8 w-7 shrink-0" />
