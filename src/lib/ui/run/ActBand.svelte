@@ -17,11 +17,8 @@
 </script>
 
 <script lang="ts">
-  import Sprite from '$lib/ui/Sprite.svelte';
-  import Keyword from '$lib/ui/keyword/Keyword.svelte';
-  import { unitSlug } from '$lib/ui/sprites';
+  import StackChip from './StackChip.svelte';
   import { FACTION_INFO } from '$lib/engine/factions';
-  import { TIER_STYLE } from '$lib/ui/tierStyle';
   import {
     actOf,
     generateGauntletEnemy,
@@ -128,18 +125,11 @@
     </div>
 
     <div class="mt-3 flex flex-wrap items-end gap-3">
-      <ul class="flex flex-1 flex-wrap gap-2">
+      <div class="flex flex-1 flex-wrap gap-2">
         {#each encounter.army as slot (slot.unit.name)}
-          {@const ts = TIER_STYLE[slot.unit.tier]}
-          <li class="flex items-center gap-2 rounded border border-slate-700 bg-slate-900/70 px-2 py-1">
-            <span class="rounded ring-1 {ts.ring}"><Sprite name={slot.unit.name} class="h-8 w-7" /></span>
-            <span class="text-sm {ts.text}">
-              {slot.count} ×
-              <Keyword entryKind="unit" id={unitSlug(slot.unit.name)} label={slot.unit.name} />
-            </span>
-          </li>
+          <StackChip unit={slot.unit} count={slot.count} />
         {/each}
-      </ul>
+      </div>
 
       <button
         type="button"

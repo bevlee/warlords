@@ -4,6 +4,7 @@
   import UnitInfo from '$lib/ui/UnitInfo.svelte';
   import ArtifactCard from './ArtifactCard.svelte';
   import { previewStack } from './previewStack';
+  import { scrollCap } from './scrollCap';
   import { TIER_STYLE } from '$lib/ui/tierStyle';
   import { skillIconFor, skillGlyph } from '$lib/ui/skillIcons';
   import { FACTION_UNITS } from '$lib/engine/factions';
@@ -82,7 +83,11 @@
             Tier {unit?.tier ?? '?'} · {ts.label}
           </span>
           {#if unit}
-            <UnitInfo unit={previewStack(unit, card.count)} items={run.items} embedded />
+            <!-- A long ability list scrolls inside the card, so three cards
+                 stay the same height and the picks stay side by side. -->
+            <div class="card-scroll max-h-[26rem]" use:scrollCap>
+              <UnitInfo unit={previewStack(unit, card.count)} items={run.items} embedded />
+            </div>
           {/if}
           <button
             type="button"

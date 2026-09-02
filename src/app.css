@@ -6,10 +6,44 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Every screen is dark and paints its own slate ground, but the gutter above
+   sits outside them: on a page short enough not to scroll it showed as a white
+   strip down the edge. */
+body {
+  background: #0f172a;
+}
+
 /* The battle screen's scaled pixel: it overrides this per-viewport on its own
    root, and every length in that screen is written as calc(N * var(--fx)).
    Declared here so the components consuming it don't each carry a fallback.
    See "Fitting the screen" in src/lib/ui/Battle.svelte. */
 :root {
   --fx: 1px;
+}
+
+/* A card whose ability list is taller than its cap scrolls inside itself.
+   macOS hides overlay scrollbars until something scrolls, so the track below
+   is styled for the platforms that reserve one, and `scrollCap` adds
+   `data-more` to fade the bottom edge wherever the bar is invisible. */
+.card-scroll[data-more] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+}
+
+.card-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #475569 rgb(30 41 59 / 0.8);
+}
+
+.card-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+.card-scroll::-webkit-scrollbar-track {
+  background: rgb(30 41 59 / 0.8);
+}
+
+.card-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
 }
