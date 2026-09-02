@@ -7,6 +7,7 @@
   import { attributeIconFor } from './attributeIcons';
   import { entryHref } from '$lib/compendium/entries';
   import Sprite from './Sprite.svelte';
+  import type { HeroActionView } from './heroActionDisplay';
 
   // The battle screen's bottom band: everything the acting stack can do, in one
   // strip. Sized entirely off `--fx`, the scaled pixel published by
@@ -20,7 +21,8 @@
     spellbookOpen: boolean;
     /** Activated abilities the acting stack can use this turn, already gated by
      *  the engine's canActivate — `enabled` is the whole rule, not a hint. */
-    abilities?: { id: string; info: { label: string; description: string }; enabled: boolean }[];
+    abilities?: { id: string; info: { label: string; description: string }; enabled: boolean; view?: HeroActionView }[];
+    selectedAbilityId?: string | null;
     onwait: () => void;
     ondefend: () => void;
     /** Hovering an action projects its effect onto the turns bar. Null on
@@ -36,6 +38,7 @@
     isHeroTurn,
     spellbookOpen,
     abilities = [],
+    selectedAbilityId = null,
     onwait,
     ondefend,
     onpreview,
@@ -132,9 +135,29 @@
   <div class="rule" aria-hidden="true"></div>
 
   <!-- Active abilities: the hero's spellbook lives in the first slot. -->
-  <div class="segment column">
-    <div class="segment-body row slots">
-      {#each abilitySlots as slot, i (i)}
+  <div class="segment column {isHeroTurn && abilities.length > 0 ? 'hero-actions' : ''}">
+    {#if isHeroTurn && abilities.length > 0}
+      <div class="hero-card-list">
+        {#each abilities as ability (ability.id)}
+          <button
+            type="button"
+            class="hero-card {selectedAbilityId === ability.id ? 'selected' : ''} {!ability.enabled ? 'unavailable' : ''}"
+            aria-pressed={selectedAbilityId === ability.id}
+            aria-disabled={!ability.enabled}
+            onclick={() => onability?.(ability.id)}
+          >
+            <span class="hero-card-icon" aria-hidden="true">{ability.view?.icon ?? '✦'}</span>
+            <span class="hero-card-copy">
+              <strong>{ability.info.label}</strong>
+              <small>{ability.view?.summary ?? ability.info.description}</small>
+              {#if ability.view?.usesLabel}<em>{ability.view.usesLabel}</em>{/if}
+            </span>
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <div class="segment-body row slots">
+        {#each abilitySlots as slot, i (i)}
         {#if slot?.kind === 'spell'}
           <div class="slot-wrap">
             <button
@@ -169,9 +192,10 @@
             <span class="slot-label">—</span>
           </div>
         {/if}
-      {/each}
-    </div>
-    <span class="segment-caption">Active abilities</span>
+        {/each}
+      </div>
+    {/if}
+    <span class="segment-caption">{isHeroTurn && abilities.length > 0 ? 'Hero abilities' : 'Active abilities'}</span>
   </div>
 
   <div class="rule" aria-hidden="true"></div>
@@ -242,6 +266,43 @@
   .segment.grow {
     flex: 1;
   }
+
+  .segment.hero-actions {
+    width: calc(480 * var(--fx));
+  }
+
+  .hero-card-list {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: calc(7 * var(--fx));
+  }
+
+  .hero-card {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: calc(6 * var(--fx));
+    border-radius: calc(8 * var(--fx));
+    border: 1px solid rgb(52 211 153 / .5);
+    background: linear-gradient(180deg, rgb(6 78 59 / .42), rgb(15 23 42 / .85));
+    padding: calc(7 * var(--fx));
+    text-align: left;
+  }
+
+  .hero-card:hover:not(:disabled), .hero-card.selected {
+    border-color: #fcd34d;
+    background: linear-gradient(180deg, rgb(120 53 15 / .45), rgb(15 23 42 / .9));
+  }
+
+  .hero-card.unavailable { opacity: .58; }
+  .hero-card-icon { flex: none; font-size: calc(20 * var(--fx)); line-height: 1; }
+  .hero-card-copy { min-width: 0; }
+  .hero-card-copy strong, .hero-card-copy small, .hero-card-copy em { display: block; }
+  .hero-card-copy strong { font-size: calc(11 * var(--fx)); line-height: 1.15; color: #fde68a; }
+  .hero-card-copy small { margin-top: calc(3 * var(--fx)); font-size: calc(8.5 * var(--fx)); line-height: 1.25; color: #cbd5e1; }
+  .hero-card-copy em { margin-top: calc(3 * var(--fx)); font-size: calc(7.5 * var(--fx)); font-style: normal; color: #6ee7b7; }
 
   .segment-body {
     flex: 1;

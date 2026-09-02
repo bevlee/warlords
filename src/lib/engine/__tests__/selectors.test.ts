@@ -61,6 +61,27 @@ describe('getReachableCells', () => {
     expect(has(cells, 7, 7)).toBe(true);  // 4 steps manhattan
   });
 
+  it('allows a diagonal move through two orthogonally adjacent rocks', () => {
+    const goblin = makeStack({ ...GOBLIN, speed: 2 }, { col: 5, row: 5 }, 'player');
+    let state = makeState([goblin]);
+    state = {
+      ...state,
+      grid: setBlocked(setBlocked(state.grid, { col: 6, row: 5 }), { col: 5, row: 6 }),
+    };
+
+    const cells = getReachableCells(state.grid, goblin);
+
+    expect(has(cells, 6, 6)).toBe(true);
+  });
+
+  it('charges two movement points for a diagonal step', () => {
+    const oneSpeed = makeStack({ ...GOBLIN, speed: 1 }, { col: 5, row: 5 }, 'player');
+    const twoSpeed = makeStack({ ...GOBLIN, speed: 2 }, { col: 5, row: 5 }, 'player');
+
+    expect(has(getReachableCells(makeState([oneSpeed]).grid, oneSpeed), 6, 6)).toBe(false);
+    expect(has(getReachableCells(makeState([twoSpeed]).grid, twoSpeed), 6, 6)).toBe(true);
+  });
+
   it('does not include or path through occupied cells for walkers', () => {
     const goblin = makeStack(GOBLIN, { col: 0, row: 0 }, 'player');
     // wall of units sealing the corner: (1,0) and (0,1) and (1,1)

@@ -57,7 +57,7 @@ describe('stepsFromLogEntry: damage', () => {
     ]);
   });
 
-  it('carries the kill count on the damage step', () => {
+  it('shows the whole-creature loss instead of raw damage when anything dies', () => {
     const entry: BattleEvent = {
       type: 'attack',
       data: { attackerId: 'a1', targetId: 't1', damage: 7, killed: 3 },
@@ -65,7 +65,7 @@ describe('stepsFromLogEntry: damage', () => {
 
     const steps = stepsFromLogEntry(entry);
 
-    expect(steps).toContainEqual({ unitId: 't1', kind: 'damage', value: 7, kills: 3 });
+    expect(steps).toContainEqual({ unitId: 't1', kind: 'damage', value: 3, stackLoss: true });
   });
 
   it('omits kills from the damage step when nothing died', () => {
@@ -77,6 +77,33 @@ describe('stepsFromLogEntry: damage', () => {
     const steps = stepsFromLogEntry(entry);
 
     expect(steps).toContainEqual({ unitId: 't1', kind: 'damage', value: 7 });
+  });
+
+  it('shows raw healing when no whole creature is revived', () => {
+    const entry: BattleEvent = {
+      type: 'status',
+      data: { effect: 'life_drain', unitId: 'a1', heal: 7, revived: 0 },
+    };
+
+    expect(stepsFromLogEntry(entry)).toContainEqual({ unitId: 'a1', kind: 'heal', value: 7 });
+  });
+
+  it('shows the whole-creature gain instead of raw healing when creatures revive', () => {
+    const entry: BattleEvent = {
+      type: 'status',
+      data: { effect: 'life_drain', unitId: 'a1', heal: 27, revived: 2 },
+    };
+
+    expect(stepsFromLogEntry(entry)).toContainEqual({ unitId: 'a1', kind: 'heal', value: 2, stackGain: true });
+  });
+
+  it('uses the same healing display for Resurrect', () => {
+    const entry: BattleEvent = {
+      type: 'cast',
+      data: { spell: 'resurrect', casterId: 'h1', targetId: 'a1', heal: 40, revived: 1 },
+    };
+
+    expect(stepsFromLogEntry(entry)).toEqual([{ unitId: 'a1', kind: 'heal', value: 1, stackGain: true }]);
   });
 
   it('maps a retaliate entry to a strike lunge by the retaliator plus damage', () => {
@@ -235,6 +262,18 @@ describe('stepsFromLogEntry: movement', () => {
 
     expect(stepsFromLogEntry(entry)).toEqual([
       { unitId: 't1', kind: 'move', from: { col: 1, row: 1 }, to: { col: 4, row: 2 } },
+    ]);
+  });
+
+  it('preserves movement waypoints for path-following animation', () => {
+    const path = [{ col: 1, row: 2 }, { col: 2, row: 2 }, { col: 3, row: 1 }];
+    const entry: BattleEvent = {
+      type: 'move',
+      data: { unitId: 't1', from: { col: 1, row: 1 }, to: { col: 3, row: 1 }, path },
+    };
+
+    expect(stepsFromLogEntry(entry)).toEqual([
+      { unitId: 't1', kind: 'move', from: { col: 1, row: 1 }, to: { col: 3, row: 1 }, path },
     ]);
   });
 });

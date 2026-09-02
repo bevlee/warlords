@@ -155,7 +155,9 @@ export interface UnitStack {
   defenseBuff?: number; // battle-long defense modifier (spells add, Zombie infecting_strike subtracts)
   damageBonus?: number; // battle-long flat bonus to min and max damage (Blood Acolyte blood_frenzy)
   initiativeBonus?: number; // battle-long flat bonus to ATB fill rate (gauntlet items)
-  lastMovedFrom?: Pos;  // set when a unit moves this turn; cleared at round start (Knight jousting)
+  lastMovedFrom?: Pos;      // set when a unit moves this turn; cleared at round start
+  lastMovedDistance?: number; // resolved route length used by Pounce/Jousting/etc.
+  lastMovePath?: Pos[];     // shortest legal route, including destination but not origin
   speedBonus?: number;        // battle-long movement bonus (Ranger Logistics), set once at battle start
   speedPenalty?: number;      // temporary movement reduction (Zombie slow_on_hit); cleared at round start
   blindedUntilRound?: number; // set on blind_on_hit proc; cleared after skipping this stack's next turn

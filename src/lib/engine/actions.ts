@@ -1,6 +1,7 @@
 import type { BattleAction, BattleState, Hero, Pos, SpellId, UnitStack } from './types.ts';
 import { canActivate } from './unitAbilities.ts';
 import { chebyshevDistance } from './grid.ts';
+import { movementRoute } from './movement.ts';
 import { canShootTarget, getDartingRetreatCells, getReachableCells, isShootingBlocked } from './selectors.ts';
 
 export interface ActionContext {
@@ -120,7 +121,7 @@ export function createActionContext(state: BattleState, action: BattleAction): A
     actorId: actor.id,
     kind: action.type === 'attack' ? 'melee' : action.type === 'shoot' ? 'ranged' : action.type === 'cast' ? 'spell' : action.type as ActionContext['kind'],
     startPos: actor.isHero ? undefined : actor.pos,
-    movedDistance: to ? chebyshevDistance(actor.pos, to) : 0,
+    movedDistance: to ? movementRoute(state, actor, to, 'voluntary').distance : 0,
     primaryTargetId: targetId,
     strikeIndex: 0,
     isPrimaryHit: true,

@@ -126,13 +126,22 @@ describe('findPath', () => {
     expect(findPath(grid, { col: 1, row: 1 }, { col: 1, row: 1 })).toEqual([]);
   });
 
-  it('returns empty path for unreachable cell', () => {
+  it('finds a diagonal path between two orthogonally adjacent rocks', () => {
     const grid = createGrid(3, 3);
-    // wall off all paths to (2,1)
     grid.cells[0][1].blocked = true;
     grid.cells[1][0].blocked = true;
+
+    expect(findPath(grid, { col: 0, row: 0 }, { col: 1, row: 1 })).toEqual([
+      { col: 1, row: 1, blocked: false, occupantId: null },
+    ]);
+  });
+
+  it('returns empty path for unreachable cell', () => {
+    const grid = createGrid(3, 3);
+    // A complete rock column still seals the destination, including diagonals.
+    grid.cells[0][1].blocked = true;
+    grid.cells[1][1].blocked = true;
     grid.cells[2][1].blocked = true;
-    grid.cells[1][2].blocked = true;
     const path = findPath(grid, { col: 0, row: 1 }, { col: 2, row: 1 });
     expect(path).toEqual([]);
   });

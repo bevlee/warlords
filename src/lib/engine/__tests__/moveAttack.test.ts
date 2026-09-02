@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createGrid, placeUnits, getCell, chebyshevDistance, setBlocked } from '../grid';
+import { createGrid, placeUnits, getCell, chebyshevDistance, pathCost, setBlocked } from '../grid';
 import { applyAction } from '../battle';
 import { aiTakeTurn } from '../ai';
 import { canShootTarget, isBeyondRange, getMeleeApproaches, isShootingBlocked } from '../selectors';
@@ -58,6 +58,31 @@ describe('move logging', () => {
     expect(entry.data).toMatchObject({ unitId: rider.id, from: { col: 1, row: 1 }, to: { col: 4, row: 2 } });
   });
 
+  it('records a shortest legal walking path around occupied cells', () => {
+    const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
+    const blocker = makeStack(GOBLIN, { col: 2, row: 1 }, 'player');
+    const state = makeState([rider, blocker]);
+
+    const next = applyAction(state, { type: 'move', to: { col: 3, row: 1 } });
+    const entry = next.log.find(e => e.type === 'move')!;
+    const path = entry.data.path as Pos[];
+
+    expect(path.at(-1)).toEqual({ col: 3, row: 1, blocked: false, occupantId: null });
+    expect(path).not.toContainEqual(expect.objectContaining({ col: 2, row: 1 }));
+    expect(pathCost(rider.pos, path)).toBe(4);
+  });
+
+  it('records direct movement for flyers even when units block the line', () => {
+    const bird = makeStack(THUNDERBIRD, { col: 1, row: 1 }, 'player');
+    const blocker = makeStack(GOBLIN, { col: 2, row: 1 }, 'player');
+    const state = makeState([bird, blocker]);
+
+    const next = applyAction(state, { type: 'move', to: { col: 4, row: 1 } });
+    const entry = next.log.find(e => e.type === 'move')!;
+
+    expect(entry.data.path).toEqual([{ col: 4, row: 1 }]);
+  });
+
   it('records from and to on the move of a move+attack', () => {
     const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
     const goblins = makeStack(GOBLIN, { col: 6, row: 1 }, 'enemy', { count: 30 });
@@ -87,6 +112,19 @@ describe('attack with moveTo (move+attack)', () => {
     expect(hurtGoblins.count).toBeLessThan(30);
     expect(next.log.some(e => e.type === 'attack')).toBe(true);
     expect(next.log.some(e => e.type === 'retaliate')).toBe(false);
+  });
+
+  it('uses the walked route length for Pounce when a blocker forces a detour', () => {
+    const rider = makeStack(WOLF_RIDER, { col: 1, row: 1 }, 'player');
+    const blocker = makeStack(GOBLIN, { col: 2, row: 1 }, 'player');
+    const target = makeStack(GOBLIN, { col: 4, row: 1 }, 'enemy', { count: 30 });
+    const state = makeState([rider, blocker, target]);
+
+    const next = applyAction(state, { type: 'attack', targetId: target.id, moveTo: { col: 3, row: 1 } });
+    const moved = next.units.find(unit => unit.id === rider.id)!;
+
+    expect(moved.lastMovedDistance).toBe(4);
+    expect(next.log.some(entry => entry.type === 'retaliate')).toBe(false);
   });
 });
 

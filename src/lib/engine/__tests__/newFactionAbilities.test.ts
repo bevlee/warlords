@@ -3,7 +3,7 @@ import { initBattle, applyAction } from '../battle';
 import { resolveDamagePacket } from '../combat';
 import { setOccupant } from '../grid';
 import { getDartingRetreatCells, getReachableCells } from '../selectors';
-import { GOBLIN } from '../barbarian';
+import { GOBLIN, RAM_RIDER } from '../barbarian';
 import { DENDROID, GRAND_ELF, SPRITE, UNICORN } from '../ranger';
 import { EFREET } from '../demon';
 import type { BattleState, Hero, Pos } from '../types';
@@ -28,6 +28,21 @@ function adjacentBattle(attackerDef: typeof GOBLIN, className: Hero['class'], ra
 }
 
 describe('redesigned faction abilities', () => {
+  it('pushes with Battering Ram without advancing the Ram Rider', () => {
+    const { state, attackerId, targetId } = adjacentBattle(RAM_RIDER, 'barbarian');
+    const charged = {
+      ...state,
+      units: state.units.map(unit => unit.id === attackerId
+        ? { ...unit, lastMovedFrom: { col: 1, row: 4 }, lastMovedDistance: 3 }
+        : unit),
+    };
+
+    const next = applyAction(charged, { type: 'attack', targetId });
+
+    expect(next.units.find(unit => unit.id === attackerId)?.pos).toEqual({ col: 4, row: 4 });
+    expect(next.units.find(unit => unit.id === targetId)?.pos).toEqual({ col: 6, row: 4 });
+  });
+
   it('scales Burn from the stored actual Gauntlet Rank', () => {
     const { state, attackerId, targetId } = adjacentBattle(EFREET, 'demon', 4);
     const afterHit = applyAction(state, { type: 'attack', targetId });

@@ -92,4 +92,22 @@ describe('describeEvent', () => {
     const line = describeEvent({ type: 'death', data: { unitId: 'e1' } }, units, HERO);
     expect(textOf(line)).toBe('Wild Wolfs are wiped out!');
   });
+
+  it('describes corpse raising as creature creation with the created count', () => {
+    const raised = stack('s1', 'Skeleton', 'player', { count: 3, startCount: 3 });
+    const line = describeEvent(
+      { type: 'status', data: { effect: 'corpse_raise', unitId: 's1', count: 3 } },
+      [...units, raised], HERO
+    );
+    expect(textOf(line)).toBe('3 Skeletons created from Corpse Raise.');
+  });
+
+  it('uses the singular creature name when Corpse Raise creates one unit', () => {
+    const raised = stack('s1', 'Skeleton', 'player', { count: 1, startCount: 1 });
+    const line = describeEvent(
+      { type: 'status', data: { effect: 'corpse_raise', unitId: 's1', count: 1 } },
+      [...units, raised], HERO
+    );
+    expect(textOf(line)).toBe('1 Skeleton created from Corpse Raise.');
+  });
 });

@@ -1,5 +1,5 @@
 import type { BattleState, Grid, Pos, UnitStack } from './types.ts';
-import { getNeighbours, chebyshevDistance, manhattanDistance } from './grid.ts';
+import { getCell, getNeighbours, chebyshevDistance, manhattanDistance, stepCost } from './grid.ts';
 import { modifiedDamage, modifiedDamageInBattle, applyDamage, applyStrike } from './combat.ts';
 import { hasArtifact } from './artifacts.ts';
 
@@ -13,36 +13,49 @@ export function effectiveSpeed(unit: UnitStack, state?: BattleState): number {
 }
 
 /**
- * Empty cells the unit can move to this turn: BFS from its position,
- * at most `speed` steps. Walkers cannot path through occupants; flyers
- * pass over them but cannot land on them. The start cell is excluded.
+ * Empty cells the unit can move to this turn, spending at most `speed`
+ * movement points. Cardinal steps cost one and diagonals cost two. Walkers
+ * cannot path through occupants; flyers pass over them but cannot land on
+ * them. The start cell is excluded.
  */
 export function getReachableCells(grid: Grid, unit: UnitStack, state?: BattleState): Pos[] {
   const teleport = unit.definition.abilities.includes('teleport');
   const flying = unit.definition.abilities.includes('flying') || teleport;
   const key = (p: Pos) => `${p.col},${p.row}`;
-  const visited = new Set<string>([key(unit.pos)]);
+  const costs = new Map<string, number>([[key(unit.pos), 0]]);
+  const settled = new Set<string>();
   const reachable: Pos[] = [];
-  let frontier: Pos[] = [unit.pos];
 
-  const movement = teleport ? Math.max(grid.width, grid.height) : effectiveSpeed(unit, state);
-  for (let step = 0; step < movement; step++) {
-    const next: Pos[] = [];
-    for (const pos of frontier) {
-      for (const nb of getNeighbours(grid, pos.col, pos.row)) {
-        const k = key(nb);
-        if (visited.has(k)) continue;
-        // A cell you can end your move on: empty ground, no rock, no occupant.
-        const landable = nb.occupantId === null && !nb.blocked;
-        // Walkers cannot enter a rock or an occupied cell at all; flyers pass
-        // straight over both but still cannot land on them.
-        if (!landable && !flying) continue;
-        visited.add(k);
-        next.push({ col: nb.col, row: nb.row });
-        if (landable) reachable.push({ col: nb.col, row: nb.row });
+  const budget = teleport ? Math.max(grid.width, grid.height) : effectiveSpeed(unit, state);
+  for (;;) {
+    let bestKey: string | null = null;
+    let bestCost = Infinity;
+    for (const [candidate, cost] of costs) {
+      if (!settled.has(candidate) && cost < bestCost) {
+        bestKey = candidate;
+        bestCost = cost;
       }
     }
-    frontier = next;
+    if (bestKey === null) break;
+    settled.add(bestKey);
+
+    const [col, row] = bestKey.split(',').map(Number);
+    const pos = { col, row };
+    const cell = getCell(grid, col, row);
+    if (bestKey !== key(unit.pos) && cell && cell.occupantId === null && !cell.blocked) {
+      reachable.push(pos);
+    }
+
+    for (const nb of getNeighbours(grid, pos.col, pos.row)) {
+      const k = key(nb);
+      if (settled.has(k)) continue;
+      // Walkers cannot enter a rock or an occupied cell at all; flyers pass
+      // straight over both but still cannot land on them.
+      if (!flying && (nb.occupantId !== null || nb.blocked)) continue;
+      const nextCost = bestCost + stepCost(pos, nb);
+      if (nextCost > budget || nextCost >= (costs.get(k) ?? Infinity)) continue;
+      costs.set(k, nextCost);
+    }
   }
   return reachable;
 }

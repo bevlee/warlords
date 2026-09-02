@@ -40,6 +40,23 @@ describe('signedModifier', () => {
 });
 
 describe('activeEffects', () => {
+  it('shows controller-wide enemy Veterancy with the values combat uses', () => {
+    const unit = makeStack({ controllerId: 'enemy' });
+    const battle = {
+      controllerStats: {
+        enemy: { attack: 5, defense: 5, label: 'Enemy Veterancy' },
+      },
+    } as unknown as BattleState;
+
+    expect(activeEffects(unit, null, battle)).toContainEqual({
+      id: 'controller-stats:enemy',
+      label: 'Enemy Veterancy',
+      value: 'ATK +5 · DEF +5',
+      detail: 'Encounter-wide bonus included in this stack’s effective Attack and Defence.',
+      tone: 'buff',
+    });
+  });
+
   it('lists each named cause separately and combines only repeated applications', () => {
     const unit = makeStack({
       side: 'player',
@@ -161,6 +178,18 @@ describe('activeEffects', () => {
       tone: 'buff',
     });
     expect(effects.some(effect => effect.label === 'Other speed modifier')).toBe(false);
+  });
+
+  it('removes the opening Banner from the unit panel after its effect expires', () => {
+    const unit = makeStack({
+      side: 'player',
+      controllerId: 'player',
+      empoweredTurnsRemaining: 0,
+      abilityState: { bannerSpeed: 0 },
+    });
+    const battle = { artifacts: { player: ['banner_of_the_first_raid'] } } as unknown as BattleState;
+
+    expect(activeEffects(unit, null, battle).some(effect => effect.id === 'banner-of-the-first-raid')).toBe(false);
   });
 
   it('adds descriptions to combat effects without duplicating their named stat source', () => {

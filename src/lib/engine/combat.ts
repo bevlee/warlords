@@ -174,7 +174,7 @@ export function modifiedDamage(
 
   // Knight Jousting: cavalry deals +5% damage per cell moved before this attack.
   if (attacker.definition.abilities.includes('jousting') && attacker.lastMovedFrom) {
-    const cellsMoved = chebyshevDistance(attacker.pos, attacker.lastMovedFrom);
+    const cellsMoved = attacker.lastMovedDistance ?? chebyshevDistance(attacker.pos, attacker.lastMovedFrom);
     if (cellsMoved > 0) totalDamage *= 1 + 0.05 * cellsMoved;
   }
 

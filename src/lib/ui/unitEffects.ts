@@ -7,7 +7,7 @@ import type {
   UnitStack,
 } from '$lib/engine/types';
 import { chebyshevDistance } from '$lib/engine/grid';
-import { artifactIdsFor } from '$lib/engine/artifacts';
+import { artifactIdsFor, controllerOfUnit } from '$lib/engine/artifacts';
 
 export type EffectTone = 'buff' | 'debuff' | 'status';
 
@@ -290,6 +290,26 @@ export function activeEffects(
     }
   }
 
+  const controllerStats = battle?.controllerStats?.[controllerOfUnit(unit)];
+  if (controllerStats && (controllerStats.attack !== 0 || controllerStats.defense !== 0)) {
+    const values = [
+      controllerStats.attack !== 0 ? `ATK ${signedModifier(controllerStats.attack)}` : null,
+      controllerStats.defense !== 0 ? `DEF ${signedModifier(controllerStats.defense)}` : null,
+    ].filter((value): value is string => value !== null);
+    const numeric = [controllerStats.attack, controllerStats.defense].filter(value => value !== 0);
+    effects.push({
+      id: `controller-stats:${controllerOfUnit(unit)}`,
+      label: controllerStats.label ?? 'Controller bonus',
+      value: values.join(' · '),
+      detail: 'Encounter-wide bonus included in this stack’s effective Attack and Defence.',
+      tone: numeric.every(value => value > 0)
+        ? 'buff'
+        : numeric.every(value => value < 0)
+          ? 'debuff'
+          : 'status',
+    });
+  }
+
   const combatEffects = unit.effects ?? [];
   const sources = unit.modifierSources ?? [];
   effects.push(...sources.map(source => sourceEffect(
@@ -344,7 +364,7 @@ export function activeEffects(
   }
 
   if (unit.definition.abilities.includes('jousting') && unit.lastMovedFrom) {
-    const distance = chebyshevDistance(unit.pos, unit.lastMovedFrom);
+    const distance = unit.lastMovedDistance ?? chebyshevDistance(unit.pos, unit.lastMovedFrom);
     if (distance > 0) {
       effects.push({
         id: 'jousting',

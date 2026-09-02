@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BattleState, Pos, UnitStack } from '$lib/engine/types';
+  import { stepCost } from '$lib/engine/grid';
   import type { DamagePreview } from '$lib/engine/selectors';
   import type { AnimStep } from './animSteps';
   import { pickScreenOrigin, type ScreenOrigin, type ScreenPoint } from './aim';
@@ -87,19 +88,47 @@
   const CELL_X = 100 / 0.92;
   const CELL_Y = 100 / 1.18;
 
+  type PathMotion = { keyframes: Keyframe[]; duration: number };
+
+  function followPath(node: HTMLElement, initial?: PathMotion) {
+    let running: Animation | null = null;
+    const play = (motion?: PathMotion) => {
+      running?.cancel();
+      running = motion
+        ? node.animate(motion.keyframes, { duration: motion.duration, easing: 'linear' })
+        : null;
+    };
+    play(initial);
+    return {
+      update: play,
+      destroy: () => running?.cancel(),
+    };
+  }
+
   // Per-standee animation for the current beat. This is the seam for richer
   // combat animation later: add a step kind in animSteps.ts, then map it here
   // to a class plus CSS vars (and keyframes below). All animations run in the
   // board plane — translate before the rotateX that stands the token up.
   const standeeAnim = $derived.by(() => {
-    const map = new Map<string, { cls: string; style: string }>();
+    const map = new Map<string, { cls: string; style: string; motion?: PathMotion }>();
     const ms = `--anim-ms: ${Math.round(stepMs * 0.9)}ms;`;
     for (const { unitId, step } of activeSteps) {
       if (step.kind === 'move') {
-        // Slide: start translated back at the source cell, settle in place.
-        const dx = (step.from.col - step.to.col) * CELL_X;
-        const dy = (step.from.row - step.to.row) * CELL_Y;
-        map.set(unitId, { cls: 'sliding', style: `--slide-x: ${dx}%; --slide-y: ${dy}%; ${ms}` });
+        // The engine supplies the shortest legal route. Render each waypoint
+        // relative to the destination cell, where the moved token now lives.
+        const points = [step.from, ...(step.path?.length ? step.path : [step.to])];
+        const costs = [0];
+        for (let i = 1; i < points.length; i++) costs.push(costs[i - 1] + stepCost(points[i - 1], points[i]));
+        const total = costs.at(-1) || 1;
+        const keyframes = points.map((point, i) => ({
+          transform: `translate(${(point.col - step.to.col) * CELL_X}%, ${(point.row - step.to.row) * CELL_Y}%) rotateX(calc(-1 * var(--tilt)))`,
+          offset: costs[i] / total,
+        }));
+        map.set(unitId, {
+          cls: 'path-sliding',
+          style: ms,
+          motion: { keyframes, duration: Math.round(stepMs * 0.9) },
+        });
       } else if (step.kind === 'strike') {
         // Melee lunge: bump ~45% of a cell toward the target and spring back.
         const attacker = unitsById.get(unitId);
@@ -501,6 +530,7 @@
               class:hover-glow={occupant.id === hoveredId}
               class:dying={dyingIds.has(occupant.id)}
               style={anim?.style ?? ''}
+              use:followPath={anim?.motion}
             >
               <UnitToken unit={occupant} active={occupant.id === activeId} dying={dyingIds.has(occupant.id)} />
             </div>
@@ -702,20 +732,8 @@
     transform-origin: 50% 100%;
   }
 
-  /* Move beat: slide from the source cell into place. The translate runs in
-     the board plane (before the rotateX that stands the token up). */
-  .token-standing.sliding {
-    animation: standee-slide var(--anim-ms, 400ms) ease-in-out;
-  }
-
-  @keyframes standee-slide {
-    from {
-      transform: translate(var(--slide-x), var(--slide-y)) rotateX(calc(-1 * var(--tilt)));
-    }
-    to {
-      transform: rotateX(calc(-1 * var(--tilt)));
-    }
-  }
+  /* Movement follows engine-provided waypoints via the Web Animations API. */
+  .token-standing.path-sliding { will-change: transform; }
 
   /* Attack beat: the attacker lunges into the target and springs back. */
   .token-standing.striking {

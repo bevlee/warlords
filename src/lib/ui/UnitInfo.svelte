@@ -1,7 +1,12 @@
 <script lang="ts">
   import type { BattleState, Hero, UnitStack } from '$lib/engine/types';
   import { maxMana } from '$lib/engine/factionSkills';
-  import { effectiveAttack, effectiveDefense } from '$lib/engine/combat';
+  import {
+    effectiveAttack,
+    effectiveAttackInBattle,
+    effectiveDefense,
+    effectiveDefenseInBattle,
+  } from '$lib/engine/combat';
   import { effectiveSpeed } from '$lib/engine/selectors';
   import { abilityInfo } from './abilities';
   import { abilityLevel } from '$lib/engine/abilityCatalog';
@@ -11,12 +16,17 @@
   import { entryHref } from '$lib/compendium/entries';
   import Sprite from './Sprite.svelte';
   import { activeEffects } from './unitEffects';
+  import { artifactInteractionsFor } from './artifactDisplay';
+  import type { ItemId } from '$lib/gauntlet/items';
+  import ItemIcon from './ItemIcon.svelte';
 
   interface Props {
     unit: UnitStack | null;
     hero?: Hero | null;
     /** Live battle context resolves artifact-upgraded effect values. */
     battle?: BattleState | null;
+    /** Army artifacts; related items are explanatory and never treated as equipped. */
+    items?: ItemId[];
     pinned?: boolean;
     onunpin?: (() => void) | null;
     /** Render inside another surface (e.g. a draft card): no own border, no pin hint. */
@@ -27,7 +37,7 @@
     size?: 'compact' | 'large' | 'rail';
   }
 
-  let { unit, hero = null, battle = null, pinned = false, onunpin = null, embedded = false, size = 'compact' }: Props = $props();
+  let { unit, hero = null, battle = null, items = [], pinned = false, onunpin = null, embedded = false, size = 'compact' }: Props = $props();
 
   const isRail = $derived(size === 'rail');
 
@@ -85,8 +95,9 @@
         { key: 'defense', value: `${hero.defense}` },
         { key: 'damage', value: `${d.minDamage}–${d.maxDamage}` },
         { key: 'initiative', value: `${d.initiative}` },
+        { key: 'morale', value: `${unit.morale}` },
+        { key: 'luck', value: `${unit.luck}` },
         { key: 'range', value: '∞' },
-        { key: 'xp', value: `${hero.xp}` },
       ];
     }
     // Every row is the final effective value used by combat. The named source
@@ -98,8 +109,14 @@
       { key: 'hp', value: `${unit.hp}/${d.hp}` },
       // Straight from the damage formula's own helpers, so an infected stack
       // shown at 0 attack is exactly what it fights at.
-      { key: 'attack', value: `${effectiveAttack(unit, heroAttack)}` },
-      { key: 'defense', value: `${effectiveDefense(unit)}` },
+      {
+        key: 'attack',
+        value: `${battle ? effectiveAttackInBattle(battle, unit) : effectiveAttack(unit, heroAttack)}`,
+      },
+      {
+        key: 'defense',
+        value: `${battle ? effectiveDefenseInBattle(battle, unit) : effectiveDefense(unit)}`,
+      },
       {
         key: 'damage',
         value: `${d.minDamage + (unit.damageBonus ?? 0)}–${d.maxDamage + (unit.damageBonus ?? 0)}`,
@@ -117,6 +134,7 @@
   });
 
   const effects = $derived(unit ? activeEffects(unit, hero, battle) : []);
+  const artifactInteractions = $derived(unit ? artifactInteractionsFor(unit, items) : []);
 </script>
 
 <!-- One layout for both states: right-clicking pins the panel to whatever it is
@@ -245,6 +263,19 @@
             </div>
           {/each}
         </div>
+      {/if}
+
+      {#if artifactInteractions.length > 0}
+        <section class="artifact-interactions border-t border-slate-700 pt-1.5" aria-label="Artifact interactions">
+          <h3>Artifact interactions</h3>
+          {#each artifactInteractions as interaction (interaction.id)}
+            <div class="artifact-interaction">
+              <ItemIcon id={interaction.id} class="artifact-interaction-icon" />
+              <div><strong>{interaction.name}</strong><p>{interaction.description}</p></div>
+            </div>
+          {/each}
+          <p class="artifact-scope">Army-owned synergy; not equipped by this unit.</p>
+        </section>
       {/if}
     {:else}
       <p class="empty-hint text-lg text-slate-500">Hover a unit to inspect it. Right-click to pin.</p>
@@ -434,6 +465,41 @@
     font-size: calc(11 * var(--fx));
     text-wrap: pretty;
   }
+
+  .artifact-interactions h3 {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fbbf24;
+  }
+
+  .artifact-interaction {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+  }
+
+  .artifact-interaction :global(.artifact-interaction-icon) {
+    width: 1.35rem;
+    height: 1.35rem;
+    flex: none;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+
+  .artifact-interaction strong { display: block; font-size: 0.72rem; color: #fde68a; }
+  .artifact-interaction p { margin: 0.1rem 0 0; font-size: 0.66rem; line-height: 1.25; color: #94a3b8; }
+  .artifact-scope { margin: 0.4rem 0 0; font-size: 0.6rem; font-style: italic; color: #64748b; }
+
+  .rail .artifact-interactions h3 { font-size: calc(9 * var(--fx)); }
+  .rail .artifact-interaction { gap: calc(5 * var(--fx)); margin-top: calc(4 * var(--fx)); }
+  .rail .artifact-interaction :global(.artifact-interaction-icon) { width: calc(18 * var(--fx)); height: calc(18 * var(--fx)); }
+  .rail .artifact-interaction strong { font-size: calc(10.5 * var(--fx)); }
+  .rail .artifact-interaction p { font-size: calc(9.5 * var(--fx)); }
+  .rail .artifact-scope { font-size: calc(8.5 * var(--fx)); }
 
   .rail .empty-hint {
     font-size: calc(12.5 * var(--fx));

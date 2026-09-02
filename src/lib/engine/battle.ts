@@ -183,7 +183,9 @@ function withHeroBonus(
 function attackMultiplier(state: BattleState, attacker: UnitStack, defender: UnitStack, ranged: boolean, retaliation: boolean): number {
   let multiplier = 1;
   const abilities = attacker.definition.abilities;
-  const moved = attacker.lastMovedFrom ? chebyshevDistance(attacker.pos, attacker.lastMovedFrom) : 0;
+  const moved = attacker.lastMovedFrom
+    ? (attacker.lastMovedDistance ?? chebyshevDistance(attacker.pos, attacker.lastMovedFrom))
+    : 0;
   if ((attacker.empoweredTurnsRemaining ?? 0) > 0 && !retaliation) multiplier *= mechanicParam(state, attacker, 'banner_of_the_first_raid', 'damage', 1.3);
   if (retaliation && factionUnit(state, attacker, 'knight') && heroSystemState(state, attacker).activeOrder === 'ready_the_counterattack' && !attacker.abilityState?.counterattackUsed) multiplier *= 1.5;
   if (retaliation && attacker.definition.name === 'Griffin' && hasArtifact(state, attacker, 'gryphon_talon_bracers')) multiplier *= 1.5;
@@ -1594,7 +1596,8 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     }
     const from = actor.pos;
     nextState = moveStack(nextState, actor.id, action.to, { kind: 'voluntary' });
-    nextState.log = [...nextState.log, { type: 'move', data: { unitId: actorId, from, to: action.to } }];
+    const mover = nextState.units.find(unit => unit.id === actor.id)!;
+    nextState.log = [...nextState.log, { type: 'move', data: { unitId: actorId, from, to: action.to, path: mover.lastMovePath } }];
 
   } else if (action.type === 'attack') {
     const targetId = action.targetId;
@@ -1609,7 +1612,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     } else if (action.moveTo) {
       nextState = moveStack(nextState, actor.id, action.moveTo, { kind: 'voluntary' });
       attacker = nextState.units.find(unit => unit.id === actor.id)!;
-      nextState.log = [...nextState.log, { type: 'move', data: { unitId: actorId, from: attacker.lastMovedFrom, to: action.moveTo } }];
+      nextState.log = [...nextState.log, { type: 'move', data: { unitId: actorId, from: attacker.lastMovedFrom, to: action.moveTo, path: attacker.lastMovePath } }];
     }
 
     const wasSoaring = !!attacker.abilityState?.soaring;
@@ -1660,7 +1663,9 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     }
     nextState = flushBloodTithe(nextState, actorId);
 
-    const movedDistance = attacker.lastMovedFrom ? chebyshevDistance(attacker.pos, attacker.lastMovedFrom) : 0;
+    const movedDistance = attacker.lastMovedFrom
+      ? (attacker.lastMovedDistance ?? chebyshevDistance(attacker.pos, attacker.lastMovedFrom))
+      : 0;
     const dealSecondary = (victim: UnitStack, amount: number, id: string, type: 'physical' | 'magic' = 'physical', attributes?: Array<'lightning' | 'fire'>) => {
       const packetRng = rngFor(nextState.seed, nextState.actionSeq ?? 0, 'damage', id, victim.id);
       const hit = resolveDamagePacket(nextState, {
@@ -1715,8 +1720,6 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       nextState = moveStack(nextState, target.id, destination, { kind: 'forced' });
       if (nextState === beforePush) {
         dealSecondary(resolvedVictim, damage * (hasArtifact(nextState, attacker, 'ironbound_horns') ? 0.5 : 0.25), 'collision');
-      } else if (!nextState.grid.cells[target.pos.row][target.pos.col].occupantId) {
-        nextState = moveStack(nextState, attacker.id, target.pos, { kind: 'advance' });
       }
     }
 

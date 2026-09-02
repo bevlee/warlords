@@ -36,7 +36,7 @@
   import TurnBar from './TurnBar.svelte';
   import UnitInfo from './UnitInfo.svelte';
   import ArtifactStrip from './ArtifactStrip.svelte';
-  import { ITEMS, type ItemId } from '$lib/gauntlet/items';
+  import type { ItemId } from '$lib/gauntlet/items';
   import Sprite from './Sprite.svelte';
   import { heroSpriteName, unitSlug } from './sprites';
   import { recordSeen } from '$lib/compendium/discovery';
@@ -52,6 +52,12 @@
   import BattleDebugDrawer from './BattleDebugDrawer.svelte';
   import { formationFromBattle, type SavedFormation } from '$lib/engine/deployment';
   import { validateAction } from '$lib/engine/actions';
+  import HeroActionDetails from './HeroActionDetails.svelte';
+  import HeroSheet from './HeroSheet.svelte';
+  import ActiveHeroBanner from './ActiveHeroBanner.svelte';
+  import ArtifactDetails from './ArtifactDetails.svelte';
+  import { activeHeroEffect, heroActionViews, type HeroActionView } from './heroActionDisplay';
+  import { artifactModifierSources } from './artifactDisplay';
 
   interface Props {
     playerArmy: ArmySlot[];
@@ -121,12 +127,7 @@
 
   // A battle snapshots its armies at start; later prop changes are irrelevant.
   // svelte-ignore state_referenced_locally
-  const modifierSources = items.map(id => ({
-    id: `item:${id}`,
-    label: ITEMS[id].name,
-    stats: { ...ITEMS[id].effects },
-    stacks: 1,
-  }));
+  const modifierSources = artifactModifierSources(items);
   // svelte-ignore state_referenced_locally
   const training = Object.fromEntries(playerArmy.flatMap(slot => {
     const grants = new Set(slot.unit.grantedAbilities ?? []);
@@ -428,6 +429,9 @@
   const heroUnit = $derived(
     battle.units.find(u => u.isHero && (!online || u.controllerId === localControllerId)) ?? null
   );
+  const localHero = $derived(heroUnit ? heroFor(battle, heroUnit) : null);
+  const heroActions = $derived(heroUnit && localHero ? heroActionViews(battle, heroUnit, localHero) : []);
+  const activeHeroBanner = $derived(heroUnit && localHero ? activeHeroEffect(battle, heroUnit, localHero) : null);
   const isPlayerTurn = $derived(
     !replay && !debugOpen && !autoBattle && battle.result === 'ongoing' && !inDeploy && activeUnit !== null && activeUnit.side === 'player' &&
       (!online || activeUnit.controllerId === localControllerId)
@@ -478,38 +482,12 @@
 
   const isHeroTurn = $derived(isPlayerTurn && !!activeUnit?.isHero);
 
-  const HERO_ACTIONS: Record<Hero['class'], Array<{ id: string; label: string; description: string }>> = {
-    knight: [
-      { id: 'hold_the_line', label: 'Hold the Line', description: 'Units that finish a turn without moving become Braced.' },
-      { id: 'ready_the_counterattack', label: 'Counterattack', description: 'Each unit’s first retaliation deals 50% more damage and advances it 10% ATB.' },
-      { id: 'advance_by_ranks', label: 'Advance by Ranks', description: 'Long move-only actions beside an ally return at 50% ATB.' },
-    ],
-    ranger: [
-      { id: 'name_the_quarry', label: 'Name the Quarry', description: 'Choose an enemy; each ally’s first primary hit advances it 10% ATB.' },
-      { id: 'set_the_ambush', label: 'Set the Ambush', description: 'Choose a 3×3 area for stronger, safer opening attacks.' },
-      { id: 'open_an_escape_route', label: 'Escape Route', description: 'Choose a 3×3 area where move-only actions return at 75% ATB.' },
-    ],
-    barbarian: [
-      { id: 'charge', label: 'Charge!', description: 'Empower every friendly melee unit for its next turn.' },
-      { id: 'loose', label: 'Loose!', description: 'Empower each shooter’s next attack and save its ammunition.' },
-      { id: 'blood_for_blood', label: 'Blood for Blood!', description: 'Friendly units deal and take 50% more damage until the hero’s next turn.' },
-    ],
-    demon: [
-      { id: 'blood_offering', label: 'Blood Offering', description: 'Sacrifice 10% of a friendly stack to advance the rest of the army.' },
-      { id: 'feed_the_fire', label: 'Feed the Fire', description: 'Consume a Burn tick now and spread Burn to adjacent units.' },
-      { id: 'demonic_bargain', label: 'Demonic Bargain', description: 'Sacrifice HP to double a friendly stack’s next attack.' },
-    ],
-    necromancer: [
-      { id: 'reknit_the_dead', label: 'Reknit the Dead', description: 'Consume Skeletons to heal a wounded undead stack.' },
-      { id: 'grasping_dead', label: 'Grasping Dead', description: 'Consume five Skeletons to pin an enemy for its next turn.' },
-      { id: 'death_march', label: 'Death March', description: 'Consume ten Skeletons to advance every other undead stack.' },
-    ],
-    wizard: [],
-  };
-
   // Spell targeting: pick a spell on the hero's turn, then click a stack.
   let pendingSpell: SpellId | null = $state(null);
   let pendingActivated: { id: string; hero: boolean } | null = $state(null);
+  let selectedHeroActionId: string | null = $state(null);
+  let selectedArtifactId: ItemId | null = $state(null);
+  const selectedHeroAction = $derived(heroActions.find(action => action.id === selectedHeroActionId) ?? null);
   let pendingDarting: { targetId: string; moveTo: Pos; cells: Pos[] } | null = $state(null);
   const dartingRetreatKeys = $derived.by(() => {
     const pending = pendingDarting as { targetId: string; moveTo: Pos; cells: Pos[] } | null;
@@ -747,7 +725,12 @@
   function toggleAutoBattle() {
     autoBattle = !autoBattle;
     if (autoBattle) {
+      settingsOpen = false;
       pendingSpell = null;
+      pendingActivated = null;
+      pendingDarting = null;
+      selectedHeroActionId = null;
+      selectedArtifactId = null;
       spellbookOpen = false;
       hovered = null;
     }
@@ -847,6 +830,7 @@
     }
     if (pendingActivated) {
       if (!activatedCellKeys.has(`${pos.col},${pos.row}`)) {
+        if (pendingActivated.hero) selectedHeroActionId = null;
         pendingActivated = null;
         return;
       }
@@ -854,6 +838,7 @@
         const area: Pos[] = [];
         for (let row = pos.row - 1; row <= pos.row + 1; row++) for (let col = pos.col - 1; col <= pos.col + 1; col++) area.push({ col, row });
         takeAction({ type: 'hero_action', actionId: pendingActivated.id, area }, 'host');
+        selectedHeroActionId = null;
       } else {
         takeAction({ type: 'ability', abilityId: pendingActivated.id, to: pos }, 'host');
       }
@@ -887,6 +872,7 @@
 
     if (pendingActivated) {
       if (!activatedTargetIds?.has(unit.id)) {
+        if (pendingActivated.hero) selectedHeroActionId = null;
         pendingActivated = null;
         return;
       }
@@ -897,6 +883,7 @@
         takeAction({ type: 'ability', abilityId: pendingActivated.id, to: unit.pos }, 'host');
       } else if (pendingActivated.hero) {
         takeAction({ type: 'hero_action', actionId: pendingActivated.id, targetId: unit.id }, 'host');
+        selectedHeroActionId = null;
       } else {
         takeAction({ type: 'ability', abilityId: pendingActivated.id, targetId: unit.id }, 'host');
       }
@@ -934,15 +921,16 @@
   // rule can never disagree.
   const unitAbilities = $derived.by(() => {
     if (!activeUnit) return [];
-    if (activeUnit.isHero) return HERO_ACTIONS[heroFor(battle, activeUnit).class].map(action => {
-      const targeted = ['name_the_quarry', 'blood_offering', 'feed_the_fire', 'demonic_bargain', 'reknit_the_dead', 'grasping_dead'].includes(action.id);
-      const area = ['set_the_ambush', 'open_an_escape_route'].includes(action.id);
+    if (activeUnit.isHero) return heroActions.map(action => {
+      const targeted = action.targeting !== 'none' && action.targeting !== 'area';
+      const area = action.targeting === 'area';
       const legal = area || (targeted
         ? battle.units.some(unit => validateAction(battle, { type: 'hero_action', actionId: action.id, targetId: unit.id }))
         : validateAction(battle, { type: 'hero_action', actionId: action.id }));
       return {
         id: action.id,
         info: { label: action.label, description: action.description },
+        view: action,
         enabled: isPlayerTurn && !animating && legal,
       };
     });
@@ -964,14 +952,38 @@
     if (!isPlayerTurn || animating) return;
     pendingSpell = null;
     const heroAction = !!activeUnit?.isHero;
-    const targeted = heroAction
-      ? ['name_the_quarry', 'set_the_ambush', 'open_an_escape_route', 'blood_offering', 'feed_the_fire', 'demonic_bargain', 'reknit_the_dead', 'grasping_dead'].includes(abilityId)
-      : ['cleanse', 'repair', 'ride_by_attack', 'caustic_breath', 'gate'].includes(abilityId);
+    if (heroAction) {
+      const view = heroActions.find(action => action.id === abilityId);
+      if (!view) return;
+      selectedArtifactId = null;
+      selectedHeroActionId = abilityId;
+      const enabled = unitAbilities.some(candidate => candidate.id === abilityId && candidate.enabled);
+      pendingActivated = view.targeting === 'none' || !enabled ? null : { id: abilityId, hero: true };
+      return;
+    }
+    const targeted = ['cleanse', 'repair', 'ride_by_attack', 'caustic_breath', 'gate'].includes(abilityId);
     if (targeted) {
       pendingActivated = { id: abilityId, hero: heroAction };
       return;
     }
-    takeAction(heroAction ? { type: 'hero_action', actionId: abilityId } : { type: 'ability', abilityId }, 'host');
+    takeAction({ type: 'ability', abilityId }, 'host');
+  }
+
+  function selectedHeroActionEnabled(action: HeroActionView): boolean {
+    return unitAbilities.some(candidate => candidate.id === action.id && candidate.enabled);
+  }
+
+  function activateSelectedHeroAction() {
+    if (!selectedHeroAction || selectedHeroAction.targeting !== 'none' || !selectedHeroActionEnabled(selectedHeroAction)) return;
+    const actionId = selectedHeroAction.id;
+    selectedHeroActionId = null;
+    pendingActivated = null;
+    takeAction({ type: 'hero_action', actionId }, 'host');
+  }
+
+  function closeHeroActionDetails() {
+    selectedHeroActionId = null;
+    if (pendingActivated?.hero) pendingActivated = null;
   }
 
   function handleForfeit() {
@@ -1088,7 +1100,7 @@
       return 'Choose attack position — click or tap a highlighted tile. Click the enemy again, press Esc, or right-click to cancel.';
     }
     if (isPlayerTurn && activeUnit.isHero) {
-      return 'Your hero\'s turn — click any enemy to strike, or cast a spell.';
+      return 'Your hero\'s turn — select an ability card for details, click an enemy to strike, or cast a spell.';
     }
     if (isPlayerTurn) {
       const hints = ['highlighted cell to move'];
@@ -1125,7 +1137,12 @@
       pendingDarting = null;
     }
     else if (pendingSpell) pendingSpell = null;
-    else if (pendingActivated) pendingActivated = null;
+    else if (pendingActivated) {
+      if (pendingActivated.hero) selectedHeroActionId = null;
+      pendingActivated = null;
+    }
+    else if (selectedHeroActionId) selectedHeroActionId = null;
+    else if (selectedArtifactId) selectedArtifactId = null;
     else if (selectedId) selectedId = null;
   }
 </script>
@@ -1210,10 +1227,12 @@
             {#if !debugAvailable}
               <button
                 type="button"
-                class="flank-button"
-                aria-label="Auto battle"
-                title="Auto battle — not wired up yet"
-                disabled
+                class="flank-button {autoBattle ? 'auto-active' : ''}"
+                aria-label={autoBattle ? 'Stop auto battle' : 'Start auto battle'}
+                aria-pressed={autoBattle}
+                title={autoBattle ? 'Stop auto battle after the current action' : 'Auto battle — enemy AI controls your army'}
+                disabled={battle.result !== 'ongoing'}
+                onclick={toggleAutoBattle}
               >⏩</button>
             {/if}
           </div>
@@ -1237,6 +1256,20 @@
               </div>
               <button
                 type="button"
+                role="switch"
+                aria-checked={autoBattle}
+                class="auto-battle-toggle {autoBattle ? 'on' : ''}"
+                disabled={battle.result !== 'ongoing'}
+                onclick={toggleAutoBattle}
+              >
+                <span class="auto-battle-copy">
+                  <strong>Auto battle</strong>
+                  <small>Enemy AI controls your army</small>
+                </span>
+                <span class="auto-battle-switch" aria-hidden="true"><span></span></span>
+              </button>
+              <button
+                type="button"
                 class="settings-resign"
                 aria-label="Resign"
                 disabled={battle.result !== 'ongoing'}
@@ -1255,7 +1288,15 @@
             </div>
           {:else}
             <!-- Active artifacts: army-wide bonuses in play, tucked under the cog. -->
-            <ArtifactStrip {items} />
+            <ArtifactStrip
+              {items}
+              selected={selectedArtifactId}
+              onselect={id => {
+                selectedArtifactId = selectedArtifactId === id ? null : id;
+                selectedHeroActionId = null;
+                if (pendingActivated?.hero) pendingActivated = null;
+              }}
+            />
           {/if}
         </div>
       {/if}
@@ -1267,6 +1308,11 @@
           type="button"
           class="hero-standee {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
           aria-label="Hero — level {deployHero.level}"
+          onclick={() => {
+            selectedArtifactId = null;
+            selectedHeroActionId = null;
+            inspect(heroUnit);
+          }}
           onmouseenter={() => (hovered = heroUnit)}
           onmouseleave={() => (hovered = null)}
           oncontextmenu={e => {
@@ -1372,11 +1418,34 @@
          reclaimed width and would instead re-centre, sliding out from under the
          cursor that triggered the hover. -->
     <div class="info-rail">
-      {#if infoUnit}
+      {#if selectedHeroAction}
+        <HeroActionDetails
+          action={selectedHeroAction}
+          selected={pendingActivated?.hero === true && pendingActivated.id === selectedHeroAction.id}
+          canUse={selectedHeroActionEnabled(selectedHeroAction)}
+          onactivate={isHeroTurn && selectedHeroAction.targeting === 'none' ? activateSelectedHeroAction : undefined}
+          oncancel={closeHeroActionDetails}
+        />
+      {:else if selectedArtifactId}
+        <ArtifactDetails id={selectedArtifactId} onclose={() => (selectedArtifactId = null)} />
+      {:else if infoUnit?.isHero && localHero}
+        <HeroSheet
+          unit={infoUnit}
+          hero={localHero}
+          actions={heroActions}
+          activeEffect={activeHeroBanner}
+          onselect={id => {
+            selectedHeroActionId = id;
+            selectedArtifactId = null;
+          }}
+          onclose={() => (selectedId = null)}
+        />
+      {:else if infoUnit}
         <UnitInfo
           unit={infoUnit}
           hero={heroFor(battle, infoUnit)}
           {battle}
+          {items}
           pinned={!!selectedUnit}
           onunpin={() => (selectedId = null)}
           size="rail"
@@ -1384,6 +1453,18 @@
       {/if}
     </div>
   </div>
+
+  {#if activeHeroBanner}
+    <div class="hero-banner-band">
+      <ActiveHeroBanner
+        effect={activeHeroBanner}
+        oninspect={() => {
+          selectedArtifactId = null;
+          selectedHeroActionId = activeHeroBanner?.id ?? null;
+        }}
+      />
+    </div>
+  {/if}
 
   <!-- ══ Band 4: action dock + battle log ══ -->
   <div class="dock-band">
@@ -1394,6 +1475,7 @@
         {isHeroTurn}
         {spellbookOpen}
         abilities={unitAbilities}
+        selectedAbilityId={selectedHeroActionId}
         onwait={handleWait}
         ondefend={handleDefend}
         onpreview={action => (previewAction = action)}
@@ -1564,6 +1646,13 @@
     background: rgb(71 85 105 / 0.95);
   }
 
+  .flank-button.auto-active {
+    border-color: rgb(52 211 153 / 0.75);
+    background: rgb(6 78 59 / 0.95);
+    color: #d1fae5;
+    box-shadow: 0 0 0 2px rgb(52 211 153 / 0.12), 0 2px 8px rgb(0 0 0 / 0.4);
+  }
+
   .flank-button:disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -1590,6 +1679,53 @@
     text-transform: uppercase;
     color: #94a3b8;
   }
+
+  .auto-battle-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(9 * var(--fx));
+    margin: calc(10 * var(--fx)) 0;
+    padding: calc(8 * var(--fx));
+    border-radius: calc(6 * var(--fx));
+    border: 1px solid rgb(71 85 105 / 0.8);
+    background: rgb(30 41 59 / 0.9);
+    text-align: left;
+  }
+
+  .auto-battle-toggle:hover:not(:disabled) { background: rgb(51 65 85 / 0.95); }
+  .auto-battle-toggle.on { border-color: rgb(52 211 153 / 0.55); background: rgb(6 78 59 / 0.65); }
+  .auto-battle-toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .auto-battle-copy { display: flex; min-width: 0; flex-direction: column; gap: calc(2 * var(--fx)); }
+  .auto-battle-copy strong { color: #e2e8f0; font-size: calc(12 * var(--fx)); }
+  .auto-battle-copy small { color: #94a3b8; font-size: calc(9 * var(--fx)); line-height: 1.2; }
+
+  .auto-battle-switch {
+    position: relative;
+    width: calc(34 * var(--fx));
+    height: calc(19 * var(--fx));
+    flex: none;
+    border-radius: 999px;
+    background: #475569;
+    transition: background 150ms ease;
+  }
+
+  .auto-battle-switch span {
+    position: absolute;
+    top: calc(2 * var(--fx));
+    left: calc(2 * var(--fx));
+    width: calc(15 * var(--fx));
+    height: calc(15 * var(--fx));
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.45);
+    transition: transform 150ms ease;
+  }
+
+  .auto-battle-toggle.on .auto-battle-switch { background: #10b981; }
+  .auto-battle-toggle.on .auto-battle-switch span { transform: translateX(calc(15 * var(--fx))); }
 
   .settings-pills {
     display: flex;
@@ -1802,6 +1938,13 @@
   }
 
   /* ── dock band ──────────────────────────────────────────────────── */
+
+  .hero-banner-band {
+    flex: none;
+    width: min(calc(760 * var(--fx)), 72%);
+    height: calc(43 * var(--fx));
+    align-self: center;
+  }
 
   /* The dock's height is the one number that decides how much vertical space
      is left for the board, so tune it here rather than padding the segments:

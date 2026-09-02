@@ -59,7 +59,7 @@ export function advanceTurn(state: BattleState): BattleState {
     // Zombie slow_on_hit's speed penalty lasts until the round ends.
     finalUnits = units.map(u => {
       if (!u.lastMovedFrom && u.speedPenalty === undefined) return u;
-      const cleared = { ...u, lastMovedFrom: undefined, speedPenalty: undefined };
+      const cleared = { ...u, lastMovedFrom: undefined, lastMovedDistance: undefined, lastMovePath: undefined, speedPenalty: undefined };
       return u.speedPenalty !== undefined ? removeModifierSource(cleared, 'slow_on_hit') : cleared;
     });
   }

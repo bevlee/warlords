@@ -106,6 +106,13 @@ export function describeEvent(
     case 'status': {
       const u = unit(d.unitId);
       switch (d.effect) {
+        case 'corpse_raise': {
+          const raised = units.find(candidate => candidate.id === d.unitId);
+          const count = Number(d.count ?? raised?.count ?? 1);
+          const name = raised?.definition.name ?? 'Skeleton';
+          const creature = count === 1 ? name : `${name}s`;
+          return line(num(count), t(' '), { text: creature, controller: raised ? controllerOf(raised) : undefined }, t(' created from Corpse Raise.'));
+        }
         case 'life_drain': {
           const revived = (d.revived as number) ?? 0;
           return revived > 0

@@ -145,7 +145,7 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
   quickdraw: { label: 'Quickdraw', description: 'A first-turn ranged attack returns Orc at 50% ATB.' },
   bully: { label: 'Bully', description: 'Deals 50% more melee damage to lower-tier stacks.' },
   follow_through: { label: 'Follow Through', description: 'A primary kill transfers half its overkill to a nearby enemy.' },
-  battering_ram: { label: 'Battering Ram', description: 'A 3-cell charge deals 50% more damage and pushes or collides.' },
+  battering_ram: { label: 'Battering Ram', description: 'A 3-cell charge deals 50% more damage and pushes the target 1 tile. A blocked target takes 25% collision damage.' },
   boulder_burst: { label: 'Boulder Burst', description: 'Shots splash 50% damage to surrounding enemies.' },
   marked_quarry: { label: 'Marked Quarry', description: 'Cyclops gains stronger primary and splash damage against Marked targets.' },
   thunder_dive: { label: 'Thunder Dive', description: 'A 4-cell charge splashes Lightning damage and prevents retaliation.' },

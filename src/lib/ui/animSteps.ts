@@ -1,4 +1,4 @@
-import type { BattleEvent, BattleState, Pos } from '$lib/engine/types';
+import type { BattleEvent, BattleState, Pos, SpellId } from '$lib/engine/types';
 import { applyDamage, applyStrike } from '$lib/engine/combat';
 import { BLOOD_FRENZY_DAMAGE } from '$lib/engine/abilityCatalog';
 import { setOccupant } from '$lib/engine/grid';
@@ -26,14 +26,14 @@ const STATUS_ICON: Partial<Record<string, string>> = {
 };
 
 export type AnimStep =
-  | { unitId: string; kind: 'damage'; value: number; delayed?: boolean; kills?: number }
+  | { unitId: string; kind: 'damage'; value: number; delayed?: boolean; stackLoss?: boolean }
   | { unitId: string; kind: 'buff'; value: number; label: string; delayed?: boolean }
-  // Lifesteal floater: `revived` creatures brought back (green +N) and `topHp`
-  // the lead creature's partial health gain (red +M). Either can be 0.
-  | { unitId: string; kind: 'heal'; topHp: number; revived: number }
+  // Healing reports either raw HP restored or the number of whole creatures
+  // revived. The latter takes precedence when both values are present.
+  | { unitId: string; kind: 'heal'; value: number; stackGain?: boolean }
   | { unitId: string; kind: 'death' }
   | { unitId: string; kind: 'status'; icon: string }
-  | { unitId: string; kind: 'move'; from: Pos; to: Pos }
+  | { unitId: string; kind: 'move'; from: Pos; to: Pos; path?: Pos[] }
   // Melee lunge: the attacker bumps into the target and springs back.
   // Future combat animations (cast flashes, sprite sheets) should follow
   // this pattern: a new kind here, resolved visually in BattleGrid/BattleFx
@@ -47,17 +47,25 @@ export type AnimStep =
   // `delayed` waits for the projectile flight before flinching (ranged).
   | { unitId: string; kind: 'recoil'; fromId: string; delayed?: boolean }
   // Cast visual at the target cell: lightning bolt flash or buff glow.
-  | { unitId: string; kind: 'spell_fx'; spell: 'lightning' | 'bloodlust' | 'stoneskin' };
+  | { unitId: string; kind: 'spell_fx'; spell: Exclude<SpellId, 'resurrect'> };
 
-/** A damage floater step, carrying the stack-kill count only when something died. */
+/** Prefer the whole-creature loss over raw HP when an attack kills anything. */
 function dmgStep(unitId: string, value: number, killed?: number, delayed?: boolean): AnimStep {
+  const stackLoss = Number(killed) > 0;
   return {
     unitId,
     kind: 'damage',
-    value,
-    ...(killed && killed > 0 ? { kills: killed } : {}),
+    value: stackLoss ? Number(killed) : value,
+    ...(stackLoss ? { stackLoss: true } : {}),
     ...(delayed ? { delayed: true } : {}),
   };
+}
+
+/** Prefer the whole-creature gain over raw HP when healing revives anything. */
+function healStep(unitId: string, healed?: number, revived?: number): AnimStep | null {
+  const stackGain = Number(revived) > 0;
+  const value = stackGain ? Number(revived) : Number(healed);
+  return value > 0 ? { unitId, kind: 'heal', value, ...(stackGain ? { stackGain: true } : {}) } : null;
 }
 
 /** Translates one battle log entry into the visual steps it should play. */
@@ -89,18 +97,30 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       ];
     }
     case 'cast': {
-      const { targetId, damage, killed, spell } = entry.data as {
+      const { targetId, damage, killed, heal, revived, spell } = entry.data as {
         targetId: string;
         damage?: number;
         killed?: number;
-        spell: 'lightning' | 'bloodlust' | 'stoneskin';
+        heal?: number;
+        revived?: number;
+        spell: SpellId;
       };
-      const fx: AnimStep = { unitId: targetId, kind: 'spell_fx', spell };
       if (damage !== undefined) {
+        const fx: AnimStep = { unitId: targetId, kind: 'spell_fx', spell: spell as Exclude<SpellId, 'resurrect'> };
         return [fx, dmgStep(targetId, damage, killed, true)];
       }
-      if (spell === 'bloodlust') return [fx, { unitId: targetId, kind: 'buff', value: 4, label: 'ATK', delayed: true }];
-      if (spell === 'stoneskin') return [fx, { unitId: targetId, kind: 'buff', value: 4, label: 'DEF', delayed: true }];
+      if (heal !== undefined) {
+        const healing = healStep(targetId, heal, revived);
+        return healing ? [healing] : [];
+      }
+      if (spell === 'bloodlust') return [
+        { unitId: targetId, kind: 'spell_fx', spell },
+        { unitId: targetId, kind: 'buff', value: 4, label: 'ATK', delayed: true },
+      ];
+      if (spell === 'stoneskin') return [
+        { unitId: targetId, kind: 'spell_fx', spell },
+        { unitId: targetId, kind: 'buff', value: 4, label: 'DEF', delayed: true },
+      ];
       return [];
     }
     case 'death': {
@@ -111,10 +131,12 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       const { unitId, effect } = entry.data as { unitId: string; effect: string };
       const icon = STATUS_ICON[effect];
       const base: AnimStep[] = icon ? [{ unitId, kind: 'status', icon }] : [];
-      // Healing effects also float the numbers: green revived count + red partial HP.
-      if (effect === 'life_drain' || effect === 'absorb') {
-        const { revived = 0, topHp = 0 } = entry.data as { revived?: number; topHp?: number };
-        if (revived > 0 || topHp > 0) base.push({ unitId, kind: 'heal', revived, topHp });
+      // Healing effects report a single result: revived creatures when any
+      // return, otherwise the raw HP restored to the lead creature.
+      if (effect === 'life_drain' || effect === 'absorb' || effect === 'repair') {
+        const { heal = 0, revived = 0 } = entry.data as { heal?: number; revived?: number };
+        const healing = healStep(unitId, heal, revived);
+        if (healing) base.push(healing);
       }
       if (effect === 'blood_frenzy') {
         base.push({ unitId, kind: 'buff', value: BLOOD_FRENZY_DAMAGE, label: 'DMG' });
@@ -138,8 +160,8 @@ export function stepsFromLogEntry(entry: BattleEvent): AnimStep[] {
       return [{ unitId, kind: 'status', icon: statusIconFor(kind === 'good' ? 'good_luck' : 'bad_luck') }];
     }
     case 'move': {
-      const { unitId, from, to } = entry.data as { unitId: string; from?: Pos; to: Pos };
-      return from ? [{ unitId, kind: 'move', from, to }] : [];
+      const { unitId, from, to, path } = entry.data as { unitId: string; from?: Pos; to: Pos; path?: Pos[] };
+      return from ? [{ unitId, kind: 'move', from, to, ...(path?.length ? { path } : {}) }] : [];
     }
     default:
       return [];

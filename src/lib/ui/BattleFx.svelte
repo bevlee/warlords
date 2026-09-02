@@ -96,19 +96,13 @@
           ></span>
         {/if}
       {:else if step.kind === 'damage'}
-        <span class="fx-text fx-damage {DMG_SIZE[damageTier(step.value)]}" class:fx-delayed={step.delayed}>-{step.value}</span>
-        {#if step.kills}
-          <span class="fx-text fx-kills" class:fx-delayed={step.delayed}>-{step.kills} 💀</span>
-        {/if}
+        <span class="fx-text fx-damage {DMG_SIZE[damageTier(step.value)]}" class:fx-delayed={step.delayed}>
+          {step.stackLoss ? `−${step.value}💀` : `−${step.value}`}
+        </span>
       {:else if step.kind === 'buff'}
         <span class="fx-text fx-buff" class:fx-delayed={step.delayed}>+{step.value} {step.label}</span>
       {:else if step.kind === 'heal'}
-        {#if step.revived > 0}
-          <span class="fx-text fx-revive">+{step.revived} 🩸</span>
-        {/if}
-        {#if step.topHp > 0}
-          <span class="fx-text fx-heal-hp" class:fx-below={step.revived > 0}>+{step.topHp}</span>
-        {/if}
+        <span class="fx-text fx-heal">+{step.value}</span>
       {:else if step.kind === 'status'}
         <img src={step.icon} alt="" class="fx-text fx-status" />
       {/if}
@@ -149,19 +143,8 @@
     color: #4ade80;
   }
 
-  /* Lifesteal floaters: green for revived creatures (stack increase), red for
-     the lead creature's partial HP gain. When both show, the HP sits below. */
-  .fx-revive {
-    color: #4ade80;
-  }
-  .fx-heal-hp {
-    color: #f87171;
-  }
-  .fx-heal-hp.fx-below {
-    top: 55%;
-    animation-delay: var(--kill-lag-ms, 150ms);
-    animation-fill-mode: backwards;
-  }
+  /* Both raw healing and whole-creature stack gains read as positive. */
+  .fx-heal { color: #4ade80; }
 
   .fx-status {
     width: 3rem;
@@ -176,21 +159,6 @@
   .fx-dmg-1 { font-size: 1.25rem; }
   .fx-dmg-2 { font-size: 1.5rem; }
   .fx-dmg-3 { font-size: 1.9rem; }
-
-  /* Kill tally floats up beneath the damage number, on a slight lag so the
-     two read as separate beats of the same hit. When the damage is itself
-     delayed (ranged/spell — waits for the projectile to land), the lag stacks
-     on top of the flight time. */
-  .fx-kills {
-    top: 55%;
-    color: #e2e8f0;
-    font-size: 0.85rem;
-    animation-delay: var(--kill-lag-ms, 150ms);
-    animation-fill-mode: backwards;
-  }
-  .fx-kills.fx-delayed {
-    animation-delay: calc(var(--flight-ms, 0ms) + var(--kill-lag-ms, 150ms));
-  }
 
   /* Projectile wrapper is exactly cell-sized (inset: 0), so translate
      percentages are cell multiples: --from-x/-y are (source − target) in
