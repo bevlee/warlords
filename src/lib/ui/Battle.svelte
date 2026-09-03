@@ -55,7 +55,6 @@
   import HeroActionDetails from './HeroActionDetails.svelte';
   import HeroSheet from './HeroSheet.svelte';
   import ActiveHeroBanner from './ActiveHeroBanner.svelte';
-  import ArtifactDetails from './ArtifactDetails.svelte';
   import { activeHeroEffect, heroActionViews, type HeroActionView } from './heroActionDisplay';
   import { artifactModifierSources } from './artifactDisplay';
 
@@ -488,7 +487,6 @@
   let pendingSpell: SpellId | null = $state(null);
   let pendingActivated: { id: string; hero: boolean } | null = $state(null);
   let selectedHeroActionId: string | null = $state(null);
-  let selectedArtifactId: ItemId | null = $state(null);
   const selectedHeroAction = $derived(heroActions.find(action => action.id === selectedHeroActionId) ?? null);
   let pendingDarting: { targetId: string; moveTo: Pos; cells: Pos[] } | null = $state(null);
   const dartingRetreatKeys = $derived.by(() => {
@@ -732,7 +730,6 @@
       pendingActivated = null;
       pendingDarting = null;
       selectedHeroActionId = null;
-      selectedArtifactId = null;
       spellbookOpen = false;
       hovered = null;
     }
@@ -957,7 +954,6 @@
     if (heroAction) {
       const view = heroActions.find(action => action.id === abilityId);
       if (!view) return;
-      selectedArtifactId = null;
       selectedHeroActionId = abilityId;
       const enabled = unitAbilities.some(candidate => candidate.id === abilityId && candidate.enabled);
       pendingActivated = view.targeting === 'none' || !enabled ? null : { id: abilityId, hero: true };
@@ -1144,7 +1140,6 @@
       pendingActivated = null;
     }
     else if (selectedHeroActionId) selectedHeroActionId = null;
-    else if (selectedArtifactId) selectedArtifactId = null;
     else if (selectedId) selectedId = null;
   }
 </script>
@@ -1247,7 +1242,6 @@
             class="hero-standee {heroUnit.id === hovered?.id ? 'brightness-125' : ''}"
             aria-label="Hero — level {deployHero.level}"
             onclick={() => {
-              selectedArtifactId = null;
               selectedHeroActionId = null;
               inspect(heroUnit);
             }}
@@ -1318,15 +1312,7 @@
             </div>
           {:else}
             <!-- Active artifacts: army-wide bonuses in play, tucked under the cog. -->
-            <ArtifactStrip
-              {items}
-              selected={selectedArtifactId}
-              onselect={id => {
-                selectedArtifactId = selectedArtifactId === id ? null : id;
-                selectedHeroActionId = null;
-                if (pendingActivated?.hero) pendingActivated = null;
-              }}
-            />
+            <ArtifactStrip {items} />
           {/if}
         {/if}
       </div>
@@ -1429,8 +1415,6 @@
           onactivate={isHeroTurn && selectedHeroAction.targeting === 'none' ? activateSelectedHeroAction : undefined}
           oncancel={closeHeroActionDetails}
         />
-      {:else if selectedArtifactId}
-        <ArtifactDetails id={selectedArtifactId} onclose={() => (selectedArtifactId = null)} />
       {:else if infoUnit?.isHero && localHero}
         <HeroSheet
           unit={infoUnit}
@@ -1439,7 +1423,6 @@
           activeEffect={activeHeroBanner}
           onselect={id => {
             selectedHeroActionId = id;
-            selectedArtifactId = null;
           }}
           onclose={() => (selectedId = null)}
         />
@@ -1462,7 +1445,6 @@
       <ActiveHeroBanner
         effect={activeHeroBanner}
         oninspect={() => {
-          selectedArtifactId = null;
           selectedHeroActionId = activeHeroBanner?.id ?? null;
         }}
       />
