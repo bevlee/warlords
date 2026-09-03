@@ -68,7 +68,7 @@ export function heroActionsFor(
 
   if (hero.class === 'ranger') return [
     action('name_the_quarry', 'Name the Quarry', 'Plan', 'First hit per ally → +10% [[atb]]', 'Choose an enemy. Each allied unit’s first damaging attack against it advances that attacker by 10% [[atb]].', 'enemy', 'Until the Ranger hero’s next turn'),
-    action('set_the_ambush', 'Set the Ambush', 'Plan', 'Stronger, safer opening attacks', 'Choose a 3×3 area. Allied units attacking from it gain a stronger opening attack and a safe return.', 'area', 'Until the Ranger hero’s next turn'),
+    action('set_the_ambush', 'Set the Ambush', 'Plan', 'Stronger, safer opening attacks', "Choose a 3×3 area. Each allied unit in that area's next attack deals 30% more damage and cannot be retaliated against.", 'area', 'Until the Ranger hero’s next turn'),
     action('open_an_escape_route', 'Escape Route', 'Plan', 'Move-only actions return at 75% [[atb]]', 'Choose a 3×3 area. Allied move-only actions ending inside it return at 75% [[atb]].', 'area', 'Until the Ranger hero’s next turn'),
   ];
 

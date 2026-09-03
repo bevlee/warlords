@@ -2,12 +2,18 @@ import type { BattleState, TargetMark, UnitStack } from './types.ts';
 import { alliedTeamId, hasArtifact } from './artifacts.ts';
 
 export function addMark(target: UnitStack, mark: TargetMark): UnitStack {
-  return { ...target, marks: [...(target.marks ?? []).filter(existing => existing.kind !== mark.kind || existing.ownerTeamId !== mark.ownerTeamId), mark] };
+  return {
+    ...target,
+    marks: [
+      ...(target.marks ?? []).filter(existing => existing.kind !== mark.kind || (mark.kind !== 'marked_for_death' && existing.ownerTeamId !== mark.ownerTeamId)),
+      mark,
+    ],
+  };
 }
 
 export function marksForAttacker(state: BattleState, attacker: UnitStack, target: UnitStack): TargetMark[] {
   const team = alliedTeamId(state, attacker);
-  return (target.marks ?? []).filter(mark => mark.ownerTeamId === team);
+  return (target.marks ?? []).filter(mark => mark.kind === 'marked_for_death' || mark.ownerTeamId === team);
 }
 
 export function incomingMarkMultiplier(state: BattleState, attacker: UnitStack, target: UnitStack, ranged: boolean): number {

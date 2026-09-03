@@ -10,7 +10,7 @@ export const WIZARD_UNITS: UnitDef[] = [
   {
     name: 'Stone Golem', tier: 2, speed: 3, initiative: 6, hp: 50,
     attack: 5, defense: 10, minDamage: 4, maxDamage: 5,
-    shots: 0, range: 0, isLarge: false, abilities: ['weakness_aura', 'unlimited_retaliation'],
+    shots: 0, range: 0, isLarge: false, types: ['construct'], abilities: ['weakness_aura', 'unlimited_retaliation'],
   },
   {
     name: 'Mage', tier: 3, speed: 5, initiative: 9, hp: 25,
@@ -30,17 +30,17 @@ export const WIZARD_UNITS: UnitDef[] = [
   {
     name: 'Siege Golem', tier: 5, speed: 4, initiative: 7, hp: 110,
     attack: 12, defense: 12, minDamage: 8, maxDamage: 12,
-    shots: 0, range: 0, isLarge: true, abilities: ['crushing_blows', 'shockwave'],
+    shots: 0, range: 0, isLarge: true, types: ['construct'], abilities: ['crushing_blows', 'shockwave'],
   },
   {
     name: 'Giant', tier: 6, speed: 5, initiative: 8, hp: 200,
     attack: 22, defense: 18, minDamage: 30, maxDamage: 40,
-    shots: 2, range: 8, isLarge: true, abilities: ['boulder_throw', 'death_blow'],
+    shots: 2, range: 8, isLarge: true, types: ['construct'], abilities: ['boulder_throw', 'death_blow'],
   },
   {
     name: 'Titan', tier: 7, speed: 7, initiative: 11, hp: 300,
     attack: 30, defense: 24, minDamage: 50, maxDamage: 65,
-    shots: 3, range: 99, isLarge: true, abilities: ['armour_piercing', 'lightning_strike'],
+    shots: 3, range: 99, isLarge: true, types: ['construct'], abilities: ['armour_piercing', 'lightning_strike'],
   },
 ];
 

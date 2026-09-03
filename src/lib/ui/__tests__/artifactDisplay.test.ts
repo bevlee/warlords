@@ -15,7 +15,7 @@ describe('artifactInteractionsFor', () => {
     expect(artifactInteractionsFor(zombie, ['plague_bell'])).toEqual([{
       id: 'plague_bell',
       name: 'Plague Bell',
-      description: 'Corpses carrying [[infecting_strike]] raise twice as many Skeletons.',
+      description: 'Gravewright’s Grimoire raises twice as many creatures from enemy stacks carrying [[infecting_strike]].',
     }]);
   });
 

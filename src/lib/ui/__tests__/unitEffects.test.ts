@@ -149,7 +149,7 @@ describe('activeEffects', () => {
       expect.objectContaining({
         label: 'Marked for Death',
         value: 'DMG TAKEN +20%',
-        detail: expect.stringContaining('every unit allied with the marking unit'),
+        detail: expect.stringContaining('all sources'),
         tone: 'debuff',
       }),
     ]));

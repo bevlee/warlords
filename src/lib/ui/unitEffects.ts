@@ -169,7 +169,7 @@ const MARK_COPY: Record<TargetMark['kind'], { label: string; detail: string }> =
   },
   marked_for_death: {
     label: 'Marked for Death',
-    detail: 'Takes 20% more damage from every unit allied with the marking unit.',
+    detail: 'Takes 20% more damage from all sources.',
   },
 };
 

@@ -65,8 +65,22 @@ export const CONCEPTS: ConceptDef[] = [
     id: 'overkill',
     name: 'Overkill',
     description:
-      'Damage beyond what was needed to destroy a stack. It is normally wasted; a few abilities pass some of it ' +
+      'Damage beyond what was needed to make a [[stack]] [[perished|perish]]. It is normally wasted; a few abilities pass some of it ' +
       'on to another enemy instead.',
+  },
+  {
+    id: 'direct_attack',
+    name: 'Direct attack',
+    description:
+      'A normal melee or ranged attack aimed directly at a [[primary_target|primary target]]. Splash damage, ' +
+      'retaliations, spells and ongoing damage are not direct attacks.',
+  },
+  {
+    id: 'perished',
+    name: 'Perished',
+    description:
+      'A [[stack]] has perished when every creature in it has died. Effects that revive creatures in a surviving ' +
+      'stack do not normally restore a perished stack unless they explicitly say so.',
   },
   {
     id: 'tier',
@@ -100,7 +114,8 @@ export const CONCEPTS: ConceptDef[] = [
     id: 'construct',
     name: 'Construct',
     description:
-      'A built creature rather than a living one — the Wizard’s golems and titans. Repair works only on these.',
+      'A built creature rather than a living one. Construct is shown as a type on the unit’s compendium entry; ' +
+      'Gremlin’s Repair normally works only on these units.',
   },
   {
     id: 'affliction',

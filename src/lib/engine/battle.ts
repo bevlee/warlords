@@ -57,6 +57,14 @@ function inChosenArea(value: import('./types.ts').JsonValue | undefined, pos: Po
 
 const demonUnitDefinition = (unit: UnitStack): boolean => DEMON_UNITS.some(definition => definition.name === unit.definition.name);
 
+function blackProcessionSkeleton(definition: UnitStack['definition']): UnitStack['definition'] {
+  if (definition.name !== 'Skeleton') return definition;
+  return {
+    ...definition,
+    abilities: [...new Set([...definition.abilities, 'infecting_strike', 'drain_morale'])],
+  };
+}
+
 function battleStrike(state: BattleState, attacker: UnitStack, defender: UnitStack, damage: number): StrikeResult {
   const strike = applyStrike(attacker, defender, damage, state);
   if (!attacker.definition.abilities.includes('soul_reaper') || !hasArtifact(state, attacker, 'reapers_tack') || strike.remaining.count <= 0) return strike;
@@ -94,10 +102,11 @@ function addTemporarySkeletons(
     .sort((a, b) => chebyshevDistance(a, source.pos) - chebyshevDistance(b, source.pos) || a.row - b.row || a.col - b.col)[0];
   if (!position) return state;
   const id = `u${state.nextId}`;
+  const definition = hasArtifact(state, source, 'the_black_procession') ? blackProcessionSkeleton(SKELETON) : SKELETON;
   const skeleton: UnitStack = {
-    id, definition: SKELETON, count, startCount: count, hp: SKELETON.hp, pos: position,
+    id, definition, count, startCount: count, hp: definition.hp, pos: position,
     side: source.side, controllerId: source.controllerId, isAlly: source.isAlly,
-    hasRetaliated: false, shotsLeft: SKELETON.shots, morale: 0, luck: 0, atb: 0,
+    hasRetaliated: false, shotsLeft: definition.shots, morale: 0, luck: 0, atb: 0,
     tiePriority: rngFor(state.seed, state.actionSeq ?? 0, 'summon', origin, id)(), isDefending: false,
     origin: { type: 'summoned', source: origin, summonerId: source.id }, hasTakenTurn: false,
   };
@@ -190,7 +199,7 @@ function attackMultiplier(state: BattleState, attacker: UnitStack, defender: Uni
     const value = Number(data.damageMultiplier ?? data.outgoing ?? 1);
     if (Number.isFinite(value) && (active.kind !== 'cry_loose' || ranged) && (active.kind !== 'cry_charge' || !ranged)) multiplier *= value;
   }
-  if ((defender.burnRoundsLeft ?? 0) > 0 && hasArtifact(state, attacker, 'brand_of_damnation')) multiplier *= 2;
+  if (!retaliation && (defender.burnRoundsLeft ?? 0) > 0 && hasArtifact(state, attacker, 'brand_of_damnation')) multiplier *= 2;
   if (hasArtifact(state, attacker, 'book_of_grudges')) {
     const afflictions = new Set((defender.effects ?? []).filter(effect => !effect.positive).map(effect => effect.kind));
     if ((defender.burnRoundsLeft ?? 0) > 0) afflictions.add('burn');
@@ -470,7 +479,7 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
   if ((dead.burnRoundsLeft ?? 0) > 0 && burnOwner && hasArtifact(state, burnOwner, 'furnace_heart')) {
     nextState = {
       ...nextState,
-      units: nextState.units.map(unit => unit.count > 0 && !unit.isHero && unit.id !== dead.id && chebyshevDistance(unit.pos, dead.pos) === 1 && !unit.definition.abilities.includes('fire_immunity')
+      units: nextState.units.map(unit => unit.count > 0 && !unit.isHero && unit.id !== dead.id && unit.side !== burnOwner.side && chebyshevDistance(unit.pos, dead.pos) === 1 && !unit.definition.abilities.includes('fire_immunity')
         ? { ...unit, burnDamage: hasArtifact(state, burnOwner, 'crown_of_wildfire') ? (unit.burnDamage ?? 0) + (dead.burnDamage ?? 0) : dead.burnDamage, burnRoundsLeft: 2, burnSourceId: burnOwner.id }
         : unit),
     };
@@ -499,7 +508,7 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
   // Death bursts resolve before rebirth and corpse claims.
   if (dead.definition.abilities.includes('cinderburst') && !dead.abilityState?.cinderburstUsed) {
     const amount = dead.startCount * dead.definition.hp * (hasArtifact(nextState, dead, 'powder_keg') ? 0.4 : 0.25);
-    const victims = areaTargets(nextState, dead.pos, { size: 3, secondaryMultiplier: 1, friendlyFire: true })
+    const victims = areaTargets(nextState, dead.pos, { size: 3, secondaryMultiplier: 1, enemyOf: dead, friendlyFire: false })
       .map(area => area.stack).filter(unit => unit.id !== dead.id);
     for (const victim of victims) {
       const burstRng = rngFor(nextState.seed, nextState.actionSeq ?? 0, 'afterDeath', 'cinderburst', victim.id);
@@ -550,7 +559,7 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
       const id = `u${nextState.nextId}`;
       const ownerUnit = nextState.units.find(unit => unit.controllerId === controller);
       const raisedDefinition = definition.name === 'Skeleton' && ids.includes('the_black_procession')
-        ? { ...definition, abilities: [...definition.abilities, 'infecting_strike', 'drain_morale'] }
+        ? blackProcessionSkeleton(definition)
         : definition;
       const raised: UnitStack = {
         id, definition: raisedDefinition, count, startCount: count, hp: definition.hp, pos,
@@ -896,7 +905,14 @@ export function initBattle(
   // to settle exact ties — seeded, so a replay reproduces the same order.
   const rng = mulberry32(seed);
   const allUnits = [...playerUnits, ...allyUnits, ...enemyUnits, heroStack, ...(allyHeroStack ? [allyHeroStack] : [])]
-    .map(u => ({ ...u, atb: 0, tiePriority: rng() }));
+    .map(u => ({
+      ...u,
+      definition: u.definition.name === 'Skeleton' && (options.artifacts?.[controllerOfUnit(u)] ?? []).includes('the_black_procession')
+        ? blackProcessionSkeleton(u.definition)
+        : u.definition,
+      atb: 0,
+      tiePriority: rng(),
+    }));
 
   grid = placeUnits(grid, allUnits);
 
@@ -1487,10 +1503,11 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
     if (action.abilityId === 'caustic_breath') {
       const length = mechanicParam(nextState, actor, 'caustic_breath', 'range', 3);
       const cells = lineCells(actor.pos, action.to!, length);
+      const allySafe = hasArtifact(nextState, actor, 'pressurised_bile_sac');
       const victims = cells.flatMap(cell => {
         const id = nextState.grid.cells[cell.row]?.[cell.col]?.occupantId;
         const unit = id ? nextState.units.find(candidate => candidate.id === id && candidate.count > 0 && !candidate.isHero) : undefined;
-        return unit ? [unit] : [];
+        return unit && (!allySafe || unit.side !== actor.side) ? [unit] : [];
       });
       const per = actor.definition.minDamage + Math.floor(rng() * (actor.definition.maxDamage - actor.definition.minDamage + 1));
       const amount = per * actor.count * 0.75;
@@ -1665,7 +1682,7 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       for (const area of areaTargets(nextState, target.pos, { size: 3, primaryId: target.id, secondaryMultiplier: fraction, enemyOf: attacker, friendlyFire: false }).filter(area => !area.primary)) dealSecondary(area.stack, damage * fraction, 'thunder_dive', 'magic', ['lightning']);
     }
     if (attacker.definition.abilities.includes('doomstep') && (target.burnRoundsLeft ?? 0) > 0 && hasArtifact(nextState, attacker, 'hells_verdict')) {
-      for (const area of areaTargets(nextState, target.pos, { size: 3, primaryId: target.id, secondaryMultiplier: 0.5, enemyOf: attacker, friendlyFire: true }).filter(area => !area.primary)) {
+      for (const area of areaTargets(nextState, target.pos, { size: 3, primaryId: target.id, secondaryMultiplier: 0.5, enemyOf: attacker, friendlyFire: false }).filter(area => !area.primary)) {
         dealSecondary(area.stack, damage * 0.5, 'hells_verdict', 'magic', ['fire']);
       }
     }
@@ -1911,6 +1928,9 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
         const marked = (target.marks ?? []).some(mark => mark.kind === 'ranged_mark');
         if (abilities.includes('boulder_burst')) fraction = hasArtifact(nextState, actor, 'shaped_stones') ? (marked ? 1 : 0.75) : (marked ? 0.75 : 0.5);
         if (hasArtifact(nextState, actor, 'rain_of_iron') && !abilities.includes('boulder_burst')) { fraction = marked ? 0.75 : 0.5; friendlyFire = false; }
+        if (abilities.includes('area_shot') && (hasArtifact(nextState, actor, 'blackpowder_fletching') || hasArtifact(nextState, actor, 'barbed_volley'))) friendlyFire = false;
+        if (abilities.includes('lightning_strike') && (hasArtifact(nextState, actor, 'storm_fletching') || hasArtifact(nextState, actor, 'overcharged_rods') || hasArtifact(nextState, actor, 'stormcrown'))) friendlyFire = false;
+        if (abilities.includes('hellfire_shot') && hasArtifact(nextState, actor, 'sulfurous_pitch')) friendlyFire = false;
         for (const area of areaTargets(nextState, target.pos, { size, primaryId: target.id, secondaryMultiplier: fraction, enemyOf: actor, friendlyFire }).filter(area => !area.primary)) {
           // The ability that owns this splash. Used for the damage seed, and
           // logged so the battle log can name it rather than saying "splash".

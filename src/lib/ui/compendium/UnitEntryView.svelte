@@ -53,6 +53,12 @@
       {#if entry.unit.isLarge}
         <span class="rounded border border-slate-600 px-1.5 py-0.5 text-slate-300">Large</span>
       {/if}
+      {#if entry.unit.types?.includes('construct')}
+        <a
+          href={hrefFor('concept', 'construct')}
+          class="rounded border border-sky-700 px-1.5 py-0.5 text-sky-300 hover:border-sky-500 hover:text-sky-200"
+        >Construct</a>
+      {/if}
     </p>
   </div>
 </div>

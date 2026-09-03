@@ -23,6 +23,8 @@ export type StackOrigin =
     }
   | { type: 'reborn'; source: 'infernal_rebirth' | 'ninth_circle' };
 
+export type UnitType = 'construct';
+
 export interface UnitDef {
   name: string;
   tier: 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -36,6 +38,8 @@ export interface UnitDef {
   shots: number;       // 0 = melee only
   range: number;       // max shooting distance in cells (Chebyshev); 0 = melee only
   isLarge: boolean;
+  /** Rules-facing creature classifications, separate from active abilities. */
+  types?: UnitType[];
   abilities: string[]; // 'no_retaliation' | 'flying' | 'defense_reduction'
   /** Subset of `abilities` granted by run skills rather than the base unit —
    *  the UI colors these differently in stat previews. */

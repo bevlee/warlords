@@ -43,6 +43,11 @@ describe('Wizard roster', () => {
     expect(bilehorn.abilities).toEqual(expect.arrayContaining(['caustic_breath', 'corrosive_carapace']));
     expect(bilehorn.abilities).not.toContain('death_stare');
   });
+
+  it('classifies every repairable machine as a Construct unit type', () => {
+    expect(WIZARD_UNITS.filter(unit => unit.types?.includes('construct')).map(unit => unit.name))
+      .toEqual(['Stone Golem', 'Siege Golem', 'Giant', 'Titan']);
+  });
 });
 
 describe('faction registry', () => {

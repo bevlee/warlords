@@ -123,23 +123,22 @@ export const UNIT_ABILITIES: Record<string, UnitAbility> = {
   },
   repair: {
     canUse(state, actor, targetId) {
-      const constructs = ['Stone Golem', 'Siege Golem', 'Giant', 'Titan'];
       const target = targetId
         ? state.units.find(unit => unit.id === targetId)
-        : state.units.filter(unit => unit.count > 0 && sameBanner(actor, unit) && constructs.includes(unit.definition.name))
+        : state.units.filter(unit => unit.count > 0 && sameBanner(actor, unit) && unit.definition.types?.includes('construct'))
           .sort((a, b) => (a.count * a.definition.hp + a.hp) - (b.count * b.definition.hp + b.hp))[0];
-      if (!target || target.isHero || !sameBanner(actor, target) || (!hasArtifact(state, actor, 'tinkers_kit') && !constructs.includes(target.definition.name))) return false;
+      const construct = target?.definition.types?.includes('construct') ?? false;
+      if (!target || target.isHero || !sameBanner(actor, target) || (!hasArtifact(state, actor, 'tinkers_kit') && !construct)) return false;
       if (target.count <= 0) {
-        return constructs.includes(target.definition.name) && hasArtifact(state, actor, 'animus_engine') && !target.abilityState?.animusRebuilt &&
+        return construct && hasArtifact(state, actor, 'animus_engine') && !target.abilityState?.animusRebuilt &&
           !state.grid.cells[target.pos.row]?.[target.pos.col]?.occupantId;
       }
       return isWounded(target);
     },
     resolve(state, actor, targetId) {
-      const constructs = ['Stone Golem', 'Siege Golem', 'Giant', 'Titan'];
       const target = targetId
         ? state.units.find(unit => unit.id === targetId)!
-        : state.units.filter(unit => unit.count > 0 && sameBanner(actor, unit) && constructs.includes(unit.definition.name) && isWounded(unit))
+        : state.units.filter(unit => unit.count > 0 && sameBanner(actor, unit) && unit.definition.types?.includes('construct') && isWounded(unit))
           .sort((a, b) => a.id.localeCompare(b.id))[0];
       if (target.count <= 0 && hasArtifact(state, actor, 'animus_engine')) {
         const rebuilt: UnitStack = {
