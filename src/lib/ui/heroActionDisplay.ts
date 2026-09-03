@@ -88,7 +88,7 @@ export function heroActionsFor(
         ...(has(artifacts, 'bronze_war_horn') ? ['Bronze War Horn supplies the displayed upgraded values.'] : []), ...voiceNote,
       ])),
       withUses(action('loose', 'Loose!', 'Battle Cry', `+${looseDamage}% ranged damage · free shot`, `Each friendly shooter’s next attack deals ${looseDamage}% more damage and costs no ammunition.${has(artifacts, 'horn_of_the_hunt') ? ' It also Marks before dealing damage.' : ''}`, 'none', 'Each affected unit’s next ranged attack', [
-        ...(has(artifacts, 'horn_of_the_hunt') ? ['Horn of the Hunt upgrades damage and applies Mark before damage.'] : []), ...voiceNote,
+        ...(has(artifacts, 'horn_of_the_hunt') ? ['Volley Horn upgrades damage and applies Mark before damage.'] : []), ...voiceNote,
       ])),
       withUses(action('blood_for_blood', 'Blood for Blood!', 'Battle Cry', `+${bloodDamage}% dealt · +50% taken`, `Every friendly unit deals ${bloodDamage}% more damage and takes 50% more damage.`, 'none', 'Until the Barbarian hero’s next turn', [
         ...(has(artifacts, 'skull_trumpet') ? ['Skull Trumpet upgrades outgoing damage to 75%.'] : []), ...voiceNote,

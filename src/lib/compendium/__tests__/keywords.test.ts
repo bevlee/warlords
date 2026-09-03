@@ -34,7 +34,7 @@ describe('parsing markup', () => {
 
   it('handles several markers in one line', () => {
     expect(text(parseKeywords('[[powder_keg]] and [[blood_chalice]]')))
-      .toBe('<item:powder_keg=Powder Keg> and <item:blood_chalice=Blood Chalice>');
+      .toBe('<item:powder_keg=Powder Keg> and <item:blood_chalice=Overflowing Chalice>');
   });
 });
 

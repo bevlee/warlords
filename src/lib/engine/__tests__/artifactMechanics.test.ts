@@ -46,7 +46,7 @@ describe('artifact-enhanced areas are ally-safe', () => {
   const cases: Array<{ name: string; attacker: UnitDef; artifact: string; heroClass: Hero['class'] }> = [
     { name: 'Blackpowder Fletching Area Shot', attacker: { ...ARCHER, range: 99 }, artifact: 'blackpowder_fletching', heroClass: 'knight' },
     { name: 'Barbed Volley Area Shot', attacker: { ...ARCHER, range: 99 }, artifact: 'barbed_volley', heroClass: 'knight' },
-    { name: 'Storm Fletching Lightning Strike', attacker: TITAN, artifact: 'storm_fletching', heroClass: 'wizard' },
+    { name: 'Storm Conductor Lightning Strike', attacker: TITAN, artifact: 'storm_fletching', heroClass: 'wizard' },
     { name: 'Overcharged Rods Lightning Strike', attacker: TITAN, artifact: 'overcharged_rods', heroClass: 'wizard' },
     { name: 'Stormcrown Lightning Strike', attacker: TITAN, artifact: 'stormcrown', heroClass: 'wizard' },
     { name: 'Sulfurous Pitch Hellfire Shot', attacker: { ...GOG, range: 99 }, artifact: 'sulfurous_pitch', heroClass: 'demon' },
