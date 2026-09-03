@@ -19,6 +19,7 @@
   const tier = $derived(entry.kind === 'unit' ? TIER_STYLE[entry.tier] : null);
 
   const RARITY_TEXT = {
+    default: 'text-slate-300',
     common: 'text-slate-300',
     rare: 'text-sky-300',
     epic: 'text-fuchsia-300',

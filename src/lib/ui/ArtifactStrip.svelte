@@ -11,11 +11,13 @@
   let { items = [], selected = null, onselect }: Props = $props();
 
   const RING: Record<ItemRarity, string> = {
+    default: 'ring-slate-500',
     common: 'ring-slate-500',
     rare: 'ring-sky-400',
     epic: 'ring-purple-400',
   };
   const NAME: Record<ItemRarity, string> = {
+    default: 'text-slate-200',
     common: 'text-slate-200',
     rare: 'text-sky-300',
     epic: 'text-purple-300',

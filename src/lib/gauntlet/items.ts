@@ -3,7 +3,7 @@ import { mulberry32 } from '../engine/rng';
 import { mixSeed, type RunState } from './run';
 
 export type ItemStat = keyof ArmyBonuses;
-export type ItemRarity = 'common' | 'rare' | 'epic';
+export type ItemRarity = 'default' | 'common' | 'rare' | 'epic';
 export type ItemId = string;
 
 export interface ItemDef {
@@ -176,9 +176,9 @@ const factionItems: ItemDef[] = [
 ];
 
 const starters = [
-  item('wayfarers_compass', { name: "Wayfarer's Compass", description: 'A Ranger stack that moves at least 3 cells without attacking takes its next turn twice as soon.', rarity: 'common', faction: 'ranger', starterForFaction: 'ranger' }),
-  item('banner_of_the_first_raid', { name: 'Banner of the First Raid', description: 'Starting stacks gain +2 Speed and 30% more damage during their first turn. That is an empowered turn.', rarity: 'common', faction: 'barbarian', starterForFaction: 'barbarian' }),
-  item('gravewrights_grimoire', { name: "Gravewright's Grimoire", description: 'Destroyed enemy stacks raise temporary Skeletons from 10% of starting HP.', rarity: 'common', faction: 'necromancer', starterForFaction: 'necromancer' }),
+  item('wayfarers_compass', { name: "Wayfarer's Compass", description: 'A Ranger stack that moves at least 3 cells without attacking takes its next turn twice as soon.', rarity: 'default', faction: 'ranger', starterForFaction: 'ranger' }),
+  item('banner_of_the_first_raid', { name: 'Banner of the First Raid', description: 'Starting stacks gain +2 Speed and 30% more damage during their first turn. That is an empowered turn.', rarity: 'default', faction: 'barbarian', starterForFaction: 'barbarian' }),
+  item('gravewrights_grimoire', { name: "Gravewright's Grimoire", description: 'Destroyed enemy stacks raise temporary Skeletons from 10% of starting HP.', rarity: 'default', faction: 'necromancer', starterForFaction: 'necromancer' }),
 ];
 
 export const ITEMS: Record<ItemId, ItemDef> = Object.fromEntries([
@@ -188,7 +188,7 @@ export const ITEMS: Record<ItemId, ItemDef> = Object.fromEntries([
 ]);
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
-const RARITY_WEIGHT: Record<ItemRarity, number> = { common: 60, rare: 35, epic: 5 };
+const RARITY_WEIGHT: Record<ItemRarity, number> = { default: 0, common: 60, rare: 35, epic: 5 };
 const STAT_LABEL: Record<ItemStat, string> = { attack: 'Atk', defense: 'Def', initiative: 'Init', speed: 'Speed', luck: 'Luck', morale: 'Morale' };
 const STAT_ORDER: ItemStat[] = ['attack', 'defense', 'initiative', 'speed', 'luck', 'morale'];
 

@@ -178,6 +178,9 @@ describe('filters', () => {
     expect(matchesFilters(pennant, filters({ rarity: 'rare' }))).toBe(true);
     expect(matchesFilters(pennant, filters({ rarity: 'epic' }))).toBe(false);
     expect(matchesFilters(unit('champion'), filters({ rarity: 'epic' }))).toBe(true);
+    const starter = items().find(e => e.id === 'wayfarers_compass')!;
+    expect(matchesFilters(starter, filters({ rarity: 'default' }))).toBe(true);
+    expect(matchesFilters(starter, filters({ rarity: 'common' }))).toBe(false);
   });
 
   it('matches names case-insensitively and ignores blank search', () => {
@@ -205,7 +208,7 @@ describe('the artifact tab sorts itself', () => {
   });
 
   it('keeps each faction\u2019s artifacts together and ordered common to epic', () => {
-    const rank = { common: 0, rare: 1, epic: 2 };
+    const rank = { default: 0, common: 1, rare: 2, epic: 3 };
     const faction = items().filter(e => e.group === 'faction');
     const sections = faction.map(itemSectionOf);
     expect(new Set(sections).size).toBe(sections.filter((s, i) => s !== sections[i - 1]).length);

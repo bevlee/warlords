@@ -1,6 +1,7 @@
 <script lang="ts" module>
   /** Rarity reads as a chip, not as a border colour you have to decode. */
   const RARITY = {
+    default: { border: 'border-slate-600', text: 'text-slate-100', chip: 'bg-slate-700 text-slate-300' },
     common: { border: 'border-slate-600', text: 'text-slate-100', chip: 'bg-slate-700 text-slate-300' },
     rare: { border: 'border-sky-700', text: 'text-sky-200', chip: 'bg-sky-900 text-sky-200' },
     epic: { border: 'border-purple-700', text: 'text-purple-200', chip: 'bg-purple-900 text-purple-200' },

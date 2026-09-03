@@ -29,6 +29,7 @@
   const byId = new Map(unitEntries().map((u) => [u.id, u]));
 
   const RARITY = {
+    default: { text: 'text-slate-300', border: 'border-slate-500', label: 'Default' },
     common: { text: 'text-slate-300', border: 'border-slate-500', label: 'Common' },
     rare: { text: 'text-sky-300', border: 'border-sky-400', label: 'Rare' },
     epic: { text: 'text-fuchsia-300', border: 'border-fuchsia-400', label: 'Epic' },

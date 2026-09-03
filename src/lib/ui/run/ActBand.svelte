@@ -18,6 +18,10 @@
 
 <script lang="ts">
   import StackChip from './StackChip.svelte';
+  import UnitInfo from '$lib/ui/UnitInfo.svelte';
+  import { TIER_STYLE } from '$lib/ui/tierStyle';
+  import { previewStack } from './previewStack';
+  import { scrollCap } from './scrollCap';
   import { FACTION_INFO } from '$lib/engine/factions';
   import {
     actOf,
@@ -41,6 +45,7 @@
   const endless = $derived(node > RUN_LENGTH);
   const currentAct = $derived(endless ? 3 : actOf(node));
   const encounter = $derived(generateGauntletEnemy(run));
+  let openEnemy = $state<string | null>(null);
 
   const nodesOf = (act: 1 | 2 | 3) =>
     Array.from({ length: RUN_LENGTH }, (_, i) => i + 1).filter(n => actOf(n) === act);
@@ -127,7 +132,12 @@
     <div class="mt-3 flex flex-wrap items-end gap-3">
       <div class="flex flex-1 flex-wrap gap-2">
         {#each encounter.army as slot (slot.unit.name)}
-          <StackChip unit={slot.unit} count={slot.count} />
+          <StackChip
+            unit={slot.unit}
+            count={slot.count}
+            open={openEnemy === slot.unit.name}
+            ontoggle={() => (openEnemy = openEnemy === slot.unit.name ? null : slot.unit.name)}
+          />
         {/each}
       </div>
 
@@ -144,5 +154,19 @@
         Fight ⚔
       </button>
     </div>
+
+    {#each encounter.army as slot (slot.unit.name)}
+      {#if openEnemy === slot.unit.name}
+        {@const ts = TIER_STYLE[slot.unit.tier]}
+        <div class="mt-3 max-w-md overflow-hidden rounded-lg border-2 bg-slate-800 {ts.border} {ts.glow}">
+          <p class="py-1 text-center text-[11px] font-semibold uppercase tracking-wider {ts.text}">
+            Tier {slot.unit.tier} · {ts.label}
+          </p>
+          <div class="card-scroll max-h-[28rem]" use:scrollCap>
+            <UnitInfo unit={previewStack(slot.unit, slot.count)} embedded />
+          </div>
+        </div>
+      {/if}
+    {/each}
   </div>
 </section>

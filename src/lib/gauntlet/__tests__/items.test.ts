@@ -8,7 +8,7 @@ describe('item catalog', () => {
       const item = ITEMS[id];
       expect(item.id).toBe(id);
       expect(item.name.length).toBeGreaterThan(0);
-      expect(['common', 'rare', 'epic']).toContain(item.rarity);
+      expect(['default', 'common', 'rare', 'epic']).toContain(item.rarity);
       expect(Object.keys(item.effects).length > 0 || item.description.length > 0).toBe(true);
     }
   });
@@ -16,6 +16,12 @@ describe('item catalog', () => {
   it('item names are unique', () => {
     const names = ITEM_IDS.map(id => ITEMS[id].name);
     expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('labels starter artifacts as default rather than common', () => {
+    const starters = ITEM_IDS.map(id => ITEMS[id]).filter(item => item.starterForFaction);
+    expect(starters.length).toBeGreaterThan(0);
+    expect(starters.every(item => item.rarity === 'default')).toBe(true);
   });
 });
 
@@ -81,7 +87,7 @@ describe('itemDraftOptions', () => {
   });
 
   it('weights rarities roughly common > rare > epic', () => {
-    const counts = { common: 0, rare: 0, epic: 0 };
+    const counts = { default: 0, common: 0, rare: 0, epic: 0 };
     for (let seed = 0; seed < 600; seed++) {
       const run = { ...newRun('demon', seed), battlesWon: 3 };
       for (const id of itemDraftOptions(run)) counts[ITEMS[id].rarity]++;
@@ -89,5 +95,6 @@ describe('itemDraftOptions', () => {
     expect(counts.common).toBeGreaterThan(counts.rare);
     expect(counts.rare).toBeGreaterThan(counts.epic);
     expect(counts.epic).toBeGreaterThan(0);
+    expect(counts.default).toBe(0);
   });
 });

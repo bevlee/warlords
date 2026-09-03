@@ -37,6 +37,7 @@
   let loaded = $state(false);
   let loadError = $state(false);
   let rulesOpen = $state(false);
+  let confirmingAbandon = $state(false);
 
   // A session-only "win button" for testing. These bonuses are applied to
   // every player stack when a battle starts and are never saved to the run.
@@ -140,6 +141,7 @@
   async function abandon() {
     run = null;
     inBattle = false;
+    confirmingAbandon = false;
     await clearRun();
   }
 
@@ -173,13 +175,33 @@
           ? Rules
         </button>
         {#if run}
-          <button
-            type="button"
-            class="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-800 hover:text-slate-300"
-            onclick={abandon}
-          >
-            Abandon
-          </button>
+          {#if confirmingAbandon}
+            <div class="flex flex-wrap items-center justify-end gap-1.5">
+              <p class="text-xs text-red-300">Abandon this run and lose all progress?</p>
+              <button
+                type="button"
+                class="rounded bg-red-700 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-600"
+                onclick={abandon}
+              >
+                Abandon run
+              </button>
+              <button
+                type="button"
+                class="rounded px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800"
+                onclick={() => (confirmingAbandon = false)}
+              >
+                Cancel
+              </button>
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-800 hover:text-slate-300"
+              onclick={() => (confirmingAbandon = true)}
+            >
+              Abandon
+            </button>
+          {/if}
         {/if}
       </div>
     </header>

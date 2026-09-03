@@ -110,7 +110,7 @@ export const FACTION_FILTERS: EntryFaction[] = [
   'neutral',
 ];
 export const TIER_FILTERS: EntryTier[] = [1, 2, 3, 4, 5, 6, 7];
-export const RARITY_FILTERS: ItemRarity[] = ['common', 'rare', 'epic'];
+export const RARITY_FILTERS: ItemRarity[] = ['default', 'common', 'rare', 'epic'];
 
 /** Display name for a faction value, including the one that is not a faction. */
 export const factionLabel = (faction: EntryFaction): string =>
@@ -399,7 +399,7 @@ export function spellEntries(heroLevel = SAMPLE_HERO_LEVEL): SpellEntry[] {
 }
 
 const ITEM_GROUP_ORDER: Record<ItemGroup, number> = { starter: 0, faction: 1, legacy: 2 };
-const RARITY_ORDER: Record<ItemRarity, number> = { common: 0, rare: 1, epic: 2 };
+const RARITY_ORDER: Record<ItemRarity, number> = { default: 0, common: 1, rare: 2, epic: 3 };
 /** Faction order follows the roster tabs rather than the alphabet, and
  *  FACTION_FILTERS already ends with Neutral, so the legacy items sort last. */
 const factionRank = (faction: EntryFaction): number => FACTION_FILTERS.indexOf(faction);
