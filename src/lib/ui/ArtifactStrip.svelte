@@ -123,10 +123,10 @@
 
 {#if items.length > 0}
   <div class="artifact-strip flex min-h-0 w-full flex-col items-stretch gap-1.5 overflow-x-hidden overflow-y-auto" role="list" aria-label="Army artifacts" onscroll={close}>
-    <p class="w-full text-center font-mono text-[8px] font-bold uppercase tracking-wider text-slate-500">Army artifacts</p>
+    <p class="artifact-heading w-full text-center font-mono text-[8px] font-bold uppercase tracking-wider text-slate-500">Army artifacts</p>
     {#each items as id (id)}
       {@const item = ITEMS[id]}
-      <div class="min-w-0 px-0.5" role="listitem">
+      <div class="artifact-entry min-w-0 px-0.5" role="listitem">
         <button
           type="button"
           aria-label="Army artifact: {item.name}"
@@ -189,4 +189,26 @@
   .name.rarity-rare { color: #7dd3fc; }
   .name.rarity-epic { color: #d8b4fe; }
   .effect { margin-top: 0.4rem !important; font: 700 0.76rem/1.4 ui-monospace, monospace; color: #fde68a; }
+
+  @media (max-width: 48rem) and (orientation: portrait) {
+    .artifact-strip {
+      flex: 1;
+      flex-direction: row;
+      align-items: center;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .artifact-heading {
+      width: auto;
+      flex: none;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+
+    .artifact-entry {
+      width: min(calc(112 * var(--fx)), 28vw);
+      flex: none;
+    }
+  }
 </style>

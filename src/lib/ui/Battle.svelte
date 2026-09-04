@@ -1406,7 +1406,7 @@
          always reserved — the board is sized by height, so it cannot grow into
          reclaimed width and would instead re-centre, sliding out from under the
          cursor that triggered the hover. -->
-    <div class="info-rail">
+    <div class="info-rail" class:has-content={!!selectedHeroAction || !!infoUnit}>
       {#if selectedHeroAction}
         <HeroActionDetails
           action={selectedHeroAction}
@@ -1994,13 +1994,77 @@
     border-color: #cbd5e1;
   }
 
-  /* Narrow screens: something has to give, and the log is the piece the dock's
-     status line and the creature rail can least replace — same call the old
-     layout made. Mobile stays cramped by design; the battle screen is built for
-     a desktop-sized viewport. */
+  /* Narrow screens: the dense log gives way first. */
   @media (max-width: 63.9375rem) {
     .log-slot {
       display: none;
+    }
+  }
+
+  /* Portrait screens cannot afford permanent rails on both sides of the
+     battlefield. Turn the left flank into a compact toolbar above the board,
+     and only show unit/hero details as an overlay when the player asks for
+     them. This leaves the full viewport width available to the 12-column grid. */
+  @media (max-width: 48rem) and (orientation: portrait) {
+    .battle-middle {
+      position: relative;
+      flex-direction: column;
+      gap: calc(4 * var(--fx));
+    }
+
+    .flank {
+      width: 100%;
+      height: calc(82 * var(--fx));
+      align-items: stretch;
+    }
+
+    .flank-top {
+      flex-direction: row;
+      align-items: center;
+      gap: calc(6 * var(--fx));
+      overflow: visible;
+    }
+
+    .flank-buttons {
+      flex: none;
+    }
+
+    .hero-standee {
+      width: calc(68 * var(--fx));
+      padding-bottom: calc(13 * var(--fx));
+    }
+
+    .hero-standee :global(.hero-sprite) {
+      width: calc(54 * var(--fx));
+    }
+
+    .hero-shadow {
+      bottom: calc(10 * var(--fx));
+    }
+
+    .hero-arc {
+      bottom: calc(6 * var(--fx));
+      height: calc(18 * var(--fx));
+    }
+
+    .board-column,
+    .board-fit {
+      width: 100%;
+    }
+
+    .info-rail {
+      display: none;
+    }
+
+    .info-rail.has-content {
+      position: absolute;
+      inset: calc(4 * var(--fx));
+      z-index: 55;
+      display: block;
+      width: auto;
+      border-radius: calc(8 * var(--fx));
+      background: rgb(15 23 42 / 0.96);
+      box-shadow: 0 12px 36px rgb(0 0 0 / 0.65);
     }
   }
 </style>
