@@ -2029,6 +2029,54 @@
       flex: none;
     }
 
+    .settings-popover {
+      box-sizing: border-box;
+      width: min(19rem, calc(100vw - 2rem));
+      max-height: calc(100dvh - 5rem);
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 0.75rem;
+    }
+
+    .settings-heading {
+      font-size: 0.75rem;
+    }
+
+    .settings-pills {
+      gap: 0.2rem;
+      padding: 0.2rem;
+    }
+
+    .settings-pill {
+      min-width: 0;
+      padding: 0.45rem 0.3rem;
+      font-size: 0.75rem;
+    }
+
+    .auto-battle-toggle {
+      gap: 0.65rem;
+      margin: 0.65rem 0;
+      padding: 0.65rem;
+    }
+
+    .auto-battle-copy strong {
+      font-size: 0.8rem;
+    }
+
+    .auto-battle-copy small {
+      font-size: 0.7rem;
+    }
+
+    .settings-resign {
+      padding: 0.55rem 0.7rem;
+      font-size: 0.8rem;
+    }
+
+    .settings-leave {
+      margin-top: 0.55rem;
+      font-size: 0.75rem;
+    }
+
     .hero-standee {
       width: calc(68 * var(--fx));
       padding-bottom: calc(13 * var(--fx));
