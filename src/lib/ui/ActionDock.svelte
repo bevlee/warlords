@@ -25,6 +25,7 @@
      *  the engine's canActivate — `enabled` is the whole rule, not a hint. */
     abilities?: { id: string; info: { label: string; description: string }; enabled: boolean; view?: HeroActionView }[];
     selectedAbilityId?: string | null;
+    activeHeroActionId?: string | null;
     onwait: () => void;
     ondefend: () => void;
     /** Hovering an action projects its effect onto the turns bar. Null on
@@ -41,6 +42,7 @@
     spellbookOpen,
     abilities = [],
     selectedAbilityId = null,
+    activeHeroActionId = null,
     onwait,
     ondefend,
     onpreview,
@@ -139,14 +141,24 @@
         {#each abilities as ability (ability.id)}
           <button
             type="button"
-            class="hero-card {selectedAbilityId === ability.id ? 'selected' : ''} {!ability.enabled ? 'unavailable' : ''}"
+            class="hero-card {selectedAbilityId === ability.id ? 'selected' : ''} {activeHeroActionId === ability.id ? 'active' : ''} {!ability.enabled ? 'unavailable' : ''}"
             aria-pressed={selectedAbilityId === ability.id}
-            aria-disabled={!ability.enabled}
+            disabled={!ability.enabled}
             onclick={() => onability?.(ability.id)}
           >
             <span class="hero-card-copy">
               <strong>{ability.info.label}</strong>
               <small><KeywordText text={ability.view?.summary ?? ability.info.description} /></small>
+              <span class="hero-card-cue">
+                {#if selectedAbilityId === ability.id && ability.view?.targeting !== 'none'}
+                  {ability.view?.targetingLabel}
+                {:else if ability.view?.targeting === 'none'}
+                  Activate immediately
+                {:else}
+                  {ability.view?.targetingLabel}
+                {/if}
+              </span>
+              {#if activeHeroActionId === ability.id}<em>Active</em>{/if}
               {#if ability.view?.usesLabel}<em>{ability.view.usesLabel}</em>{/if}
             </span>
           </button>
@@ -195,33 +207,35 @@
     <span class="segment-caption">{isHeroTurn && abilities.length > 0 ? 'Hero abilities' : 'Active abilities'}</span>
   </div>
 
-  <div class="rule" aria-hidden="true"></div>
+  {#if !isHeroTurn}
+    <div class="rule" aria-hidden="true"></div>
 
-  <!-- Passive abilities: the list scrolls, the caption stays pinned to the
-       bottom of the dock however many entries there are. -->
-  <div class="segment column grow">
-    <div class="passive-list">
-      {#each passives as ability (ability.id)}
-        <div>
-          <p class="passive-label {ability.taught ? 'taught' : ''}">
-            {#if ability.taught}
-              {#if skillIconFor(ability.id)}
-                <img src={skillIconFor(ability.id)} alt="" class="passive-icon" />
-              {:else}
-                <span aria-hidden="true">{skillGlyph(ability.id)}</span>
+    <!-- Passive abilities: the list scrolls, the caption stays pinned to the
+         bottom of the dock however many entries there are. -->
+    <div class="segment column grow">
+      <div class="passive-list">
+        {#each passives as ability (ability.id)}
+          <div>
+            <p class="passive-label {ability.taught ? 'taught' : ''}">
+              {#if ability.taught}
+                {#if skillIconFor(ability.id)}
+                  <img src={skillIconFor(ability.id)} alt="" class="passive-icon" />
+                {:else}
+                  <span aria-hidden="true">{skillGlyph(ability.id)}</span>
+                {/if}
               {/if}
-            {/if}
-            <a href={entryHref('ability', ability.id)} target="_blank" rel="noopener">{ability.label}</a>
-            {#if ability.taught}<span class="taught-tag">taught</span>{/if}
-          </p>
-          <p class="passive-desc"><KeywordText text={ability.description} /></p>
-        </div>
-      {:else}
-        <p class="passive-desc none">This stack has no passive abilities.</p>
-      {/each}
+              <a href={entryHref('ability', ability.id)} target="_blank" rel="noopener">{ability.label}</a>
+              {#if ability.taught}<span class="taught-tag">taught</span>{/if}
+            </p>
+            <p class="passive-desc"><KeywordText text={ability.description} /></p>
+          </div>
+        {:else}
+          <p class="passive-desc none">This stack has no passive abilities.</p>
+        {/each}
+      </div>
+      <span class="segment-caption">Passive abilities</span>
     </div>
-    <span class="segment-caption">Passive abilities</span>
-  </div>
+  {/if}
 </div>
 
 <style>
@@ -265,7 +279,8 @@
   }
 
   .segment.hero-actions {
-    width: calc(480 * var(--fx));
+    width: auto;
+    flex: 1;
   }
 
   .hero-card-list {
@@ -295,10 +310,12 @@
 
   .hero-card.unavailable { opacity: .58; }
   .hero-card-copy { min-width: 0; }
-  .hero-card-copy strong, .hero-card-copy small, .hero-card-copy em { display: block; }
+  .hero-card-copy strong, .hero-card-copy small, .hero-card-copy em, .hero-card-cue { display: block; }
   .hero-card-copy strong { font-size: calc(11 * var(--fx)); line-height: 1.15; color: #fde68a; }
   .hero-card-copy small { margin-top: calc(3 * var(--fx)); font-size: calc(8.5 * var(--fx)); line-height: 1.25; color: #cbd5e1; }
+  .hero-card-cue { margin-top: calc(5 * var(--fx)); font-size: calc(8 * var(--fx)); line-height: 1.2; color: #93c5fd; }
   .hero-card-copy em { margin-top: calc(3 * var(--fx)); font-size: calc(7.5 * var(--fx)); font-style: normal; color: #6ee7b7; }
+  .hero-card.active { border-color: rgb(52 211 153 / .8); box-shadow: inset 0 0 0 1px rgb(52 211 153 / .2); }
 
   .segment-body {
     flex: 1;

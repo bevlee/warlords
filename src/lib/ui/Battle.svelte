@@ -52,10 +52,9 @@
   import BattleDebugDrawer from './BattleDebugDrawer.svelte';
   import { formationFromBattle, type SavedFormation } from '$lib/engine/deployment';
   import { validateAction } from '$lib/engine/actions';
-  import HeroActionDetails from './HeroActionDetails.svelte';
   import HeroSheet from './HeroSheet.svelte';
   import ActiveHeroBanner from './ActiveHeroBanner.svelte';
-  import { activeHeroEffect, heroActionViews, type HeroActionView } from './heroActionDisplay';
+  import { activeHeroEffect, heroActionViews } from './heroActionDisplay';
   import { artifactModifierSources } from './artifactDisplay';
 
   interface Props {
@@ -487,7 +486,6 @@
   let pendingSpell: SpellId | null = $state(null);
   let pendingActivated: { id: string; hero: boolean } | null = $state(null);
   let selectedHeroActionId: string | null = $state(null);
-  const selectedHeroAction = $derived(heroActions.find(action => action.id === selectedHeroActionId) ?? null);
   let pendingDarting: { targetId: string; moveTo: Pos; cells: Pos[] } | null = $state(null);
   const dartingRetreatKeys = $derived.by(() => {
     const pending = pendingDarting as { targetId: string; moveTo: Pos; cells: Pos[] } | null;
@@ -954,9 +952,17 @@
     if (heroAction) {
       const view = heroActions.find(action => action.id === abilityId);
       if (!view) return;
-      selectedHeroActionId = abilityId;
       const enabled = unitAbilities.some(candidate => candidate.id === abilityId && candidate.enabled);
-      pendingActivated = view.targeting === 'none' || !enabled ? null : { id: abilityId, hero: true };
+      if (!enabled) return;
+      if (view.targeting === 'none') {
+        selectedHeroActionId = null;
+        pendingActivated = null;
+        takeAction({ type: 'hero_action', actionId: abilityId }, 'host');
+        return;
+      }
+      const alreadySelected = pendingActivated?.hero === true && pendingActivated.id === abilityId;
+      selectedHeroActionId = alreadySelected ? null : abilityId;
+      pendingActivated = alreadySelected ? null : { id: abilityId, hero: true };
       return;
     }
     const targeted = ['cleanse', 'repair', 'ride_by_attack', 'caustic_breath', 'gate'].includes(abilityId);
@@ -965,23 +971,6 @@
       return;
     }
     takeAction({ type: 'ability', abilityId }, 'host');
-  }
-
-  function selectedHeroActionEnabled(action: HeroActionView): boolean {
-    return unitAbilities.some(candidate => candidate.id === action.id && candidate.enabled);
-  }
-
-  function activateSelectedHeroAction() {
-    if (!selectedHeroAction || selectedHeroAction.targeting !== 'none' || !selectedHeroActionEnabled(selectedHeroAction)) return;
-    const actionId = selectedHeroAction.id;
-    selectedHeroActionId = null;
-    pendingActivated = null;
-    takeAction({ type: 'hero_action', actionId }, 'host');
-  }
-
-  function closeHeroActionDetails() {
-    selectedHeroActionId = null;
-    if (pendingActivated?.hero) pendingActivated = null;
   }
 
   function handleForfeit() {
@@ -1098,7 +1087,7 @@
       return 'Choose attack position — click or tap a highlighted tile. Click the enemy again, press Esc, or right-click to cancel.';
     }
     if (isPlayerTurn && activeUnit.isHero) {
-      return 'Your hero\'s turn — select an ability card for details, click an enemy to strike, or cast a spell.';
+      return 'Your hero\'s turn — choose an ability card, click an enemy to strike, or cast a spell.';
     }
     if (isPlayerTurn) {
       const hints = ['highlighted cell to move'];
@@ -1406,24 +1395,12 @@
          always reserved — the board is sized by height, so it cannot grow into
          reclaimed width and would instead re-centre, sliding out from under the
          cursor that triggered the hover. -->
-    <div class="info-rail" class:has-content={!!selectedHeroAction || !!infoUnit}>
-      {#if selectedHeroAction}
-        <HeroActionDetails
-          action={selectedHeroAction}
-          selected={pendingActivated?.hero === true && pendingActivated.id === selectedHeroAction.id}
-          canUse={selectedHeroActionEnabled(selectedHeroAction)}
-          onactivate={isHeroTurn && selectedHeroAction.targeting === 'none' ? activateSelectedHeroAction : undefined}
-          oncancel={closeHeroActionDetails}
-        />
-      {:else if infoUnit?.isHero && localHero}
+    <div class="info-rail" class:has-content={!!infoUnit}>
+      {#if infoUnit?.isHero && localHero}
         <HeroSheet
           unit={infoUnit}
           hero={localHero}
-          actions={heroActions}
           activeEffect={activeHeroBanner}
-          onselect={id => {
-            selectedHeroActionId = id;
-          }}
           onclose={() => (selectedId = null)}
         />
       {:else if infoUnit}
@@ -1442,12 +1419,7 @@
 
   {#if activeHeroBanner}
     <div class="hero-banner-band">
-      <ActiveHeroBanner
-        effect={activeHeroBanner}
-        oninspect={() => {
-          selectedHeroActionId = activeHeroBanner?.id ?? null;
-        }}
-      />
+      <ActiveHeroBanner effect={activeHeroBanner} />
     </div>
   {/if}
 
@@ -1461,6 +1433,7 @@
         {spellbookOpen}
         abilities={unitAbilities}
         selectedAbilityId={selectedHeroActionId}
+        activeHeroActionId={activeHeroBanner?.id}
         onwait={handleWait}
         ondefend={handleDefend}
         onpreview={action => (previewAction = action)}
