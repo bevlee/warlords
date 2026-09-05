@@ -31,7 +31,7 @@ describe('redesigned progression wiring', () => {
     expect(initBattle([{ unit: GOBLIN, count: 1 }], [{ unit: GOBLIN, count: 1 }], wizard, 1).hero.mana).toBe(11);
   });
 
-  it('applies enemy bonus and controller-scoped Rank Training to effective stats', () => {
+  it('applies enemy bonus and controller-scoped completed-battle Training to effective stats', () => {
     const state = initBattle(
       [{ unit: GOBLIN, count: 5 }], [{ unit: GOBLIN, count: 5 }], hero(), 1, [], undefined,
       {
@@ -42,8 +42,8 @@ describe('redesigned progression wiring', () => {
     );
     const player = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
     const enemy = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
-    expect(effectiveAttackInBattle(state, player)).toBe(GOBLIN.attack + 2 + 7);
-    expect(effectiveDefenseInBattle(state, player)).toBe(GOBLIN.defense + 1 + 7);
+    expect(effectiveAttackInBattle(state, player)).toBe(GOBLIN.attack + 2 + 6);
+    expect(effectiveDefenseInBattle(state, player)).toBe(GOBLIN.defense + 1 + 6);
     expect(effectiveAttackInBattle(state, enemy)).toBe(GOBLIN.attack + 3);
     expect(effectiveDefenseInBattle(state, enemy)).toBe(GOBLIN.defense + 3);
   });
