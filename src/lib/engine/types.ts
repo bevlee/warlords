@@ -16,6 +16,7 @@ export type StackOrigin =
         | 'gate'
         | 'necromancy'
         | 'dragon_ossuary'
+        | 'putrid_grimoire'
         | 'blood_tithe'
         | 'knights_reliquary'
         | 'animus_engine';

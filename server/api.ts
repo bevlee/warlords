@@ -5,7 +5,9 @@ import { ENGINE_VERSION } from '../src/lib/engine/version.ts';
 import { pruneBattleHistory } from './retention.ts';
 
 const SLOTS = new Set(['hero', 'army', 'campaign', 'gauntletRun', 'compendium']);
+const FACTIONS = new Set(['barbarian', 'knight', 'wizard', 'necromancer', 'ranger', 'demon']);
 const MAX_BODY = 256 * 1024;
+const MAX_LEADERBOARD_NAME = 20;
 const ACTION_TYPES = new Set(['move', 'attack', 'shoot', 'defend', 'cast', 'ability', 'debug', 'wait']);
 
 type Next = () => void;
@@ -57,6 +59,19 @@ export function createApi(db: Database.Database) {
     getChat: db.prepare(
       'SELECT after_seq, controller, text, ts FROM battle_chat ' +
         'WHERE battle_id = ? ORDER BY after_seq, ts'
+    ),
+    insertLeaderboardRun: db.prepare(
+      'INSERT INTO leaderboard_runs ' +
+        '(id, player_id, name, faction, battles_won, endless_depth, hero_level, army, items, unit_skills, started_at, ended_at, created_at) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ),
+    listLeaderboard: db.prepare(
+      'SELECT id, name, faction, battles_won, endless_depth, hero_level, army, items, unit_skills, started_at, ended_at ' +
+        'FROM leaderboard_runs ORDER BY battles_won DESC, endless_depth DESC, started_at ASC LIMIT ?'
+    ),
+    listLeaderboardByFaction: db.prepare(
+      'SELECT id, name, faction, battles_won, endless_depth, hero_level, army, items, unit_skills, started_at, ended_at ' +
+        'FROM leaderboard_runs WHERE faction = ? ORDER BY battles_won DESC, endless_depth DESC, started_at ASC LIMIT ?'
     ),
   };
 
@@ -192,6 +207,37 @@ export function createApi(db: Database.Database) {
       });
     }
 
+    if (pathname === '/api/leaderboard') {
+      if (method === 'GET') {
+        const faction = url.searchParams.get('faction');
+        if (faction !== null && !FACTIONS.has(faction)) {
+          return send(res, 400, { error: 'unknown faction' });
+        }
+        const limitParam = url.searchParams.get('limit');
+        const limit = Math.min(Math.max(parseInt(limitParam ?? '50', 10) || 50, 1), 100);
+        const rows = (faction
+          ? stmts.listLeaderboardByFaction.all(faction, limit)
+          : stmts.listLeaderboard.all(limit)) as LeaderboardRow[];
+        return send(res, 200, rows.map(formatLeaderboardRow));
+      }
+      if (method === 'POST') {
+        const playerId = authenticate(req);
+        if (!playerId) return send(res, 401, { error: 'unauthorized' });
+        const parsed = parseLeaderboardSubmission(await readBody(req));
+        if (!parsed) return send(res, 400, { error: 'invalid submission' });
+        const id = randomUUID();
+        const now = Date.now();
+        stmts.insertLeaderboardRun.run(
+          id, playerId, parsed.name, parsed.faction,
+          parsed.battlesWon, parsed.endlessDepth, parsed.heroLevel,
+          JSON.stringify(parsed.army), JSON.stringify(parsed.items),
+          JSON.stringify(parsed.unitSkills), parsed.startedAt, now, now
+        );
+        return send(res, 201, { id });
+      }
+      return send(res, 405, { error: 'method not allowed' });
+    }
+
     send(res, 404, { error: 'not found' });
   }
 
@@ -240,6 +286,81 @@ function formatBattleListRow(row: BattleListRow) {
     summary: row.summary === null ? null : JSON.parse(row.summary),
     startedAt: row.started_at,
     endedAt: row.ended_at,
+  };
+}
+
+interface LeaderboardRow {
+  id: string;
+  name: string;
+  faction: string;
+  battles_won: number;
+  endless_depth: number;
+  hero_level: number;
+  army: string;
+  items: string;
+  unit_skills: string;
+  started_at: number;
+  ended_at: number;
+}
+
+function formatLeaderboardRow(row: LeaderboardRow) {
+  return {
+    id: row.id,
+    name: row.name,
+    faction: row.faction,
+    battlesWon: row.battles_won,
+    endlessDepth: row.endless_depth,
+    heroLevel: row.hero_level,
+    army: JSON.parse(row.army),
+    items: JSON.parse(row.items),
+    unitSkills: JSON.parse(row.unit_skills),
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+  };
+}
+
+interface LeaderboardSubmission {
+  name: string;
+  faction: string;
+  battlesWon: number;
+  endlessDepth: number;
+  heroLevel: number;
+  army: Array<{ name: string; count: number }>;
+  items: string[];
+  unitSkills: Record<string, Record<string, number>>;
+  startedAt: number;
+}
+
+function parseLeaderboardSubmission(body: string | null): LeaderboardSubmission | null {
+  if (body === null) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!isRecord(value)) return null;
+  if (typeof value.name !== 'string') return null;
+  const name = (value.name as string).trim();
+  if (name.length < 1 || name.length > MAX_LEADERBOARD_NAME) return null;
+  if (typeof value.faction !== 'string' || !FACTIONS.has(value.faction)) return null;
+  if (!Number.isInteger(value.battlesWon) || (value.battlesWon as number) < 0) return null;
+  if (!Number.isInteger(value.endlessDepth) || (value.endlessDepth as number) < 0) return null;
+  if (!Number.isInteger(value.heroLevel) || (value.heroLevel as number) < 1) return null;
+  if (!Array.isArray(value.army)) return null;
+  if (!Array.isArray(value.items)) return null;
+  if (!isRecord(value.unitSkills)) return null;
+  if (!Number.isInteger(value.startedAt)) return null;
+  return {
+    name,
+    faction: value.faction as string,
+    battlesWon: value.battlesWon as number,
+    endlessDepth: value.endlessDepth as number,
+    heroLevel: value.heroLevel as number,
+    army: value.army as LeaderboardSubmission['army'],
+    items: value.items as string[],
+    unitSkills: value.unitSkills as LeaderboardSubmission['unitSkills'],
+    startedAt: value.startedAt as number,
   };
 }
 

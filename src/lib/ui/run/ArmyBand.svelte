@@ -23,7 +23,7 @@
 
   // Taught skills are baked into the unit definition, so an opened card's
   // ability list shows them exactly as the battle will.
-  const stacks = $derived(applyUnitSkills(army, unitSkills, faction));
+  const stacks = $derived(applyUnitSkills(army, unitSkills, faction, items));
 
   let openUnit = $state<string | null>(null);
 

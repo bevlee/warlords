@@ -32,9 +32,9 @@ import { applySavedFormation, type SavedFormation } from './deployment.ts';
 import { resolveHeroAction } from './heroActions.ts';
 import { areaTargets, lineCells } from './areaDamage.ts';
 import { moveStack } from './movement.ts';
-import { alliedTeamId, controllerOfUnit, hasArtifact, mechanicParam } from './artifacts.ts';
+import { alliedTeamId, controllerOfUnit, hasArtifact, mechanicParam, protectedByPython } from './artifacts.ts';
 import { IMP } from './demon.ts';
-import { BONE_DRAGON, SKELETON } from './necromancer.ts';
+import { BONE_DRAGON, SKELETON, ZOMBIE } from './necromancer.ts';
 import { addMark, incomingMarkMultiplier, triggerQuarry } from './marks.ts';
 import { chebyshevDistance } from './grid.ts';
 
@@ -69,6 +69,10 @@ function battleStrike(state: BattleState, attacker: UnitStack, defender: UnitSta
   const strike = applyStrike(attacker, defender, damage, state);
   if (!attacker.definition.abilities.includes('soul_reaper') || !hasArtifact(state, attacker, 'reapers_tack') || strike.remaining.count <= 0) return strike;
   const extra = applyDamage(strike.remaining, strike.remaining.hp);
+  if (extra.remaining.count === 0 && protectedByPython(state, defender)) {
+    extra.remaining = { ...extra.remaining, count: 1, hp: 1 };
+    extra.killed = 0;
+  }
   return {
     ...strike,
     killed: strike.killed + extra.killed,
@@ -327,6 +331,14 @@ function applyOnHitEffects(
     }
   }
 
+  if (a.count > 0 && a.definition.name === 'Vampire' && v.count === 0 && !v.isHero &&
+      v.side !== a.side && state.units.some(unit => unit.id === v.id && unit.count > 0) &&
+      hasArtifact(state, a, 'chalice_of_conquest')) {
+    const count = Math.max(1, Math.ceil(v.startCount * v.definition.hp * 0.1 / a.definition.hp));
+    a = { ...a, count: a.count + count, startCount: a.startCount + count };
+    events.push({ type: 'status', data: { effect: 'chalice_of_conquest', unitId: a.id, sourceId: v.id, count } });
+  }
+
   if (v.count > 0 && !v.isHero) {
     const acceptsNegative = !(v.effects ?? []).some(effect => effect.kind === 'negative_immunity');
     if (acceptsNegative && abilities.includes('slow_on_hit') && rng() < 0.3) {
@@ -405,6 +417,9 @@ function applyOnHitEffects(
 
 function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState {
   if (dead.abilityState?.deathProcessed) return state;
+  if (protectedByPython(state, dead)) {
+    return { ...state, units: state.units.map(unit => unit.id === dead.id ? { ...dead, count: 1, hp: 1 } : unit), grid: setOccupant(state.grid, dead.pos, dead.id) };
+  }
   let nextState: BattleState = {
     ...state,
     units: state.units.map(unit => unit.id === dead.id
@@ -528,7 +543,7 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
   const willRebirth = !alreadyReborn && (seal || ownRebirth);
 
   const corpseOwner = Object.entries(nextState.artifacts ?? {}).find(([controller, ids]) => {
-    if (!ids.includes('gravewrights_grimoire') && !ids.includes('dragon_ossuary')) return false;
+    if (!ids.includes('gravewrights_grimoire') && !ids.includes('dragon_ossuary') && !ids.includes('putrid_grimoire')) return false;
     const representative = nextState.units.find(unit => unit.controllerId === controller);
     return representative ? representative.side !== dead.side : controller === 'player' && dead.side === 'enemy';
   });
@@ -547,7 +562,8 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
 
   if (canRaise) {
     const [controller, ids] = corpseOwner!;
-    const definition = ids.includes('dragon_ossuary') ? BONE_DRAGON : SKELETON;
+    const raisingArtifact = ids.includes('dragon_ossuary') ? 'dragon_ossuary' : ids.includes('putrid_grimoire') ? 'putrid_grimoire' : 'gravewrights_grimoire';
+    const definition = raisingArtifact === 'dragon_ossuary' ? BONE_DRAGON : raisingArtifact === 'putrid_grimoire' ? ZOMBIE : SKELETON;
     let count = Math.max(1, Math.ceil(dead.startCount * dead.definition.hp * 0.1 / definition.hp));
     if (dead.modifierSources?.some(source => source.id === 'infecting_strike') && ids.includes('plague_bell')) count *= 2;
     const occupied = (pos: Pos) => !!nextState.grid.cells[pos.row]?.[pos.col]?.occupantId || !!nextState.grid.cells[pos.row]?.[pos.col]?.blocked;
@@ -564,14 +580,14 @@ function handleDeath(state: BattleState, dead: UnitStack, rng: Rng): BattleState
       const raised: UnitStack = {
         id, definition: raisedDefinition, count, startCount: count, hp: definition.hp, pos,
         side: ownerUnit?.side ?? 'player', controllerId: controller, hasRetaliated: false, shotsLeft: definition.shots,
-        morale: 0, luck: 0, atb: ids.includes('marrow_crown') ? 0.5 : 0, tiePriority: rng(), isDefending: false,
-        origin: { type: 'summoned', source: ids.includes('dragon_ossuary') ? 'dragon_ossuary' : 'necromancy' }, hasTakenTurn: false,
+        morale: 0, luck: 0, atb: definition.name === 'Skeleton' && ids.includes('marrow_crown') ? 0.5 : 0, tiePriority: rng(), isDefending: false,
+        origin: { type: 'summoned', source: raisingArtifact === 'gravewrights_grimoire' ? 'necromancy' : raisingArtifact }, hasTakenTurn: false,
       };
       nextState = {
         ...nextState,
         units: [...nextState.units.map(unit => unit.id === dead.id ? { ...unit, abilityState: { ...(unit.abilityState ?? {}), corpseRaised: true } } : unit), raised],
         grid: setOccupant(nextState.grid, pos, id), nextId: nextState.nextId + 1,
-        log: [...nextState.log, { type: 'status', data: { effect: 'corpse_raise', unitId: id, sourceId: dead.id, count, artifact: ids.includes('dragon_ossuary') ? 'dragon_ossuary' : 'gravewrights_grimoire' } }],
+        log: [...nextState.log, { type: 'status', data: { effect: 'corpse_raise', unitId: id, sourceId: dead.id, count, artifact: raisingArtifact } }],
       };
     }
   }
@@ -913,6 +929,8 @@ export function initBattle(
       ...u,
       definition: u.definition.name === 'Skeleton' && (options.artifacts?.[controllerOfUnit(u)] ?? []).includes('the_black_procession')
         ? blackProcessionSkeleton(u.definition)
+        : u.definition.name === 'Vampire' && (options.artifacts?.[controllerOfUnit(u)] ?? []).includes('crimson_ascension')
+        ? { ...u.definition, abilities: [...new Set([...u.definition.abilities, 'blood_frenzy'])] }
         : u.definition,
       atb: 0,
       tiePriority: rng(),
@@ -2052,27 +2070,36 @@ export function applyAction(state: BattleState, action: BattleAction): BattleSta
       nextState = { ...nextState, units: nextState.units.map(unit => unit.id === actorId ? { ...unit, abilityState: { ...(unit.abilityState ?? {}), ambushUsedPlanId: planId } } : unit) };
     }
 
-    // Lich curse shot: every surviving target permanently loses another 5
-    // attack. The penalty compounds with repeated shots and other modifiers.
-    if (actor.definition.abilities.includes('curse_shot') && currentTarget.count > 0) {
-      const curseAttack = CURSE_SHOT_PENALTY * (hasArtifact(nextState, actor, 'crown_of_ruin') ? 2 : 1);
-      const curseDefense = hasArtifact(nextState, actor, 'withered_quiver') ? CURSE_SHOT_PENALTY * (hasArtifact(nextState, actor, 'crown_of_ruin') ? 2 : 1) : 0;
-      currentTarget = addEffect(addModifierSource(
-        {
-          ...currentTarget,
-          attackBuff: (currentTarget.attackBuff ?? 0) - curseAttack,
-          defenseBuff: (currentTarget.defenseBuff ?? 0) - curseDefense,
-        },
-        { id: 'curse_shot', label: 'Lich — Curse Shot', stats: { attack: -curseAttack, ...(curseDefense ? { defense: -curseDefense } : {}) } },
-      ), { id: 'curse_shot', kind: 'curse', sourceStackId: actor.id, sourceControllerId: actor.controllerId, positive: false, innate: false, removable: true, stacks: 1, stats: { attack: -curseAttack, ...(curseDefense ? { defense: -curseDefense } : {}) } }, false);
-      nextState = {
-        ...nextState,
-        units: nextState.units.map(u => (u.id === targetId ? currentTarget : u)),
-        log: [
-          ...nextState.log,
-          { type: 'status', data: { effect: 'curse', unitId: targetId, attackPenalty: curseAttack, defensePenalty: curseDefense } },
-        ],
+    if (actor.definition.abilities.includes('curse_shot')) {
+      const curse = (victim: UnitStack): UnitStack => {
+        if (victim.count <= 0) return victim;
+        const attack = CURSE_SHOT_PENALTY * (hasArtifact(nextState, actor, 'crown_of_ruin') ? 2 : 1);
+        const defense = hasArtifact(nextState, actor, 'withered_quiver') ? attack : 0;
+        const stats = { attack: -attack, ...(defense ? { defense: -defense } : {}) };
+        nextState = { ...nextState, log: [...nextState.log, { type: 'status', data: { effect: 'curse', unitId: victim.id, attackPenalty: attack, defensePenalty: defense } }] };
+        return addEffect(addModifierSource({ ...victim, attackBuff: (victim.attackBuff ?? 0) - attack, defenseBuff: (victim.defenseBuff ?? 0) - defense },
+          { id: 'curse_shot', label: 'Lich — Curse Shot', stats }),
+          { id: 'curse_shot', kind: 'curse', sourceStackId: actor.id, sourceControllerId: actor.controllerId, positive: false, innate: false, removable: true, stacks: 1, stats }, false);
       };
+      currentTarget = curse(currentTarget);
+      nextState = { ...nextState, units: nextState.units.map(unit => unit.id === targetId ? currentTarget : unit) };
+      if (actor.definition.name === 'Lich' && hasArtifact(nextState, actor, 'chain_of_lament')) {
+        const visited = new Set([targetId]);
+        let previous = target;
+        for (let bounce = 0; bounce < 2; bounce++) {
+          const victim = nextState.units.filter(unit => unit.count > 0 && !unit.isHero && !visited.has(unit.id) && alliedTeamId(nextState, unit) !== alliedTeamId(nextState, actor) && chebyshevDistance(unit.pos, previous.pos) <= 2)
+            .sort((a, b) => chebyshevDistance(a.pos, previous.pos) - chebyshevDistance(b.pos, previous.pos) || a.id.localeCompare(b.id))[0];
+          if (!victim) break;
+          visited.add(victim.id);
+          const roll = rollHit(nextState, actor, victim, rng, heroFor(nextState, actor).attack, true);
+          const hit = damageStack(victim, roll.damage, nextState);
+          const remaining = curse(hit.remaining);
+          nextState = { ...nextState, units: nextState.units.map(unit => unit.id === victim.id ? remaining : unit), log: [...nextState.log, ...roll.luckEvents,
+            { type: 'shoot', data: { attackerId: actorId, targetId: victim.id, damage: roll.damage, killed: hit.killed, bounce: true } }, ...hit.events] };
+          if (remaining.count === 0) nextState = handleDeath(nextState, remaining, rng);
+          previous = victim;
+        }
+      }
     }
   }
 
