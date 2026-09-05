@@ -13,6 +13,11 @@ export function hasArtifact(state: BattleState, owner: UnitStack | string, artif
   return artifactIdsFor(state, owner).includes(artifactId);
 }
 
+export function protectedByPython(state: BattleState, unit: UnitStack): boolean {
+  return unit.definition.name === 'Black Knight' && hasArtifact(state, unit, 'montys_python') &&
+    state.units.some(other => other.id !== unit.id && other.count > 0 && !other.isHero && controllerOfUnit(other) === controllerOfUnit(unit));
+}
+
 export function alliedTeamId(state: BattleState, unit: UnitStack): string {
   const controller = controllerOfUnit(unit);
   return state.controllerTeams?.[controller] ?? unit.side;
