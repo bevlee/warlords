@@ -154,7 +154,7 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
   marked_quarry: { label: 'Marked Quarry', description: 'Cyclops gains stronger primary and splash damage against [[marking_shot|Marked]] targets.' },
   thunder_dive: { label: 'Thunder Dive', description: 'A 4-cell [[charge]] splashes Lightning damage and prevents [[retaliation]].' },
   rampage: { label: 'Rampage', description: 'A [[primary_target|primary]] melee kill returns Behemoth at 100% [[atb]] — it acts again immediately.' },
-  repair: { label: 'Repair', description: 'Active: restore health and revive creatures in a wounded friendly [[construct]].' },
+  repair: { label: 'Repair', description: 'Active: restore 5 HP per Gremlin to a wounded friendly [[construct]], reviving fallen creatures.' },
   scrap_frenzy: { label: 'Scrap Frenzy', description: 'A shot that kills a creature returns Gremlin at 50% [[atb]].' },
   weakness_aura: { label: 'Weakness Aura', description: 'Magic damage is doubled for units in all 8 adjacent cells.' },
   arcane_conduit: { label: 'Arcane Conduit', description: 'While alive, the Wizard hero deals 10% more spell damage. Does not stack.' },
