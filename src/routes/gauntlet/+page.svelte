@@ -284,7 +284,7 @@
   {:else if inBattle}
     {#key battleKey}
       <Battle
-        playerArmy={applyUnitSkills(run.army, run.unitSkills, run.faction)}
+        playerArmy={applyUnitSkills(run.army, run.unitSkills, run.faction, run.items)}
         enemyArmy={encounter?.army ?? []}
         hero={run.hero}
         armyBonuses={battleBonuses(run.items)}

@@ -6,6 +6,7 @@ import { mixSeed, mulberry32, type Rng } from '../engine/rng';
 import { addItem, itemDraftOptions, starterItemsForFaction, type ItemId } from './items';
 import { skillDraftOptions, canLearnSkill, type SkillId, type UnitSkills } from './skills';
 import { addAbilityLevels, isUnique } from '../engine/abilityCatalog';
+import { VAMPIRE } from '../engine/necromancer';
 
 export { mixSeed };
 
@@ -71,7 +72,7 @@ export function migrateRunState(value: unknown): RunState | null {
     pendingDraft: (old.pendingDraft ?? null)?.map(card => ({ ...card, unitName: migratedUnitName(card.unitName) })) ?? null,
     pendingItems: old.pendingItems ?? null,
     pendingSkills: old.pendingSkills ?? null,
-    items: [...new Set([...starters, ...(old.items ?? [])])],
+    items: (old.items ?? []).reduce((items, id) => addItem(items, id), starters),
     unitSkills: renameRecord(old.unitSkills),
     status: old.status ?? 'map',
     battlesWon: Math.max(0, Math.floor(old.battlesWon ?? 0)),
@@ -242,6 +243,16 @@ function stillDrafting(run: RunState): 'draft' | 'map' {
 }
 
 export function applyItemPick(run: RunState, itemId: ItemId): RunState {
+  if (itemId === 'crimson_ascension' && !run.items.includes(itemId)) {
+    const converted = run.army.filter(slot => slot.unit.name === 'Blood Acolyte').reduce((sum, slot) => sum + slot.count, 0);
+    let army = run.army.filter(slot => slot.unit.name !== 'Blood Acolyte');
+    if (converted > 0) {
+      army = army.some(slot => slot.unit.name === 'Vampire')
+        ? army.map(slot => slot.unit.name === 'Vampire' ? { ...slot, count: slot.count + converted } : slot)
+        : [...army, { unit: VAMPIRE, count: converted }];
+    }
+    run = { ...run, army };
+  }
   return {
     ...run,
     items: addItem(run.items, itemId),

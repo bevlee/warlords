@@ -59,6 +59,8 @@ const EFFECT_ENTRY: Record<string, { entryKind: EntryKind; id: string }> = {
   animus_engine: { entryKind: 'item', id: 'animus_engine' },
   gravewrights_grimoire: { entryKind: 'item', id: 'gravewrights_grimoire' },
   dragon_ossuary: { entryKind: 'item', id: 'dragon_ossuary' },
+  putrid_grimoire: { entryKind: 'item', id: 'putrid_grimoire' },
+  chalice_of_conquest: { entryKind: 'item', id: 'chalice_of_conquest' },
   blighted_soil: { entryKind: 'item', id: 'blighted_soil' },
   blood_tithe_ready: { entryKind: 'item', id: 'blood_tithe' },
   funeral_drum: { entryKind: 'item', id: 'funeral_drum' },
@@ -270,11 +272,13 @@ export function describeEvent(
           // though corpses simply get up on their own, and a player has no way
           // to connect it to the Grimoire they drafted.
           const raiser = String(d.artifact ?? 'gravewrights_grimoire');
-          const label = raiser === 'dragon_ossuary' ? 'Dragon Ossuary' : "Gravewright's Grimoire";
+          const label = raiser === 'dragon_ossuary' ? 'Dragon Ossuary' : raiser === 'putrid_grimoire' ? 'Putrid Grimoire' : "Gravewright's Grimoire";
           return line(term(raiser, label), t(' raises '), num(d.count), t(' from the remains of '), unit(d.sourceId), t('.'));
         }
         case 'blighted_soil':
           return line(term('blighted_soil', 'Blighted Soil'), t(' spreads the rot from '), unit(d.sourceId), t(' to everything around it.'));
+        case 'chalice_of_conquest':
+          return line(term('chalice_of_conquest', 'Chalice of Conquest'), t(' adds '), num(d.count), t(' Vampires to '), u, t('.'));
         case 'blood_tithe_ready':
           return line(term('blood_tithe_ready', 'Blood Tithe'), t(' pays out — '), num(d.count), t(d.count === 1 ? ' Skeleton rises.' : ' Skeletons rise.'));
         case 'shroud_of_preservation':

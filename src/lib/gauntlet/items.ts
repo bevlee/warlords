@@ -154,6 +154,11 @@ const factionItems: ItemDef[] = [
   f('demon', 'hells_verdict', "Hell's Verdict", 'epic', '[[doomstep]] against a burning target deals 50% of the primary attack’s damage as Fire damage to every adjacent enemy.', ['Devil']),
 
   // Necromancer
+  item('putrid_grimoire', { name: 'Putrid Grimoire', description: 'Replaces [[gravewrights_grimoire]]. Enemy stacks raise temporary Zombies from 10% of their starting total HP instead of Skeletons, rounded up.', rarity: 'rare', faction: 'necromancer', upgrades: 'gravewrights_grimoire' }),
+  f('necromancer', 'chalice_of_conquest', 'Chalice of Conquest', 'rare', 'When Vampires kill an enemy stack, they gain Vampires equal to 10% of its starting total HP divided by Vampire HP, rounded up. The extra creatures last for this battle.', ['Vampire']),
+  f('necromancer', 'crimson_ascension', 'Crimson Ascension', 'epic', 'On pickup, convert all your Blood Acolytes into Vampires, one for one. Your Vampires gain [[blood_frenzy]].', ['Blood Acolyte', 'Vampire']),
+  f('necromancer', 'chain_of_lament', 'Chain of Lament', 'epic', 'Lich shots bounce to up to two additional enemies, each within 2 cells of the previous target. Bounces deal full shot damage and apply Curse Shot, including its artifact upgrades. Each enemy is hit once; bounces cost no ammunition.', ['Lich']),
+  f('necromancer', 'montys_python', 'Montý’s python', 'epic', 'Black Knights survive lethal damage with one creature at 1 HP while another friendly army stack you control lives. Heroes do not count.', ['Black Knight']),
   f('necromancer', 'marrow_crown', 'Marrow Crown', 'common', '[[gravewrights_grimoire]] Skeletons arrive halfway to their first turn instead of waiting the full cycle.'),
   f('necromancer', 'plague_bell', 'Plague Bell', 'common', 'Gravewright’s Grimoire raises twice as many creatures from enemies afflicted by [[infecting_strike]].', ['Zombie']),
   f('necromancer', 'wailing_lantern', 'Wailing Lantern', 'common', '[[drain_morale]] removes 2 Morale instead of 1.', ['Ghost']),
@@ -242,5 +247,6 @@ export function itemDraftOptions(run: RunState): ItemId[] {
 
 export function addItem(ids: ItemId[], id: ItemId): ItemId[] {
   const upgraded = ITEMS[id]?.upgrades;
-  return [...ids.filter(owned => owned !== id && owned !== upgraded), id];
+  return [...ids.filter(owned => owned !== id && owned !== upgraded &&
+    !(upgraded && ITEMS[owned]?.upgrades === upgraded)), id];
 }

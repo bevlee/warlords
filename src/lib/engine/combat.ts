@@ -3,7 +3,7 @@ import { abilityLevel, defenseReductionMult, BLOOD_FRENZY_DAMAGE } from './abili
 import type { Rng } from './rng.ts';
 import { chebyshevDistance } from './grid.ts';
 import { addModifierSource } from './unitModifiers.ts';
-import { controllerOfUnit, hasArtifact } from './artifacts.ts';
+import { controllerOfUnit, hasArtifact, protectedByPython } from './artifacts.ts';
 import { trainingBonus } from './training.ts';
 import { incomingMarkMultiplier } from './marks.ts';
 
@@ -311,6 +311,10 @@ function frenzy(stack: UnitStack, damage: number, bonus = BLOOD_FRENZY_DAMAGE): 
  */
 export function damageStack(defender: UnitStack, damage: number, state?: BattleState): StrikeResult {
   const hit = applyDamage(defender, damage);
+  if (state && defender.count > 0 && hit.remaining.count === 0 && protectedByPython(state, defender)) {
+    hit.remaining = { ...hit.remaining, count: 1, hp: 1 };
+    hit.killed = defender.count - 1;
+  }
   let bonus = BLOOD_FRENZY_DAMAGE;
   if (state && hasArtifact(state, defender, 'crimson_needle')) bonus = 4;
   if (state && hasArtifact(state, defender, 'red_moon_covenant')) bonus *= 2;
@@ -338,6 +342,11 @@ export function applyStrike(attacker: UnitStack, defender: UnitStack, damage: nu
     killed += reaped.killed;
     soulReaperKills += reaped.killed;
     remaining = reaped.remaining;
+  }
+  if (state && defender.count > 0 && remaining.count === 0 && protectedByPython(state, defender)) {
+    remaining = { ...remaining, count: 1, hp: 1 };
+    killed = defender.count - 1;
+    soulReaperKills = Math.min(soulReaperKills, killed);
   }
   let bonus = BLOOD_FRENZY_DAMAGE;
   if (state && hasArtifact(state, defender, 'crimson_needle')) bonus = 4;

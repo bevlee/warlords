@@ -85,7 +85,7 @@ export function skillDraftOptions(run: RunState): SkillId[] {
  *  Idempotent by construction: every unit is rebuilt from its clean faction
  *  base def (survivors round-trip merged defs back into the run, so merging
  *  on top of a merged def would stack speed/levels). */
-export function applyUnitSkills(army: ArmySlot[], unitSkills: UnitSkills, faction: FactionClass): ArmySlot[] {
+export function applyUnitSkills(army: ArmySlot[], unitSkills: UnitSkills, faction: FactionClass, artifacts: string[] = []): ArmySlot[] {
   return army.map(slot => {
     const grants = unitSkills[slot.unit.name];
     if (!grants || Object.keys(grants).length === 0) return slot;
@@ -122,7 +122,9 @@ export function applyUnitSkills(army: ArmySlot[], unitSkills: UnitSkills, factio
 
     if (grantedList.length === 0) return slot;
     return { ...slot, unit: { ...base, speed, initiative, shots, abilities, abilityLevels, grantedAbilities: grantedList } };
-  });
+  }).map(slot => slot.unit.name === 'Vampire' && artifacts.includes('crimson_ascension')
+    ? { ...slot, unit: { ...slot.unit, abilities: [...new Set([...slot.unit.abilities, 'blood_frenzy'])] } }
+    : slot);
 }
 
 /** Old saves stored unitSkills values as SkillId[] — upgrade to level-1 maps. */
