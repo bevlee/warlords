@@ -1,6 +1,6 @@
 import type { UnitDef } from './types.ts';
 
-// Knight faction — defensive, balanced units, strong against undead
+// Knight faction — defensive, balanced units built around formations and counterattacks
 export const KNIGHT_UNITS: UnitDef[] = [
   {
     name: 'Peasant', tier: 1, speed: 3, initiative: 9, hp: 5,

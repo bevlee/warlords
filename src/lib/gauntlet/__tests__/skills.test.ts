@@ -1,17 +1,31 @@
 import { describe, it, expect } from 'vitest';
-import { UNIT_SKILLS, SKILL_IDS, skillDraftOptions, applyUnitSkills, migrateUnitSkills, type SkillId } from '../skills';
+import { UNIT_SKILLS, SKILL_IDS, skillDraftOptions, canLearnSkill, applyUnitSkills, migrateUnitSkills, type SkillId } from '../skills';
 import { newRun } from '../run';
-import { GOBLIN, WOLF_RIDER } from '../../engine/barbarian';
+import { GOBLIN, ORC, WOLF_RIDER } from '../../engine/barbarian';
+import { OUTRIDER } from '../../engine/ranger';
 
 describe('catalog', () => {
-  it('keeps the five launch skills and adds Rank-scaled Training', () => {
+  it('includes training, repeatable stat skills, and the two unique combat skills', () => {
     expect(new Set(SKILL_IDS)).toEqual(
-      new Set(['life_drain', 'double_strike', 'no_retaliation', 'fleet_footwork', 'bravery', 'weapon_training', 'armour_training'])
+      new Set([
+        'life_drain', 'double_strike', 'no_retaliation', 'fleet_footwork', 'bravery',
+        'fortune', 'ammunition_training', 'weapon_training', 'armour_training',
+      ])
     );
     for (const id of SKILL_IDS) {
       expect(UNIT_SKILLS[id].name).toBeTruthy();
       expect(UNIT_SKILLS[id].description).toBeTruthy();
     }
+  });
+
+  it('clearly labels which skills can be trained more than once', () => {
+    for (const id of ['life_drain', 'fleet_footwork', 'bravery', 'fortune', 'ammunition_training'] as const) {
+      expect(UNIT_SKILLS[id].description).toContain('Can be trained multiple times per unit');
+    }
+    expect(UNIT_SKILLS.double_strike.description).not.toContain('multiple times');
+    expect(UNIT_SKILLS.no_retaliation.description).not.toContain('multiple times');
+    expect(UNIT_SKILLS.weapon_training.description).toContain('for each Gauntlet battle won');
+    expect(UNIT_SKILLS.armour_training.description).toContain('for each Gauntlet battle won');
   });
 });
 
@@ -56,16 +70,23 @@ describe('skillDraftOptions', () => {
       expect(skillDraftOptions({ ...run, seed })).not.toContain('bravery');
     }
   });
+
+  it('offers Ammunition Training only to ranged units', () => {
+    const skills = {};
+    expect(canLearnSkill({ unit: GOBLIN, count: 10 }, skills, 'ammunition_training')).toBe(false);
+    expect(canLearnSkill({ unit: ORC, count: 10 }, skills, 'ammunition_training')).toBe(true);
+  });
 });
 
 describe('applyUnitSkills', () => {
-  it('merges granted levels into matching units, adds fleet speed, stamps provenance', () => {
+  it('merges granted levels, adds Agility stats, and stamps provenance', () => {
     const army = [{ unit: GOBLIN, count: 10 }, { unit: WOLF_RIDER, count: 5 }];
     const out = applyUnitSkills(army, { Goblin: { fleet_footwork: 1, life_drain: 2 } }, 'barbarian');
     const g = out.find(s => s.unit.name === 'Goblin')!;
     expect(g.unit.abilities).toContain('fleet_footwork');
     expect(g.unit.abilities).toContain('life_drain');
     expect(g.unit.speed).toBe(GOBLIN.speed + 1);
+    expect(g.unit.initiative).toBe(GOBLIN.initiative + 1);
     expect(g.unit.abilityLevels?.life_drain).toBe(2);
     // Provenance for the UI: granted skills render in a different color than
     // the unit's base abilities.
@@ -89,9 +110,37 @@ describe('applyUnitSkills', () => {
     const once = applyUnitSkills(army, skills, 'barbarian');
     const twice = applyUnitSkills(once, skills, 'barbarian');
     expect(twice[0].unit.speed).toBe(GOBLIN.speed + 2);
+    expect(twice[0].unit.initiative).toBe(GOBLIN.initiative + 2);
     expect(twice[0].unit.abilities.filter(a => a === 'fleet_footwork')).toHaveLength(1);
     expect(twice[0].unit.abilityLevels?.life_drain).toBe(1);
     expect(twice[0].unit.grantedAbilities).toEqual(['fleet_footwork', 'life_drain']);
+  });
+
+  it('adds only the trained Agility level on top of an innate level', () => {
+    const out = applyUnitSkills(
+      [{ unit: OUTRIDER, count: 5 }],
+      { Outrider: { fleet_footwork: 1 } },
+      'ranger',
+    );
+
+    expect(out[0].unit.speed).toBe(OUTRIDER.speed + 1);
+    expect(out[0].unit.initiative).toBe(OUTRIDER.initiative + 1);
+    expect(out[0].unit.abilityLevels?.fleet_footwork).toBe(3);
+    expect(canLearnSkill({ unit: OUTRIDER, count: 5 }, { Outrider: { fleet_footwork: 1 } }, 'fleet_footwork')).toBe(false);
+  });
+
+  it('adds up to +3 Luck and +15 Shots through repeatable training', () => {
+    const army = [{ unit: GOBLIN, count: 10 }, { unit: ORC, count: 5 }];
+    const out = applyUnitSkills(army, {
+      Goblin: { fortune: 3 },
+      Orc: { ammunition_training: 3 },
+    }, 'barbarian');
+    const goblin = out.find(slot => slot.unit.name === 'Goblin')!.unit;
+    const orc = out.find(slot => slot.unit.name === 'Orc')!.unit;
+
+    expect(goblin.abilityLevels?.fortune).toBe(3);
+    expect(orc.shots).toBe(ORC.shots + 15);
+    expect(orc.abilityLevels?.ammunition_training).toBe(3);
   });
 });
 

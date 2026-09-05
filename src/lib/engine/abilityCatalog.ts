@@ -17,6 +17,8 @@ export const ABILITY_CATALOG: Record<string, AbilityCatalogEntry> = {
   defense_reduction: { kind: 'leveled', maxLevel: 15, defaultLevel: 8 },
   bravery:           { kind: 'leveled', maxLevel: 3,  defaultLevel: 1 },
   fleet_footwork:    { kind: 'leveled', maxLevel: 3,  defaultLevel: 1 },
+  fortune:            { kind: 'leveled', maxLevel: 3,  defaultLevel: 1 },
+  ammunition_training: { kind: 'leveled', maxLevel: 3, defaultLevel: 1 },
 };
 
 export const isUnique = (id: string): boolean =>

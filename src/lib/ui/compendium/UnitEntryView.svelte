@@ -33,7 +33,6 @@
     if (base.shots > 0) {
       rows.push({ key: 'shots', value: `${base.shots}` }, { key: 'range', value: `${base.range}` });
     }
-    if (entry.cost !== null) rows.push({ key: 'cost', value: `${entry.cost}` });
     return rows;
   });
 </script>

@@ -28,6 +28,8 @@ export const SKILL_GLYPH: Record<string, string> = {
   no_retaliation: '🛡️',
   fleet_footwork: '🥾',
   bravery: '🎺',
+  fortune: '🍀',
+  ammunition_training: '🏹',
 };
 
 export function skillGlyph(id: string): string {

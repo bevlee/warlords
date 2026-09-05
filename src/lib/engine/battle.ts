@@ -663,6 +663,7 @@ function slotToStack(
     ? 1 + index
     : Math.round(index * (GRID_H - 1) / Math.max(1, armySize - 1));
   const bravery = abilityLevel(slot.unit, 'bravery');
+  const fortune = abilityLevel(slot.unit, 'fortune');
   let stack: UnitStack = {
     id,
     definition: slot.unit,
@@ -675,7 +676,7 @@ function slotToStack(
     shotsLeft: slot.unit.shots,
     // Bravery: the unit carries its own morale into battle, either side; +level.
     morale: clampProc(bravery),
-    luck: 0,
+    luck: clampProc(fortune),
     atb: 0,
     isDefending: false,
     origin: { type: 'deployed', armySlotKey: slot.unit.name },
@@ -684,6 +685,9 @@ function slotToStack(
   };
   if (bravery > 0) {
     stack = addModifierSource(stack, { id: 'bravery', label: 'Bravery', stats: { morale: bravery } });
+  }
+  if (fortune > 0) {
+    stack = addModifierSource(stack, { id: 'fortune', label: 'Fortune', stats: { luck: fortune } });
   }
   return stack;
 }

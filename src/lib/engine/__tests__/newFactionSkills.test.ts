@@ -19,15 +19,15 @@ describe('faction redesign foundations', () => {
     }
   });
 
-  it('makes Rank-scaled Training specific to controller and unit type', () => {
+  it('scales Training by completed battles and keeps it specific to controller and unit type', () => {
     const state = initBattle(
       [{ unit: GOBLIN, count: 3 }], [{ unit: GOBLIN, count: 3 }], hero('barbarian'), 1, [], undefined,
       { gauntletRound: 8, training: { player: { Goblin: { weapon: true, armour: true } } } },
     );
     const player = state.units.find(unit => unit.side === 'player' && !unit.isHero)!;
     const enemy = state.units.find(unit => unit.side === 'enemy' && !unit.isHero)!;
-    expect(effectiveAttackInBattle(state, player) - effectiveAttackInBattle(state, enemy)).toBe(2 + 8);
-    expect(effectiveDefenseInBattle(state, player) - effectiveDefenseInBattle(state, enemy)).toBe(1 + 8);
+    expect(effectiveAttackInBattle(state, player) - effectiveAttackInBattle(state, enemy)).toBe(2 + 7);
+    expect(effectiveDefenseInBattle(state, player) - effectiveDefenseInBattle(state, enemy)).toBe(1 + 7);
   });
 
   it('uses Rank to increase enemy bonus while limiting distinct stacks', () => {

@@ -13,9 +13,9 @@ export const RANGER_UNITS: UnitDef[] = [
     shots: 15, range: 10, isLarge: false, abilities: ['no_melee_penalty', 'pinning_shot'],
   },
   {
-    // Speed already includes the innate Fleet Footwork II (+2) — defs carry
-    // their final speed; the ability entry is for display and identity.
-    name: 'Outrider', tier: 2, speed: 8, initiative: 10, hp: 18,
+    // Speed and Initiative already include the innate Agility Training II (+2).
+    // Definitions carry final stats; the ability entry is for display and identity.
+    name: 'Outrider', tier: 2, speed: 8, initiative: 12, hp: 18,
     attack: 5, defense: 4, minDamage: 2, maxDamage: 4,
     shots: 0, range: 0, isLarge: false, abilities: ['fleet_footwork', 'first_strike'],
     abilityLevels: { fleet_footwork: 2 },

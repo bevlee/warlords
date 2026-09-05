@@ -66,7 +66,7 @@ export function createDebugStackTemplate(
   const def = cloneDefinition(definition);
   const player = side === 'player';
   const morale = abilityLevel(def, 'bravery') + (player ? armyBonuses?.morale ?? 0 : 0);
-  const luck = player ? (armyBonuses?.luck ?? 0) : 0;
+  const luck = abilityLevel(def, 'fortune') + (player ? armyBonuses?.luck ?? 0 : 0);
   const logistics = 0;
   const speedBonus = logistics + (player ? armyBonuses?.speed ?? 0 : 0);
   return {

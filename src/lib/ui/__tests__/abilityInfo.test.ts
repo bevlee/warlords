@@ -10,7 +10,9 @@ describe('abilityInfo with levels', () => {
     expect(abilityInfo('defense_reduction', 4).label).toBe('Defense reduction IV');
     expect(abilityInfo('defense_reduction', 4).description).toContain('20%');
     expect(abilityInfo('bravery', 2)).toEqual({ label: 'Bravery II', description: '+2 morale.' });
-    expect(abilityInfo('fleet_footwork', 3)).toEqual({ label: 'Fleet footwork III', description: '+3 speed.' });
+    expect(abilityInfo('fleet_footwork', 3)).toEqual({ label: 'Agility Training III', description: '+3 speed and +3 initiative.' });
+    expect(abilityInfo('fortune', 3)).toEqual({ label: 'Fortune III', description: '+3 luck.' });
+    expect(abilityInfo('ammunition_training', 3)).toEqual({ label: 'Ammunition Training III', description: '+15 shots.' });
   });
 
   it('level 1 leveled abilities still show the magnitude but no numeral clutter', () => {

@@ -118,3 +118,11 @@ describe('leveled bravery', () => {
     expect(state.units.find(u => u.side === 'player' && !u.isHero)!.morale).toBe(3);
   });
 });
+
+describe('leveled fortune', () => {
+  it('grants +level luck at battle init, clamped at 3', () => {
+    const FORTUNATE3: UnitDef = { ...GOBLIN, abilities: ['fortune'], abilityLevels: { fortune: 3 } };
+    const state = initBattle([{ unit: FORTUNATE3, count: 5 }], [{ unit: GOBLIN, count: 5 }], mockHero, 7);
+    expect(state.units.find(u => u.side === 'player' && !u.isHero)!.luck).toBe(3);
+  });
+});

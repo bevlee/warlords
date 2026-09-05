@@ -106,9 +106,9 @@ export function heroActionsFor(
   ];
 
   if (hero.class === 'necromancer') return [
-    action('reknit_the_dead', 'Reknit the Dead', 'Necromancy', 'Consume up to 5 Skeletons · heal', 'Consume up to five Skeletons to heal a wounded non-Skeleton undead stack.', 'friendly', 'Immediate'),
+    action('reknit_the_dead', 'Reknit the Dead', 'Necromancy', 'Consume up to 5 Skeletons · heal', 'Consume up to five Skeletons to heal a wounded non-Skeleton Necromancer stack.', 'friendly', 'Immediate'),
     action('grasping_dead', 'Grasping Dead', 'Necromancy', 'Consume 5 Skeletons · pin enemy', 'Consume five Skeletons to prevent an enemy from moving or retaliating until its next turn.', 'enemy', 'Until the target’s next turn'),
-    action('death_march', 'Death March', 'Necromancy', 'Consume 10 Skeletons · army +20% [[atb]]', 'Consume ten Skeletons to advance every other friendly undead stack by 20% [[atb]].', 'none', 'Immediate'),
+    action('death_march', 'Death March', 'Necromancy', 'Consume 10 Skeletons · army +20% [[atb]]', 'Consume ten Skeletons to advance every other friendly Necromancer stack by 20% [[atb]].', 'none', 'Immediate'),
   ];
 
   return [];

@@ -157,7 +157,7 @@
                 ? 'border-violet-400 bg-slate-800 hover:bg-slate-700'
                 : 'cursor-not-allowed border-slate-700 bg-slate-800/50 opacity-40'}"
             disabled={!learnable}
-            title={learnable ? '' : 'Already knows this skill'}
+            title={learnable ? '' : 'This unit cannot train this skill again'}
             onclick={() => teach(slot.unit.name)}
           >
             <Sprite name={slot.unit.name} class="h-9 w-8" />

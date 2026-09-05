@@ -39,8 +39,8 @@ describe('addAbilityLevels', () => {
 });
 
 describe('catalog shape', () => {
-  it('classifies the launch leveled set and defaults everything else to unique', () => {
-    for (const id of ['life_drain', 'defense_reduction', 'bravery', 'fleet_footwork']) {
+  it('classifies the leveled set and defaults everything else to unique', () => {
+    for (const id of ['life_drain', 'defense_reduction', 'bravery', 'fleet_footwork', 'fortune', 'ammunition_training']) {
       expect(ABILITY_CATALOG[id]?.kind).toBe('leveled');
     }
     expect(isUnique('double_strike')).toBe(true);

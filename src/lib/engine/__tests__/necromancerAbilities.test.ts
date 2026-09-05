@@ -8,7 +8,7 @@ import { UNIT_ABILITIES, activatedAbilitiesOf } from '../unitAbilities';
 import { INFECT_PENALTY, BLOOD_FRENZY_DAMAGE } from '../abilityCatalog';
 import { GOBLIN } from '../barbarian';
 import { setOccupant } from '../grid';
-import { ZOMBIE, SKELETON, BLACK_KNIGHT, BONE_DRAGON, VAMPIRE, BLOOD_ACOLYTE } from '../necromancer';
+import { NECROMANCER_UNITS, ZOMBIE, SKELETON, BLACK_KNIGHT, BONE_DRAGON, VAMPIRE, BLOOD_ACOLYTE } from '../necromancer';
 import type { BattleState, Hero, UnitStack } from '../types';
 
 function baseHero(overrides: Partial<Hero> = {}): Hero {
@@ -36,6 +36,12 @@ function makeStack(overrides: Partial<UnitStack>): UnitStack {
     ...overrides,
   };
 }
+
+describe('Necromancer roster', () => {
+  it('does not give the undead ability to any unit', () => {
+    expect(NECROMANCER_UNITS.every(unit => !unit.abilities.includes('undead'))).toBe(true);
+  });
+});
 
 /** Puts `attacker` next to `defender` and hands the turn to the attacker. */
 function meleeSetup(attackerDef: typeof GOBLIN, defenderDef: typeof GOBLIN, counts = [5, 100]) {

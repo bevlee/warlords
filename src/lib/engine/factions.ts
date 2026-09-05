@@ -17,9 +17,9 @@ export const FACTION_UNITS: Record<FactionClass, UnitDef[]> = {
 
 export const FACTION_INFO: Record<FactionClass, { name: string; description: string }> = {
   barbarian: { name: 'Barbarian', description: 'Aggressive melee horde with cheap shock troops.' },
-  knight: { name: 'Knight', description: 'Defensive, balanced units — strong against undead.' },
+  knight: { name: 'Knight', description: 'Defensive, balanced units built around formations and counterattacks.' },
   wizard: { name: 'Wizard', description: 'Fragile but powerful ranged and magic units.' },
-  necromancer: { name: 'Necromancer', description: 'Fragile undead horde that raises fallen enemies.' },
+  necromancer: { name: 'Necromancer', description: 'Fragile attrition horde that raises fallen enemies.' },
   ranger: { name: 'Ranger', description: 'Fast, mobile nature-bonded skirmishers and archers.' },
   demon: { name: 'Demon', description: 'Reckless, high-damage raiders from the burning wastes.' },
 };

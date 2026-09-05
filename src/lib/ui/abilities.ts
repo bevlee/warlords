@@ -89,10 +89,6 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
     label: 'Fire immunity',
     description: 'Takes no damage from fire-based attacks or burning.',
   },
-  undead: {
-    label: 'Undead',
-    description: 'Immune to [[morale]] effects and mind-affecting spells; cannot be healed normally.',
-  },
   gate: {
     label: 'Gate',
     description: 'Can summon reinforcements from its home dimension during battle.',
@@ -111,12 +107,20 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
     description: 'Melee attacks land a second blow after the retaliation.',
   },
   fleet_footwork: {
-    label: 'Fleet footwork',
-    description: '+1 speed.',
+    label: 'Agility Training',
+    description: '+1 speed and +1 initiative.',
   },
   bravery: {
     label: 'Bravery',
     description: '+1 morale.',
+  },
+  fortune: {
+    label: 'Fortune',
+    description: '+1 luck.',
+  },
+  ammunition_training: {
+    label: 'Ammunition Training',
+    description: '+5 shots.',
   },
   militia: { label: 'Militia', description: '+1 Attack and Defense per 10 living Peasants, uncapped.' },
   spearwall: { label: 'Spearwall', description: 'Enemy [[grand_joust]] bonuses do not apply against this stack.' },
@@ -173,8 +177,8 @@ export const ABILITY_INFO: Record<string, { label: string; description: string }
   torment_aura: { label: 'Torment Aura', description: '[[burn|Burning]] enemies deal 20% less damage while a friendly Pit Fiend lives.' },
   living_flame: { label: 'Living Flame', description: 'Immune to Fire and [[burn]]; primary melee attacks apply it in turn.' },
   doomstep: { label: 'Doomstep', description: 'Primary melee attacks against [[burn|burning]] targets deal double damage without retaliation.' },
-  weapon_training: { label: 'Weapon Training', description: 'Adds the gauntlet node number to this stack’s Attack — +1 at the first node, +10 at the last.' },
-  armour_training: { label: 'Armour Training', description: 'Adds the gauntlet node number to this stack’s Defense — +1 at the first node, +10 at the last.' },
+  weapon_training: { label: 'Weapon Training', description: 'This unit gains +1 Attack for each Gauntlet battle won.' },
+  armour_training: { label: 'Armour Training', description: 'This unit gains +1 Defense for each Gauntlet battle won.' },
 };
 
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
@@ -191,7 +195,9 @@ const LEVELED_TEXT: Record<string, { label: string; describe: (level: number) =>
     describe: l => `Reduces the target's defense by ${l * 5}%.`,
   },
   bravery: { label: 'Bravery', describe: l => `+${l} morale.` },
-  fleet_footwork: { label: 'Fleet footwork', describe: l => `+${l} speed.` },
+  fleet_footwork: { label: 'Agility Training', describe: l => `+${l} speed and +${l} initiative.` },
+  fortune: { label: 'Fortune', describe: l => `+${l} luck.` },
+  ammunition_training: { label: 'Ammunition Training', describe: l => `+${l * 5} shots.` },
 };
 
 export function abilityInfo(ability: string, level?: number): { label: string; description: string } {

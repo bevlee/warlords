@@ -118,7 +118,7 @@
 
 <main class="min-h-screen bg-slate-900 px-4 py-5 text-slate-100 sm:px-6 sm:py-6">
   <div class="mx-auto max-w-6xl">
-    <HubTopBar gold={hero?.gold ?? 0} />
+    <HubTopBar showAccount={false} />
 
     <div class="mb-3 mt-6 flex flex-wrap items-baseline justify-between gap-2 px-0.5">
       <h1 class="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">Compendium</h1>
@@ -243,7 +243,7 @@
   </div>
 
   <!-- Mobile-only bottom nav in the thumb zone -->
-  <nav class="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-slate-700/60 bg-slate-900/90 py-2 backdrop-blur sm:hidden">
+  <nav class="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t border-slate-700/60 bg-slate-900/90 py-2 backdrop-blur sm:hidden">
     <a href="/" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
       <span class="text-lg">🏰</span>Home
     </a>
@@ -255,9 +255,6 @@
     </a>
     <a href="/compendium" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-amber-300">
       <span class="text-lg">📖</span>Codex
-    </a>
-    <a href="/settings" class="grid justify-items-center gap-0.5 text-[10px] font-bold text-slate-400">
-      <span class="text-lg">👤</span>Profile
     </a>
   </nav>
   <div class="h-16 sm:hidden"></div>

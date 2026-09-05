@@ -108,7 +108,7 @@ export const CONCEPTS: ConceptDef[] = [
     name: 'Morale',
     description:
       'The chance a stack acts twice in a row, or at negative Morale freezes and skips its turn entirely. ' +
-      'It runs from −3 to +3. Undead are immune to it.',
+      'It runs from −3 to +3.',
   },
   {
     id: 'construct',
