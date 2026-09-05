@@ -83,6 +83,7 @@
     </div>
 
     <div class="flex gap-6 text-xs font-semibold text-slate-500">
+      <a href="/leaderboard" class="hover:text-slate-300">Leaderboard</a>
       <a href="/compendium" class="hover:text-slate-300">Compendium</a>
       <a href="/history" class="hover:text-slate-300">History</a>
     </div>

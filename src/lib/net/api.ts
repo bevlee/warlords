@@ -2,7 +2,7 @@
 // localStorage, retrying fetch wrapper, and typed save calls. UI code never
 // imports this directly — storage.ts/campaignStore.ts keep their signatures.
 
-import type { BattleAction, BattleState } from '$lib/engine/types';
+import type { BattleAction, BattleState, FactionClass } from '$lib/engine/types';
 import type { BattleCasualty, BattleSummary } from '$lib/replay/summary';
 
 export type { BattleCasualty, BattleSummary } from '$lib/replay/summary';
@@ -179,5 +179,48 @@ export async function getBattles(): Promise<BattleHistoryRow[]> {
 export async function getBattle(id: string): Promise<BattleDetail> {
   const res = await fetchWithRetry(`/api/battles/${encodeURIComponent(id)}`);
   if (!res.ok) throw new Error(`load battle failed: ${res.status}`);
+  return res.json();
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  name: string;
+  faction: FactionClass;
+  battlesWon: number;
+  endlessDepth: number;
+  heroLevel: number;
+  army: Array<{ name: string; count: number }>;
+  items: string[];
+  unitSkills: Record<string, Record<string, number>>;
+  startedAt: number;
+  endedAt: number;
+}
+
+export interface LeaderboardSubmission {
+  name: string;
+  faction: FactionClass;
+  battlesWon: number;
+  endlessDepth: number;
+  heroLevel: number;
+  army: Array<{ name: string; count: number }>;
+  items: string[];
+  unitSkills: Record<string, Record<string, number>>;
+  startedAt: number;
+}
+
+export async function submitLeaderboardRun(submission: LeaderboardSubmission): Promise<{ id: string }> {
+  const res = await fetchWithRetry('/api/leaderboard', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(submission),
+  });
+  if (!res.ok) throw new Error(`leaderboard submit failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getLeaderboard(faction?: FactionClass): Promise<LeaderboardEntry[]> {
+  const params = faction ? `?faction=${faction}` : '';
+  const res = await fetch(`/api/leaderboard${params}`);
+  if (!res.ok) throw new Error(`leaderboard fetch failed: ${res.status}`);
   return res.json();
 }

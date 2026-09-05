@@ -28,6 +28,8 @@
     type GauntletEncounter,
   } from '$lib/gauntlet/run';
   import { loadRun, saveRun, clearRun } from '$lib/storage';
+  import { submitLeaderboardRun, type LeaderboardSubmission } from '$lib/net/api';
+  import { loadProfile } from '$lib/profile';
   import type { ArmyBonuses, FactionClass, UnitStack } from '$lib/engine/types';
 
   let run: RunState | null = $state(null);
@@ -38,6 +40,10 @@
   let loadError = $state(false);
   let rulesOpen = $state(false);
   let confirmingAbandon = $state(false);
+  let leaderboardName = $state('');
+  let submitting = $state(false);
+  let submitted = $state(false);
+  let submitError = $state(false);
 
   // A session-only "win button" for testing. These bonuses are applied to
   // every player stack when a battle starts and are never saved to the run.
@@ -84,6 +90,7 @@
     } finally {
       loaded = true;
     }
+    leaderboardName = loadProfile().name;
   });
 
   function begin(faction: FactionClass) {
@@ -138,10 +145,37 @@
     void saveRun(run);
   }
 
+  async function submitToLeaderboard() {
+    if (!run || submitting) return;
+    submitting = true;
+    submitError = false;
+    try {
+      const submission: LeaderboardSubmission = {
+        name: leaderboardName.trim(),
+        faction: run.faction,
+        battlesWon: run.battlesWon,
+        endlessDepth: run.endlessDepth,
+        heroLevel: run.hero.level,
+        army: run.army.map(s => ({ name: s.unit.name, count: s.count })),
+        items: run.items,
+        unitSkills: run.unitSkills,
+        startedAt: run.startedAt,
+      };
+      await submitLeaderboardRun(submission);
+      submitted = true;
+    } catch {
+      submitError = true;
+    } finally {
+      submitting = false;
+    }
+  }
+
   async function abandon() {
     run = null;
     inBattle = false;
     confirmingAbandon = false;
+    submitted = false;
+    submitError = false;
     await clearRun();
   }
 
@@ -300,12 +334,12 @@
       />
     {/key}
   {:else if run.status === 'won' || run.status === 'lost'}
-    <!-- Run summary -->
+    <!-- Run summary + arcade name entry -->
     <div class="mx-auto max-w-md rounded-lg border border-slate-700 bg-slate-800 p-6 text-center">
       <p class="mb-2 text-4xl font-bold {run.status === 'won' ? 'text-amber-300' : 'text-red-400'}">
-        {run.status === 'won' ? '🏆 Gauntlet conquered!' : 'Run over'}
+        {run.status === 'won' ? 'Gauntlet conquered!' : 'Run over'}
       </p>
-      <p class="mb-4 text-slate-300">
+      <p class="mb-5 text-slate-300">
         {FACTION_INFO[run.faction].name} ·
         {#if run.endlessDepth > 0}
           cleared + {run.endlessDepth} endless {run.endlessDepth === 1 ? 'battle' : 'battles'}
@@ -313,13 +347,63 @@
           {run.battlesWon} / {RUN_LENGTH} battles won
         {/if}
       </p>
-      <button
-        type="button"
-        class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500"
-        onclick={abandon}
-      >
-        New run
-      </button>
+
+      {#if submitted}
+        <p class="mb-4 text-sm text-emerald-400">Submitted to leaderboard!</p>
+        <div class="flex flex-col items-center gap-2">
+          <a
+            href="/leaderboard"
+            class="rounded bg-slate-700 px-5 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-600"
+          >
+            View leaderboard
+          </a>
+          <button
+            type="button"
+            class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500"
+            onclick={abandon}
+          >
+            New run
+          </button>
+        </div>
+      {:else}
+        <div class="mb-4">
+          <label for="lb-name" class="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
+            Enter your name
+          </label>
+          <input
+            id="lb-name"
+            type="text"
+            maxlength={20}
+            bind:value={leaderboardName}
+            class="w-full rounded border border-slate-600 bg-slate-900 px-3 py-2 text-center text-lg
+              font-bold tracking-wide text-amber-200 placeholder-slate-600 focus:border-amber-400
+              focus:outline-none"
+            placeholder="AAA"
+            onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' && leaderboardName.trim()) submitToLeaderboard(); }}
+          />
+        </div>
+        {#if submitError}
+          <p class="mb-3 text-sm text-red-400">Something went wrong. Try again?</p>
+        {/if}
+        <div class="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            class="rounded bg-amber-600 px-5 py-2 font-semibold text-white hover:bg-amber-500
+              disabled:opacity-50 disabled:hover:bg-amber-600"
+            disabled={!leaderboardName.trim() || submitting}
+            onclick={submitToLeaderboard}
+          >
+            {submitting ? 'Submitting…' : 'Submit to leaderboard'}
+          </button>
+          <button
+            type="button"
+            class="text-sm text-slate-500 hover:text-slate-300"
+            onclick={abandon}
+          >
+            Skip
+          </button>
+        </div>
+      {/if}
     </div>
   {:else}
     <!-- The run screen. Drafts mount above the rest rather than replacing it,
