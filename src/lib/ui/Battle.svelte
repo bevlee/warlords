@@ -1195,7 +1195,7 @@
     <!-- Left flank: controls, hero, then the army's artifacts. Keeping all
          three in normal flow prevents a long artifact list covering the hero. -->
     <div class="flank">
-      <div class="flank-top">
+      <div class="flank-top" class:settings-open={settingsOpen}>
         {#if !replay}
           <div class="flank-buttons">
             <button
@@ -1604,6 +1604,13 @@
     align-items: center;
     gap: calc(7 * var(--fx));
     overflow: hidden;
+  }
+
+  /* The artifact list needs the rail to clip and scroll, but the settings card
+     is intentionally wider than the rail. Artifacts are replaced while the
+     menu is open, so allowing overflow in this state cannot leak their list. */
+  .flank-top.settings-open {
+    overflow: visible;
   }
 
   .flank-buttons {
