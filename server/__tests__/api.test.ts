@@ -244,6 +244,110 @@ describe('api', () => {
     expect((await history.json()).filter((row: { id: string }) => row.id === id)).toHaveLength(1);
   });
 
+  it('submits and lists leaderboard runs', async () => {
+    const { token } = await mintSession();
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const submission = {
+      name: 'Arcanist',
+      faction: 'wizard',
+      battlesWon: 10,
+      endlessDepth: 3,
+      heroLevel: 11,
+      army: [{ name: 'Gremlin', count: 40 }, { name: 'Gargoyle', count: 8 }],
+      items: ['mana_crystal', 'staff_of_power'],
+      unitSkills: { Gremlin: { weapon_training: 2 } },
+      startedAt: 1000,
+    };
+    const posted = await fetch(`${base}/api/leaderboard`, {
+      method: 'POST', headers: auth, body: JSON.stringify(submission),
+    });
+    expect(posted.status).toBe(201);
+    const { id } = (await posted.json()) as { id: string };
+    expect(id).toBeTruthy();
+
+    const list = await fetch(`${base}/api/leaderboard`);
+    expect(list.status).toBe(200);
+    const entries = await list.json();
+    expect(entries).toEqual([
+      expect.objectContaining({
+        id,
+        name: 'Arcanist',
+        faction: 'wizard',
+        battlesWon: 10,
+        endlessDepth: 3,
+        heroLevel: 11,
+        army: submission.army,
+        items: submission.items,
+        unitSkills: submission.unitSkills,
+      }),
+    ]);
+  });
+
+  it('filters leaderboard by faction', async () => {
+    const { token } = await mintSession();
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const base_sub = {
+      battlesWon: 5, endlessDepth: 0, heroLevel: 6,
+      army: [{ name: 'Unit', count: 10 }], items: [], unitSkills: {}, startedAt: 2000,
+    };
+    await fetch(`${base}/api/leaderboard`, {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ ...base_sub, name: 'Barb', faction: 'barbarian' }),
+    });
+    await fetch(`${base}/api/leaderboard`, {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ ...base_sub, name: 'Knight', faction: 'knight' }),
+    });
+
+    const barbOnly = await fetch(`${base}/api/leaderboard?faction=barbarian`);
+    const entries = await barbOnly.json();
+    expect(entries.every((e: { faction: string }) => e.faction === 'barbarian')).toBe(true);
+    expect(entries.some((e: { name: string }) => e.name === 'Barb')).toBe(true);
+  });
+
+  it('leaderboard GET is public (no auth)', async () => {
+    const list = await fetch(`${base}/api/leaderboard`);
+    expect(list.status).toBe(200);
+  });
+
+  it('rejects leaderboard POST without auth', async () => {
+    const res = await fetch(`${base}/api/leaderboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Test', faction: 'barbarian', battlesWon: 1, endlessDepth: 0, heroLevel: 1, army: [], items: [], unitSkills: {}, startedAt: 1 }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects leaderboard submissions with invalid names', async () => {
+    const { token } = await mintSession();
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const valid = {
+      faction: 'barbarian', battlesWon: 1, endlessDepth: 0, heroLevel: 1,
+      army: [], items: [], unitSkills: {}, startedAt: 1,
+    };
+
+    const empty = await fetch(`${base}/api/leaderboard`, {
+      method: 'POST', headers: auth, body: JSON.stringify({ ...valid, name: '   ' }),
+    });
+    expect(empty.status).toBe(400);
+
+    const tooLong = await fetch(`${base}/api/leaderboard`, {
+      method: 'POST', headers: auth, body: JSON.stringify({ ...valid, name: 'A'.repeat(21) }),
+    });
+    expect(tooLong.status).toBe(400);
+  });
+
+  it('rejects leaderboard submissions with invalid faction', async () => {
+    const { token } = await mintSession();
+    const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const res = await fetch(`${base}/api/leaderboard`, {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ name: 'Test', faction: 'elf', battlesWon: 1, endlessDepth: 0, heroLevel: 1, army: [], items: [], unitSkills: {}, startedAt: 1 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('rejects malformed solo journals', async () => {
     const { token } = await mintSession();
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
